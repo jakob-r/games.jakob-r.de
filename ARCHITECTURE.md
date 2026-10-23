@@ -14,7 +14,7 @@ General product concept lives in `idea.md`.
 - **Color System (`opponent_color`)**:
   - **OKLCH perceptual color space** in `frontend/src/lib/core/color.ts` for `opponent_color(my_color, their_color)`.
   - Ensures perceptual color distance and contrast remain uniform while keeping the UI monochrome by default and using color strictly where helpful (player identity, semantic feedback).
-- **Build & Package Manager**: **Vite** + **pnpm**.
+- **Build & Package Manager**: **Vite** + **pnpm**; production uses `@sveltejs/adapter-static` (SPA fallback) so FastAPI can serve the built site.
 
 ### Backend
 - **Language & Packaging**: **Python 3.13+** managed with **uv**.
@@ -55,3 +55,33 @@ To share components across games while allowing any game to be extracted and run
 - Use Python 3.12+ syntax (`type` aliases, generics `def foo[T]()`, built-in `dict`, `list`, `tuple`, `X | Y` unions — do not import legacy `typing` equivalents).
 - Use `repr(e)` when logging or printing exceptions.
 - Use **Psycopg 3** async pools/cursors directly rather than heavy ORMs.
+
+## Production
+
+The root `Dockerfile` builds one image: SvelteKit (`adapter-static`) is compiled into `/app/public`, and uvicorn serves the API, WebSockets, and that SPA on `BACKEND_PORT` (default `8000`). Schema init runs on DB connect (no separate migrate step). `docker-compose.yml` keeps Postgres always available for local `make db`; the `app` service sits behind the Compose `app` profile:
+
+```bash
+make docker-up
+```
+
+### VPS deployment with Docker Compose
+
+Same pattern as [retromode](https://github.com/jakob-r/retromode): own stack next to an existing [nginx-proxy](https://github.com/nginx-proxy/nginx-proxy) with acme-companion.
+
+- `postgres`: PostgreSQL with a named volume, published only on `127.0.0.1`
+- `app`: production image; joins the proxy's Docker network and advertises `VIRTUAL_HOST`, so nginx-proxy routes the hostname (including WebSockets) and Let's Encrypt issues the cert. Until the first cert exists, the app serves ACME challenges from the companion's webroot volume (`ACME_WEBROOT`).
+
+Leave the proxy's Compose file alone and don't edit nginx by hand. DNS for `VIRTUAL_HOST` must already point at the VPS.
+
+1. On the VPS: clone the repo, `cp .env.example .env`, set a strong `POSTGRES_PASSWORD` (Compose overrides `DATABASE_URL` to the internal `postgres` service), then uncomment and fill in `VIRTUAL_HOST`, `LETSENCRYPT_HOST`, `LETSENCRYPT_EMAIL`, `PROXY_NETWORK` (`docker network ls | grep proxy`) and `PROXY_HTML_VOLUME` (`docker volume ls | grep html`).
+2. Build and start:
+
+   ```bash
+   docker compose --profile app up -d --build
+   ```
+
+   Or from the Makefile: `make docker-up`.
+
+3. Check: `docker compose --profile app ps` and `docker compose --profile app logs -f app`. Redeploy with `git pull` plus step 2.
+
+Local image smoke-test (without a real nginx-proxy): create stand-ins once (`docker network create docker_compose_proxy-tier` and `docker volume create docker_compose_html`), then `make docker-up` and hit `http://127.0.0.1:8082`.

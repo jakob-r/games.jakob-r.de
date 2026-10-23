@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from games_platform.core.db import Database, db
 from games_platform.core.protocol import CreateRoomRequest, GameDefinition
@@ -21,6 +25,42 @@ ALL_GAMES: dict[str, GameDefinition] = {
     sudoku_game.slug: sudoku_game,
     kaesekaestchen_game.slug: kaesekaestchen_game,
 }
+
+
+def _mount_static(app: FastAPI) -> None:
+    """Serve ACME challenges and the built SPA when STATIC_DIR is set (production)."""
+    acme_webroot = os.environ.get("ACME_WEBROOT", "").strip()
+    if acme_webroot:
+        challenge_dir = Path(acme_webroot) / ".well-known" / "acme-challenge"
+        if challenge_dir.is_dir():
+            # nginx-proxy forwards ACME HTTP-01 here until the first cert exists.
+            app.mount(
+                "/.well-known/acme-challenge",
+                StaticFiles(directory=challenge_dir),
+                name="acme",
+            )
+
+    static_dir = os.environ.get("STATIC_DIR", "").strip()
+    if not static_dir:
+        return
+    root = Path(static_dir)
+    index_html = root / "index.html"
+    if not index_html.is_file():
+        logger.warning("STATIC_DIR=%s has no index.html; skipping SPA mount", static_dir)
+        return
+
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str = "") -> FileResponse:
+        if full_path.startswith(("api/", "ws/", ".well-known/")):
+            raise HTTPException(status_code=404, detail="Not found")
+        candidate = (root / full_path).resolve()
+        try:
+            candidate.relative_to(root.resolve())
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail="Not found") from e
+        if full_path and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(index_html)
 
 
 def create_app(
@@ -202,6 +242,9 @@ def create_app(
             logger.error("WebSocket error in room %s: %s", room_id, repr(e))
         finally:
             await manager.disconnect(room_id, conn)
+
+    # After API/WS routes so the SPA catch-all does not shadow them.
+    _mount_static(app)
 
     return app
 

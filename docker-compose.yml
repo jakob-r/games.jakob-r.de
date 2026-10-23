@@ -1,21 +1,68 @@
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: games-postgres
-    restart: unless-stopped
     environment:
-      POSTGRES_USER: games
-      POSTGRES_PASSWORD: games
-      POSTGRES_DB: games
+      POSTGRES_USER: ${POSTGRES_USER:-games}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-games}
+      POSTGRES_DB: ${POSTGRES_DB:-games}
+    # Host port for local dev (`make db`); bound to localhost so it stays off the public net.
     ports:
-      - "5434:5432"
+      - '127.0.0.1:${POSTGRES_PORT:-5434}:5432'
     volumes:
       - games_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U games -d games"]
-      interval: 3s
-      timeout: 3s
-      retries: 10
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-games} -d ${POSTGRES_DB:-games}']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-games}:${POSTGRES_PASSWORD:-games}@postgres:5432/${POSTGRES_DB:-games}
+      ACME_WEBROOT: /acme
+      STATIC_DIR: /app/public
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
+      VIRTUAL_HOST: ${VIRTUAL_HOST:-}
+      VIRTUAL_PORT: ${BACKEND_PORT:-8000}
+      LETSENCRYPT_HOST: ${LETSENCRYPT_HOST:-${VIRTUAL_HOST:-}}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL:-}
+    volumes:
+      - acme-webroot:/acme:ro
+    # Optional localhost-only debug port. Public HTTP/HTTPS is the existing nginx-proxy.
+    ports:
+      - '127.0.0.1:${APP_PORT:-8082}:${BACKEND_PORT:-8000}'
+    networks:
+      - default
+      - proxy-tier
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'
+    profiles: ['app']
 
 volumes:
   games_pgdata:
+  acme-webroot:
+    name: ${PROXY_HTML_VOLUME:-docker_compose_html}
+    external: true
+
+networks:
+  proxy-tier:
+    name: ${PROXY_NETWORK:-docker_compose_proxy-tier}
+    external: true
