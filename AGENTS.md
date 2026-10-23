@@ -13,6 +13,10 @@ Mobile first.
 - Python 3.13
 - `uv`, `ruff` modern tools
 
+## Local Development (`Makefile`)
+
+- Agents should always create or update the root `Makefile` so running the project locally can be done with `make dev`.
+
 ## Git
 
 We use git, all in main branch. 

@@ -46,6 +46,7 @@ To share components across games while allowing any game to be extracted and run
      - `SudokuGame.svelte`: Mobile-first 9x9 scribbly Sudoku board, corner notes mode, live peer cursors, and 10-second streak multiplier bar.
 
 ## Coding Conventions
+- Always keep the root `Makefile` up to date so the entire local stack (database, backend, frontend) can be started with `make dev`.
 - Use Python 3.12+ syntax (`type` aliases, generics `def foo[T]()`, built-in `dict`, `list`, `tuple`, `X | Y` unions — do not import legacy `typing` equivalents).
 - Use `repr(e)` when logging or printing exceptions.
 - Use **Psycopg 3** async pools/cursors directly rather than heavy ORMs.
