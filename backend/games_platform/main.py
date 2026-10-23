@@ -104,6 +104,19 @@ def create_app(
             raise HTTPException(status_code=404, detail="Room not found")
         return snapshot
 
+    @app.delete("/api/rooms/{room_id}")
+    async def delete_room(
+        room_id: str,
+        player_id: str = Query(..., min_length=1),
+    ) -> dict[str, Any]:
+        try:
+            deleted = await manager.delete_room(room_id=room_id, player_id=player_id)
+        except PermissionError as e:
+            raise HTTPException(status_code=403, detail=str(e)) from e
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Room not found")
+        return {"status": "deleted", "room_id": room_id}
+
     @app.get("/api/players/{player_id}/recent")
     async def get_player_recent_rooms(
         player_id: str,

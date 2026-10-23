@@ -94,3 +94,20 @@ def test_full_multiplayer_sudoku_room_lifecycle() -> None:
         stats_res = client.get("/api/players/host_1/stats")
         assert stats_res.status_code == 200
         assert stats_res.json()["summary"]["rooms_joined"] >= 1
+
+        # 5. Non-host cannot delete the room
+        forbidden_del = client.delete(f"/api/rooms/{room_id}?player_id=peer_2")
+        assert forbidden_del.status_code == 403
+
+        # 6. Host permanently deletes the room
+        ok_del = client.delete(f"/api/rooms/{room_id}?player_id=host_1")
+        assert ok_del.status_code == 200
+        assert ok_del.json() == {"status": "deleted", "room_id": room_id}
+
+        # Room is gone from GET /api/rooms/{room_id} and recent rooms
+        missing_res = client.get(f"/api/rooms/{room_id}")
+        assert missing_res.status_code == 404
+
+        recent_after = client.get("/api/players/host_1/recent").json()
+        assert all(r["room_id"] != room_id for r in recent_after)
+

@@ -215,6 +215,20 @@ class Database:
             rows = await cur.fetchall()
             return [dict(r) for r in rows]
 
+    async def delete_room(self, room_id: str) -> bool:
+        pool = self._require_pool()
+        async with pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                DELETE FROM rooms
+                WHERE id = %s
+                RETURNING id
+                """,
+                (room_id,),
+            )
+            row = await cur.fetchone()
+            return row is not None
+
     async def set_player_ready(self, room_id: str, player_id: str, is_ready: bool) -> None:
         pool = self._require_pool()
         async with pool.connection() as conn, conn.cursor() as cur:

@@ -61,6 +61,10 @@ export type ServerEvent =
 			col: number | null;
 	  }
 	| {
+			type: 'room_deleted';
+			room_id: string;
+	  }
+	| {
 			type: 'error';
 			message: string;
 	  };
@@ -139,6 +143,9 @@ export class RoomSocketClient {
 								: p
 						)
 					};
+				} else if (data.type === 'room_deleted') {
+					this.manualClose = true;
+					this.error = 'This game session was permanently deleted.';
 				} else if (data.type === 'error') {
 					this.error = data.message;
 				}

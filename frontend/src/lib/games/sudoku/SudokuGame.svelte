@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { resolvePlayerColor } from '$lib/core/color';
 	import Lobby from '$lib/core/components/Lobby.svelte';
 	import ProfileBadge from '$lib/core/components/ProfileBadge.svelte';
@@ -53,6 +54,7 @@
 	let mistakeFlashes = $state<MistakeFlash[]>([]);
 	let scorePopups = $state<ScorePopup[]>([]);
 	let copiedUrl = $state<boolean>(false);
+	let deletingRoom = $state<boolean>(false);
 	let nowTick = $state<number>(Date.now());
 	let flashCounter = 0;
 
@@ -242,6 +244,23 @@
 			// ignore
 		}
 	}
+
+	async function deleteRoom() {
+		if (!isHost || !profile.playerId || deletingRoom) return;
+		deletingRoom = true;
+		try {
+			const res = await fetch(
+				`/api/rooms/${encodeURIComponent(roomId)}?player_id=${encodeURIComponent(profile.playerId)}`,
+				{ method: 'DELETE' }
+			);
+			if (res.ok) {
+				client.disconnect();
+				await goto('/');
+			}
+		} finally {
+			deletingRoom = false;
+		}
+	}
 </script>
 
 <svelte:window onkeydown={handleKeyDown} />
@@ -272,6 +291,33 @@
 		</div>
 
 		<div class="flex items-center gap-2">
+			{#if isHost}
+				<button
+					type="button"
+					onclick={deleteRoom}
+					disabled={deletingRoom}
+					title="Permanently delete this session"
+					aria-label="Permanently delete this session"
+					class="inline-flex cursor-pointer items-center justify-center rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] p-1.5 text-[#6e6a63] shadow-[1.5px_1.5px_0px_#1a1917] transition hover:border-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-50"
+				>
+					<svg
+						class="h-3.5 w-3.5"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path d="M3 6h18" />
+						<path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+						<path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+						<line x1="10" y1="11" x2="10" y2="17" />
+						<line x1="14" y1="11" x2="14" y2="17" />
+					</svg>
+				</button>
+			{/if}
 			<button
 				type="button"
 				onclick={shareRoomUrl}

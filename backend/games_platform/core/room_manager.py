@@ -115,6 +115,29 @@ class RoomManager:
         )
         return room
 
+    async def delete_room(self, room_id: str, player_id: str) -> bool:
+        async with self._get_lock(room_id):
+            room = await self.db.get_room(room_id)
+            if room is None:
+                return False
+            if room["host_player_id"] != player_id:
+                raise PermissionError("Only the player who started this game can delete it.")
+
+            deleted = await self.db.delete_room(room_id)
+            conns = list(self.connections.pop(room_id, []))
+            self.cursors.pop(room_id, None)
+            for conn in conns:
+                try:
+                    await conn.websocket.send_json(
+                        {"type": "room_deleted", "room_id": room_id}
+                    )
+                    await conn.websocket.close(code=4004, reason="Room deleted")
+                except (RuntimeError, OSError) as e:
+                    logger.debug("WebSocket close failed for %s: %s", conn.player_id, repr(e))
+
+        self.locks.pop(room_id, None)
+        return deleted
+
     def _connected_player_ids(self, room_id: str) -> set[str]:
         return {c.player_id for c in self.connections.get(room_id, [])}
 

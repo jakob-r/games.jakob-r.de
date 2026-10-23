@@ -10,6 +10,7 @@
 		room_id: string;
 		game_slug: string;
 		status: 'lobby' | 'playing' | 'finished';
+		host_player_id: string;
 		config: {
 			difficulty?: string;
 			scoring_enabled?: boolean;
@@ -36,6 +37,7 @@
 	let kaeseHeight = $state<number>(6);
 	let creatingSudoku = $state<boolean>(false);
 	let creatingKaese = $state<boolean>(false);
+	let deletingRoomId = $state<string | null>(null);
 	let recentRooms = $state<RecentRoom[]>([]);
 	let stats = $state<PlayerStatsSummary | null>(null);
 	let joinCode = $state<string>('');
@@ -142,6 +144,25 @@
 			}
 		} catch {
 			await goto(`/sudoku/${code}`);
+		}
+	}
+
+	async function deleteRoom(roomId: string) {
+		if (!profile.playerId || deletingRoomId) return;
+		deletingRoomId = roomId;
+		try {
+			const res = await fetch(
+				`/api/rooms/${encodeURIComponent(roomId)}?player_id=${encodeURIComponent(profile.playerId)}`,
+				{ method: 'DELETE' }
+			);
+			if (res.ok) {
+				recentRooms = recentRooms.filter((r) => r.room_id !== roomId);
+				await loadPlayerDashboard();
+			}
+		} catch (e) {
+			console.error('Failed to delete room:', e);
+		} finally {
+			deletingRoomId = null;
 		}
 	}
 
@@ -402,12 +423,41 @@
 								</div>
 							</div>
 
-							<a
-								href="/{item.game_slug}/{item.room_id}"
-								class="inline-flex items-center rounded border-[1.6px] border-[#1a1917] bg-[#faf8f4] px-3 py-1.5 text-xs font-semibold shadow-[1.5px_1.5px_0px_#1a1917] transition hover:bg-[#f2eee6]"
-							>
-								{item.status === 'finished' ? 'View' : 'Resume →'}
-							</a>
+							<div class="flex items-center gap-2">
+								<a
+									href="/{item.game_slug}/{item.room_id}"
+									class="inline-flex items-center rounded border-[1.6px] border-[#1a1917] bg-[#faf8f4] px-3 py-1.5 text-xs font-semibold shadow-[1.5px_1.5px_0px_#1a1917] transition hover:bg-[#f2eee6]"
+								>
+									{item.status === 'finished' ? 'View' : 'Resume →'}
+								</a>
+								{#if item.host_player_id === profile.playerId}
+									<button
+										type="button"
+										onclick={() => deleteRoom(item.room_id)}
+										disabled={deletingRoomId === item.room_id}
+										title="Permanently delete this session"
+										aria-label="Permanently delete room #{item.room_id}"
+										class="inline-flex cursor-pointer items-center justify-center rounded border-[1.6px] border-[#1a1917] bg-[#faf8f4] p-1.5 text-[#6e6a63] shadow-[1.5px_1.5px_0px_#1a1917] transition hover:border-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-50"
+									>
+										<svg
+											class="h-3.5 w-3.5"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="2"
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											aria-hidden="true"
+										>
+											<path d="M3 6h18" />
+											<path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+											<path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+											<line x1="10" y1="11" x2="10" y2="17" />
+											<line x1="14" y1="11" x2="14" y2="17" />
+										</svg>
+									</button>
+								{/if}
+							</div>
 						</li>
 					{/each}
 				</ul>
