@@ -122,13 +122,30 @@
 
 		<!-- Section 2: Games List (Multiplayer Sudoku) -->
 		<ScribblyBox seed={19} class="bg-[#faf8f4] p-4 sm:p-6">
-			<div class="flex flex-wrap items-start justify-between gap-2">
-				<div>
-					<span class="font-mono-num rounded border border-[#1a1917] px-1.5 py-0.5 text-[10px] uppercase">
-						Multiplayer
-					</span>
-					<h2 class="font-hand mt-1 text-2xl">Multiplayer Sudoku</h2>
-				</div>
+			<div class="flex items-center justify-between gap-2">
+				<h2 class="font-hand text-2xl">Multiplayer Sudoku</h2>
+				<span
+					title="2 or more players"
+					aria-label="2 or more players"
+					class="inline-flex items-center gap-1 text-xs font-medium text-[#6e6a63]"
+				>
+					<svg
+						class="h-4 w-4"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+						<circle cx="9" cy="7" r="4" />
+						<path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+						<path d="M16 3.13a4 4 0 0 1 0 7.75" />
+					</svg>
+					<span class="font-mono-num">2+</span>
+				</span>
 			</div>
 
 			<p class="mt-1.5 text-sm text-[#6e6a63]">
