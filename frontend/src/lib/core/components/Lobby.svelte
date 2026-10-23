@@ -6,7 +6,6 @@
 	import ScribblyButton from './ScribblyButton.svelte';
 
 	let {
-		roomId,
 		hostPlayerId,
 		myPlayerId,
 		myColor,
@@ -16,7 +15,7 @@
 		startLabel = 'Start Game →',
 		configSlot
 	}: {
-		roomId: string;
+		roomId?: string;
 		hostPlayerId: string;
 		myPlayerId: string;
 		myColor: string;
@@ -27,53 +26,11 @@
 		configSlot?: Snippet;
 	} = $props();
 
-	let copied = $state(false);
-
 	let me = $derived(players.find((p) => p.player_id === myPlayerId));
 	let isHost = $derived(hostPlayerId === myPlayerId);
-	let shareUrl = $derived(typeof window !== 'undefined' ? window.location.href : '');
-
-	async function copyInviteUrl() {
-		if (typeof navigator === 'undefined') return;
-		try {
-			await navigator.clipboard.writeText(window.location.href);
-			copied = true;
-			setTimeout(() => (copied = false), 2000);
-		} catch {
-			// fallback
-		}
-	}
 </script>
 
 <div class="mx-auto w-full max-w-lg space-y-5">
-	<ScribblyBox seed={11} class="bg-[#faf8f4] p-4 sm:p-5">
-		<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-			<div>
-				<div class="font-hand text-xs tracking-wider text-[#6e6a63] uppercase">Invite Link</div>
-				<div class="font-mono-num mt-0.5 text-lg font-semibold tracking-tight">
-					Room #{roomId}
-				</div>
-				<p class="mt-0.5 text-xs text-[#6e6a63]">
-					Share this URL so others can join the same board.
-				</p>
-			</div>
-			<ScribblyButton onclick={copyInviteUrl} class="shrink-0">
-				{#if copied}
-					<span>Copied Link!</span>
-				{:else}
-					<span>Copy Invite URL</span>
-				{/if}
-			</ScribblyButton>
-		</div>
-		{#if shareUrl}
-			<div
-				class="font-mono-num mt-3 truncate rounded border border-[#1a1917]/20 bg-[#f3efe6] px-2.5 py-1.5 text-xs text-[#6e6a63]"
-			>
-				{shareUrl}
-			</div>
-		{/if}
-	</ScribblyBox>
-
 	{#if configSlot}
 		<ScribblyBox seed={23} class="bg-[#faf8f4] p-4 sm:p-5">
 			{@render configSlot()}
@@ -82,7 +39,7 @@
 
 	<ScribblyBox seed={37} class="bg-[#faf8f4] p-4 sm:p-5">
 		<div class="mb-3 flex items-center justify-between">
-			<h2 class="font-hand text-lg">Players in Lobby ({players.length})</h2>
+			<h2 class="font-hand text-lg">Players ({players.length})</h2>
 			<span class="text-xs text-[#6e6a63]">
 				{players.filter((p) => p.is_ready).length}/{players.length} ready
 			</span>
@@ -134,7 +91,7 @@
 				variant={me?.is_ready ? 'default' : 'primary'}
 				accentColor={myColor}
 			>
-				{me?.is_ready ? 'Set Not Ready' : "I'm Ready!"}
+				{me?.is_ready ? 'Not Ready' : 'Ready'}
 			</ScribblyButton>
 
 			{#if isHost}
@@ -143,7 +100,7 @@
 				</ScribblyButton>
 			{:else}
 				<span class="font-hand text-xs text-[#6e6a63]">
-					Waiting for host to start the game...
+					Waiting for host…
 				</span>
 			{/if}
 		</div>

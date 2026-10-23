@@ -273,7 +273,7 @@
 				href="/"
 				class="inline-flex items-center gap-1 rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] px-2.5 py-1 text-xs font-medium shadow-[1.5px_1.5px_0px_#1a1917] hover:bg-[#f2eee6]"
 			>
-				← Lobby
+				← Home
 			</a>
 			<div>
 				<h1 class="font-hand text-lg leading-none sm:text-xl">Multiplayer Sudoku</h1>
@@ -353,12 +353,9 @@
 		>
 			{#snippet configSlot()}
 				<div class="space-y-4">
-					<div class="flex items-center justify-between">
-						<h2 class="font-hand text-lg">Game Settings</h2>
-						{#if !isHost}
-							<span class="font-hand text-xs text-[#6e6a63]">Configured by host</span>
-						{/if}
-					</div>
+					{#if !isHost}
+						<div class="text-right font-hand text-xs text-[#6e6a63]">Configured by host</div>
+					{/if}
 
 					<div>
 						<span class="mb-1.5 block text-xs font-medium text-[#6e6a63] uppercase">
@@ -383,9 +380,9 @@
 
 					<div class="flex items-center justify-between border-t border-[#1a1917]/10 pt-3">
 						<div>
-							<div class="text-sm font-medium">Scoring & Streak Multipliers</div>
+							<div class="text-sm font-medium">Scoring & Streaks</div>
 							<p class="text-xs text-[#6e6a63]">
-								-10 for mistakes • 2×/5× points • 1.1× streak multiplier within 10s
+								-10 mistakes • 1.1× streak within 10s
 							</p>
 						</div>
 						<button
@@ -395,7 +392,7 @@
 							class="cursor-pointer rounded-full border-[1.6px] border-[#1a1917] px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed
 							{scoringEnabled ? 'bg-[#1a1917] text-[#faf8f4]' : 'bg-[#faf8f4] text-[#6e6a63]'}"
 						>
-							{scoringEnabled ? 'Scoring ON' : 'Scoring OFF'}
+							{scoringEnabled ? 'ON' : 'OFF'}
 						</button>
 					</div>
 				</div>
@@ -464,16 +461,13 @@
 			{#if room.status === 'finished'}
 				<ScribblyBox seed={55} class="bg-[#faf8f4] p-4 text-center">
 					<div class="font-hand text-xl">Board Completed!</div>
-					<p class="mt-0.5 text-xs text-[#6e6a63]">
-						Every cell has been solved collaboratively.
-					</p>
 					{#if isHost}
 						<div class="mt-3 flex justify-center gap-2">
 							<ScribblyButton onclick={() => client.startGame()} variant="primary">
 								New Board
 							</ScribblyButton>
 							<ScribblyButton onclick={() => client.returnToLobby()}>
-								Lobby Settings
+								Lobby
 							</ScribblyButton>
 						</div>
 					{/if}
@@ -638,7 +632,7 @@
 							? 'bg-[#1a1917] text-[#faf8f4] shadow-[2px_2px_0px_#6e6a63]'
 							: 'bg-[#faf8f4] text-[#1a1917] shadow-[2px_2px_0px_#1a1917]'}"
 					>
-						<span>✎ Corner Notes: {noteMode ? 'ON' : 'OFF'}</span>
+						<span>✎ Notes: {noteMode ? 'ON' : 'OFF'}</span>
 						<span class="hidden text-[10px] opacity-70 sm:inline">(Space / N)</span>
 					</button>
 
@@ -647,7 +641,7 @@
 						onclick={clearSelectedCell}
 						class="cursor-pointer rounded-md border-[1.8px] border-[#1a1917] bg-[#faf8f4] px-3.5 py-2 text-xs font-semibold shadow-[2px_2px_0px_#1a1917] transition hover:bg-[#f2eee6] active:scale-[0.98]"
 					>
-						Clear Notes
+						Clear
 					</button>
 				</div>
 

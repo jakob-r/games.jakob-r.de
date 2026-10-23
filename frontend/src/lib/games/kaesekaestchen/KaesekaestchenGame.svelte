@@ -469,7 +469,7 @@
 				href="/"
 				class="inline-flex items-center gap-1 rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] px-2.5 py-1 text-xs font-medium shadow-[1.5px_1.5px_0px_#1a1917] hover:bg-[#f2eee6]"
 			>
-				← Lobby
+				← Home
 			</a>
 			<div>
 				<h1 class="font-hand text-lg leading-none sm:text-xl">Käsekästchen</h1>
@@ -542,24 +542,20 @@
 			myPlayerId={profile.playerId}
 			myColor={profile.primaryColor}
 			{players}
-			startLabel="Start Käsekästchen →"
 			onToggleReady={(r) => client.setReady(r)}
 			onStartGame={() => client.startGame()}
 		>
 			{#snippet configSlot()}
 				<div class="space-y-4">
-					<div class="flex items-center justify-between">
-						<h2 class="font-hand text-lg">Board Size & Custom Shape</h2>
-						{#if !isHost}
-							<span class="font-hand text-xs text-[#6e6a63]">Configured by host</span>
-						{/if}
-					</div>
+					{#if !isHost}
+						<div class="text-right font-hand text-xs text-[#6e6a63]">Configured by host</div>
+					{/if}
 
 					<!-- Dimensions -->
 					<div class="grid gap-3 sm:grid-cols-2">
 						<div>
 							<span class="mb-1 block text-xs font-medium text-[#6e6a63] uppercase">
-								Width ({cfgWidth} squares)
+								Width ({cfgWidth})
 							</span>
 							<div class="flex flex-wrap gap-1">
 								{#each SIZES as w (w)}
@@ -580,7 +576,7 @@
 
 						<div>
 							<span class="mb-1 block text-xs font-medium text-[#6e6a63] uppercase">
-								Height ({cfgHeight} squares)
+								Height ({cfgHeight})
 							</span>
 							<div class="flex flex-wrap gap-1">
 								{#each SIZES as h (h)}
@@ -603,16 +599,11 @@
 					<!-- Shape & Border Presets -->
 					<div class="border-t border-[#1a1917]/15 pt-3">
 						<div class="mb-2 flex flex-wrap items-center justify-between gap-2">
-							<div>
-								<span class="text-xs font-semibold uppercase text-[#1a1917]">
-									Outline & Pre-drawn Borders
-								</span>
-								<p class="text-[11px] text-[#6e6a63]">
-									Click or drag along grid edges below to draw pre-set border lines or enclose a custom board shape.
-								</p>
-							</div>
+							<span class="text-xs font-semibold uppercase text-[#1a1917]">
+								Board Outline
+							</span>
 							<span class="font-mono-num rounded border border-[#1a1917]/30 bg-[#f3efe6] px-2 py-0.5 text-xs font-semibold">
-								{lobbyActiveCount} active square{lobbyActiveCount === 1 ? '' : 's'}
+								{lobbyActiveCount} square{lobbyActiveCount === 1 ? '' : 's'}
 							</span>
 						</div>
 
@@ -623,14 +614,14 @@
 									onclick={() => applyShapePreset('open')}
 									class="cursor-pointer rounded border border-[#1a1917] bg-[#faf8f4] px-2.5 py-1 text-xs font-medium hover:bg-[#f2eee6]"
 								>
-									All Open (No Borders)
+									Open
 								</button>
 								<button
 									type="button"
 									onclick={() => applyShapePreset('outer_border')}
 									class="cursor-pointer rounded border border-[#1a1917] bg-[#faf8f4] px-2.5 py-1 text-xs font-medium hover:bg-[#f2eee6]"
 								>
-									Outer Rectangle Border
+									Outer Border
 								</button>
 								{#if cfgWidth >= 4 && cfgHeight >= 4}
 									<button
@@ -638,14 +629,14 @@
 										onclick={() => applyShapePreset('cross')}
 										class="cursor-pointer rounded border border-[#1a1917] bg-[#faf8f4] px-2.5 py-1 text-xs font-medium hover:bg-[#f2eee6]"
 									>
-										Cross Shape
+										Cross
 									</button>
 									<button
 										type="button"
 										onclick={() => applyShapePreset('diamond')}
 										class="cursor-pointer rounded border border-[#1a1917] bg-[#faf8f4] px-2.5 py-1 text-xs font-medium hover:bg-[#f2eee6]"
 									>
-										Diamond Shape
+										Diamond
 									</button>
 								{/if}
 							</div>
@@ -853,23 +844,20 @@
 				<ScribblyBox seed={55} class="bg-[#faf8f4] p-4 text-center">
 					<div class="font-hand text-xl">
 						{#if winners.length === 1}
-							{winners[0].name} wins with {winners[0].score} squares!
+							{winners[0].name} wins ({winners[0].score} pts)!
 						{:else if winners.length > 1}
 							It's a tie! ({winners.map((w) => w.name).join(' & ')} — {winners[0].score} pts)
 						{:else}
-							All Squares Closed!
+							Game Over!
 						{/if}
 					</div>
-					<p class="mt-0.5 text-xs text-[#6e6a63]">
-						Every square on the canvas has been claimed.
-					</p>
 					{#if isHost}
 						<div class="mt-3 flex justify-center gap-2">
 							<ScribblyButton onclick={() => client.startGame()} variant="primary">
 								Play Again
 							</ScribblyButton>
 							<ScribblyButton onclick={() => client.returnToLobby()}>
-								Lobby Settings
+								Lobby
 							</ScribblyButton>
 						</div>
 					{/if}
@@ -884,7 +872,7 @@
 								class="inline-block h-2.5 w-2.5 rounded-full border border-[#1a1917]"
 								style="background-color: {profile.primaryColor};"
 							></span>
-							<span>Your turn — tap or click an open grid line!</span>
+							<span>Your turn</span>
 						</div>
 					{:else if currentPlayer}
 						<div class="flex items-center gap-2">
@@ -893,15 +881,12 @@
 								style="background-color: {currentTurnColor};"
 							></span>
 							<span>
-								Waiting for <strong style="color: {currentTurnColor};">{currentPlayer.name}</strong> to draw a line…
+								<strong style="color: {currentTurnColor};">{currentPlayer.name}</strong>'s turn
 							</span>
 						</div>
 					{:else}
 						<span class="text-[#6e6a63]">Waiting for move…</span>
 					{/if}
-					<span class="font-hand hidden text-[#6e6a63] sm:inline">
-						Close a square for +1 pt & bonus turn
-					</span>
 				</div>
 			{/if}
 
