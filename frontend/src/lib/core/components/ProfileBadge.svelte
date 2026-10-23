@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { PRESET_PLAYER_COLORS, opponent_color } from '$lib/core/color';
+	import { PRESET_PLAYER_COLORS } from '$lib/core/color';
 	import { profile } from '$lib/core/profile.svelte';
 
 	let {
@@ -120,15 +120,8 @@
 		</div>
 
 		<div>
-			<div class="mb-1.5 flex items-center justify-between">
+			<div class="mb-1.5">
 				<span class="font-hand text-sm text-[#6e6a63]">Your Ink Color</span>
-				<span class="font-mono-num text-xs text-[#6e6a63]">
-					clash-adjusted preview:
-					<span
-						class="ml-1 inline-block h-2.5 w-2.5 rounded-full border border-[#1a1917] align-middle"
-						style="background-color: {opponent_color(profile.primaryColor, profile.primaryColor)};"
-					></span>
-				</span>
 			</div>
 
 			<div class="flex flex-wrap items-center gap-2.5">
