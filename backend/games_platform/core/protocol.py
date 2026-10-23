@@ -36,7 +36,11 @@ class GameDefinition(Protocol):
         """Validate and normalize room configuration."""
         ...
 
-    def create_initial_state(self, config: dict[str, Any]) -> dict[str, Any]:
+    def create_initial_state(
+        self,
+        config: dict[str, Any],
+        player_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
         """Generate initial server-side state when a game starts."""
         ...
 

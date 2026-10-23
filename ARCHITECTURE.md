@@ -44,6 +44,11 @@ To share components across games while allowing any game to be extracted and run
      - `standalone.py`: Standalone FastAPI entrypoint (`uv run uvicorn games_platform.games.sudoku.standalone:app`).
    - **Frontend (`frontend/src/lib/games/sudoku/`)**:
      - `SudokuGame.svelte`: Mobile-first 9x9 scribbly Sudoku board, corner notes mode, live peer cursors, and 10-second streak multiplier bar.
+   - **Backend (`backend/games_platform/games/kaesekaestchen/`)**:
+     - `game.py`: `KaesekaestchenGame` implementing `GameDefinition` (configurable `3×3` to `12×12` grid, flood-fill custom enclosed board shapes and pre-drawn border edges, round-based turn order, bonus turn on closing 1 or 2 squares, `+1` point per closed square).
+     - `standalone.py`: Standalone FastAPI entrypoint (`uv run uvicorn games_platform.games.kaesekaestchen.standalone:app`).
+   - **Frontend (`frontend/src/lib/games/kaesekaestchen/`)**:
+     - `KaesekaestchenGame.svelte`: Interactive lobby custom outline editor (with shape presets and click/drag edge drawing) and scribbly SVG Dots & Boxes game canvas with player-colored lines and hatched square claims.
 
 ## Coding Conventions
 - Always keep the root `Makefile` up to date so the entire local stack (database, backend, frontend) can be started with `make dev`.

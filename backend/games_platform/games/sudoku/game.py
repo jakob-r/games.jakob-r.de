@@ -68,7 +68,12 @@ class SudokuGame:
             "scoring_enabled": scoring_enabled,
         }
 
-    def create_initial_state(self, config: dict[str, Any]) -> dict[str, Any]:
+    def create_initial_state(
+        self,
+        config: dict[str, Any],
+        player_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        _ = player_ids
         difficulty: Difficulty = config.get("difficulty", "medium")
         givens, solution, hard_cells = generate_sudoku_puzzle(difficulty=difficulty)
 

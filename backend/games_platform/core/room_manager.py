@@ -214,6 +214,21 @@ class RoomManager:
             name=name,
             color=color,
         )
+        room = await self.db.get_room(room_id)
+        if (
+            room is not None
+            and room["status"] == "playing"
+            and isinstance(room["state"], dict)
+            and "turn_order" in room["state"]
+        ):
+            state = dict(room["state"])
+            turn_order: list[str] = list(state.get("turn_order") or [])
+            if player_id not in turn_order:
+                turn_order.append(player_id)
+                state["turn_order"] = turn_order
+                if not state.get("current_player_id"):
+                    state["current_player_id"] = turn_order[0]
+                await self.db.update_room(room_id, state=state)
         await self.broadcast_room_state(room_id)
         return conn
 
@@ -253,6 +268,19 @@ class RoomManager:
                         name=msg.name,
                         color=msg.color,
                     )
+                    if (
+                        room["status"] == "playing"
+                        and isinstance(room["state"], dict)
+                        and "turn_order" in room["state"]
+                    ):
+                        state = dict(room["state"])
+                        turn_order: list[str] = list(state.get("turn_order") or [])
+                        if msg.player_id not in turn_order:
+                            turn_order.append(msg.player_id)
+                            state["turn_order"] = turn_order
+                            if not state.get("current_player_id"):
+                                state["current_player_id"] = turn_order[0]
+                            await self.db.update_room(room_id, state=state)
                     await self.broadcast_room_state(room_id)
 
                 case SetReadyMessage():
@@ -278,7 +306,12 @@ class RoomManager:
                             {"type": "error", "message": "Only the host can start the game."}
                         )
                         return
-                    initial_state = game.create_initial_state(room["config"])
+                    players_rows = await self.db.get_room_players(room_id)
+                    player_ids = [p["player_id"] for p in players_rows]
+                    initial_state = game.create_initial_state(
+                        room["config"],
+                        player_ids=player_ids,
+                    )
                     await self.db.reset_room_scores(room_id)
                     await self.db.update_room(room_id, status="playing", state=initial_state)
                     await self.broadcast_room_state(room_id)

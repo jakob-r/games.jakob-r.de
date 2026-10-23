@@ -12,12 +12,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from games_platform.core.db import Database, db
 from games_platform.core.protocol import CreateRoomRequest, GameDefinition
 from games_platform.core.room_manager import RoomManager
+from games_platform.games.kaesekaestchen.game import kaesekaestchen_game
 from games_platform.games.sudoku.game import sudoku_game
 
 logger = logging.getLogger(__name__)
 
 ALL_GAMES: dict[str, GameDefinition] = {
     sudoku_game.slug: sudoku_game,
+    kaesekaestchen_game.slug: kaesekaestchen_game,
 }
 
 

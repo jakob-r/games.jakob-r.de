@@ -13,6 +13,7 @@
 		players,
 		onToggleReady,
 		onStartGame,
+		startLabel = 'Start Game →',
 		configSlot
 	}: {
 		roomId: string;
@@ -22,6 +23,7 @@
 		players: PlayerInfo[];
 		onToggleReady: (ready: boolean) => void;
 		onStartGame: () => void;
+		startLabel?: string;
 		configSlot?: Snippet;
 	} = $props();
 
@@ -137,7 +139,7 @@
 
 			{#if isHost}
 				<ScribblyButton onclick={onStartGame} variant="primary" accentColor="#1a1917">
-					Start Sudoku →
+					{startLabel}
 				</ScribblyButton>
 			{:else}
 				<span class="font-hand text-xs text-[#6e6a63]">

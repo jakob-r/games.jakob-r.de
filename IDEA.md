@@ -51,5 +51,12 @@ When the user enters games.jakob-r.de they can
 - The starting user creates a new game which will generate a unique game id url that they can share with others to invite them to join.
 - The starting player can decide how big the board should be.
 - The starting player can leave the board rectangular according to the measurements they have set or draw a custom shape within the measurements.
-- The game canvas is rectangular like the math paper.
-- 
+- The game canvas is a grid of squares.
+- Round based game.
+- Each player can draw a line on the canvas on the grid.
+- Lines are shown in the players color.
+- As soon as a player closes a square they get a point and are allowed to draw another line.
+- If the move does not close a square, it's the next players turn.
+- The game ends when all squares are closed.
+- The player with the most points wins.
+

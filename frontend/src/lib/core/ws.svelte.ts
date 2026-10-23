@@ -45,6 +45,16 @@ export type ServerEvent =
 			reason: string;
 	  }
 	| {
+			type: 'line_drawn';
+			orientation: 'h' | 'v';
+			row: number;
+			col: number;
+			player_id: string;
+			closed_squares: { row: number; col: number }[];
+			points_delta: number;
+			next_player_id: string | null;
+	  }
+	| {
 			type: 'cursor_update';
 			player_id: string;
 			row: number | null;
