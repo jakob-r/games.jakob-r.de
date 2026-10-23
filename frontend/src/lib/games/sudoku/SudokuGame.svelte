@@ -1,0 +1,691 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { resolvePlayerColor } from '$lib/core/color';
+	import Lobby from '$lib/core/components/Lobby.svelte';
+	import ProfileBadge from '$lib/core/components/ProfileBadge.svelte';
+	import ScribblyBox from '$lib/core/components/ScribblyBox.svelte';
+	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
+	import { profile } from '$lib/core/profile.svelte';
+	import { RoomSocketClient, type PlayerInfo, type ServerEvent } from '$lib/core/ws.svelte';
+
+	let { roomId }: { roomId: string } = $props();
+
+	interface SudokuCell {
+		value: number | null;
+		given: boolean;
+		author_id: string | null;
+	}
+
+	interface SudokuPublicState {
+		cells?: SudokuCell[][];
+		notes?: Record<string, string>[][];
+		hard_cells?: boolean[][];
+		filled_count?: number;
+		total_cells?: number;
+		difficulty?: 'easy' | 'medium' | 'hard' | 'expert';
+		scoring_enabled?: boolean;
+	}
+
+	interface MistakeFlash {
+		id: number;
+		row: number;
+		col: number;
+		value: number;
+		player_id: string;
+		points_delta: number;
+	}
+
+	interface ScorePopup {
+		id: number;
+		row: number;
+		col: number;
+		player_id: string;
+		points_delta: number;
+		multiplier: number;
+		reason: string;
+	}
+
+	const client = new RoomSocketClient();
+
+	let selectedRow = $state<number | null>(4);
+	let selectedCol = $state<number | null>(4);
+	let noteMode = $state<boolean>(false);
+	let mistakeFlashes = $state<MistakeFlash[]>([]);
+	let scorePopups = $state<ScorePopup[]>([]);
+	let copiedUrl = $state<boolean>(false);
+	let nowTick = $state<number>(Date.now());
+	let flashCounter = 0;
+
+	const DIFFICULTIES: ('easy' | 'medium' | 'hard' | 'expert')[] = [
+		'easy',
+		'medium',
+		'hard',
+		'expert'
+	];
+
+	let room = $derived(client.room);
+	let sudokuState = $derived((room?.state ?? {}) as SudokuPublicState);
+	let cells = $derived(sudokuState.cells ?? []);
+	let notes = $derived(sudokuState.notes ?? []);
+	let hardCells = $derived(sudokuState.hard_cells ?? []);
+	let players = $derived<PlayerInfo[]>(room?.players ?? []);
+	let isHost = $derived(room?.host_player_id === profile.playerId);
+	let scoringEnabled = $derived(Boolean(room?.config?.scoring_enabled ?? true));
+	let currentDifficulty = $derived(String(room?.config?.difficulty ?? 'medium'));
+
+	let selectedValue = $derived.by(() => {
+		if (selectedRow === null || selectedCol === null) return null;
+		return cells[selectedRow]?.[selectedCol]?.value ?? null;
+	});
+
+	// Count how many of each digit (1..9) are already placed on the board
+	let digitCounts = $derived.by(() => {
+		const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 };
+		for (const row of cells) {
+			for (const cell of row) {
+				if (cell.value) {
+					counts[cell.value] = (counts[cell.value] ?? 0) + 1;
+				}
+			}
+		}
+		return counts;
+	});
+
+	onMount(() => {
+		profile.init();
+		client.connect({
+			gameSlug: 'sudoku',
+			roomId,
+			playerId: profile.playerId,
+			name: profile.name,
+			color: profile.primaryColor
+		});
+
+		const unsub = client.onEvent((ev: ServerEvent) => {
+			if (ev.type === 'mistake_flash') {
+				const id = ++flashCounter;
+				mistakeFlashes = [
+					...mistakeFlashes,
+					{
+						id,
+						row: ev.row,
+						col: ev.col,
+						value: ev.value,
+						player_id: ev.player_id,
+						points_delta: ev.points_delta
+					}
+				];
+				setTimeout(() => {
+					mistakeFlashes = mistakeFlashes.filter((f) => f.id !== id);
+				}, 950);
+			} else if (ev.type === 'cell_scored') {
+				const id = ++flashCounter;
+				scorePopups = [
+					...scorePopups,
+					{
+						id,
+						row: ev.row,
+						col: ev.col,
+						player_id: ev.player_id,
+						points_delta: ev.points_delta,
+						multiplier: ev.multiplier,
+						reason: ev.reason
+					}
+				];
+				setTimeout(() => {
+					scorePopups = scorePopups.filter((s) => s.id !== id);
+				}, 1150);
+			}
+		});
+
+		const timer = setInterval(() => {
+			nowTick = Date.now();
+		}, 120);
+
+		return () => {
+			clearInterval(timer);
+			unsub();
+			client.disconnect();
+		};
+	});
+
+	function selectCell(r: number, c: number) {
+		selectedRow = r;
+		selectedCol = c;
+		client.sendCursor(r, c);
+	}
+
+	function enterDigit(digit: number) {
+		if (room?.status !== 'playing' || selectedRow === null || selectedCol === null) return;
+		const cell = cells[selectedRow]?.[selectedCol];
+		if (!cell || cell.value !== null) return;
+
+		if (noteMode) {
+			client.sendAction({
+				type: 'toggle_note',
+				row: selectedRow,
+				col: selectedCol,
+				digit
+			});
+		} else {
+			client.sendAction({
+				type: 'set_value',
+				row: selectedRow,
+				col: selectedCol,
+				value: digit
+			});
+		}
+	}
+
+	function clearSelectedCell() {
+		if (room?.status !== 'playing' || selectedRow === null || selectedCol === null) return;
+		client.sendAction({
+			type: 'clear_cell',
+			row: selectedRow,
+			col: selectedCol
+		});
+	}
+
+	function handleKeyDown(e: KeyboardEvent) {
+		if (room?.status !== 'playing') return;
+		const tag = (e.target as HTMLElement | null)?.tagName;
+		if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+		if (e.key >= '1' && e.key <= '9') {
+			e.preventDefault();
+			enterDigit(Number(e.key));
+			return;
+		}
+		if (e.key === 'n' || e.key === 'N' || e.key === ' ') {
+			e.preventDefault();
+			noteMode = !noteMode;
+			return;
+		}
+		if (e.key === 'Backspace' || e.key === 'Delete') {
+			e.preventDefault();
+			clearSelectedCell();
+			return;
+		}
+
+		const r = selectedRow ?? 4;
+		const c = selectedCol ?? 4;
+		if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+			e.preventDefault();
+			selectCell((r + 8) % 9, c);
+		} else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+			e.preventDefault();
+			selectCell((r + 1) % 9, c);
+		} else if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+			e.preventDefault();
+			selectCell(r, (c + 8) % 9);
+		} else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+			e.preventDefault();
+			selectCell(r, (c + 1) % 9);
+		}
+	}
+
+	function isPeerUnit(r: number, c: number): boolean {
+		if (selectedRow === null || selectedCol === null) return false;
+		if (r === selectedRow && c === selectedCol) return false;
+		const sameBlock =
+			Math.floor(r / 3) === Math.floor(selectedRow / 3) &&
+			Math.floor(c / 3) === Math.floor(selectedCol / 3);
+		return r === selectedRow || c === selectedCol || sameBlock;
+	}
+
+	function getMultiplierRemainingRatio(p: PlayerInfo): number {
+		if (!p.last_correct_at) return 0;
+		const lastMs = new Date(p.last_correct_at).getTime();
+		const elapsed = (nowTick - lastMs) / 1000;
+		if (elapsed >= 10 || elapsed < -2) return 0;
+		return Math.max(0, Math.min(1, (10 - Math.max(0, elapsed)) / 10));
+	}
+
+	function getLiveMultiplier(p: PlayerInfo): number {
+		const ratio = getMultiplierRemainingRatio(p);
+		return ratio > 0 ? p.multiplier : 1;
+	}
+
+	async function shareRoomUrl() {
+		if (typeof navigator === 'undefined') return;
+		try {
+			await navigator.clipboard.writeText(window.location.href);
+			copiedUrl = true;
+			setTimeout(() => (copiedUrl = false), 1800);
+		} catch {
+			// ignore
+		}
+	}
+</script>
+
+<svelte:window onkeydown={handleKeyDown} />
+
+<div class="mx-auto flex w-full max-w-3xl flex-1 flex-col px-3 py-3 sm:px-6 sm:py-5">
+	<!-- Top Header -->
+	<header class="mb-3 flex items-center justify-between gap-2">
+		<div class="flex items-center gap-2.5">
+			<a
+				href="/"
+				class="inline-flex items-center gap-1 rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] px-2.5 py-1 text-xs font-medium shadow-[1.5px_1.5px_0px_#1a1917] hover:bg-[#f2eee6]"
+			>
+				← Lobby
+			</a>
+			<div>
+				<h1 class="font-hand text-lg leading-none sm:text-xl">Multiplayer Sudoku</h1>
+				<div class="font-mono-num flex items-center gap-2 text-[11px] text-[#6e6a63]">
+					<span>#{roomId}</span>
+					{#if room?.status === 'playing' || room?.status === 'finished'}
+						<span>•</span>
+						<span class="capitalize">{currentDifficulty}</span>
+					{/if}
+					{#if !client.connected}
+						<span class="text-[#dc2626]">• reconnecting…</span>
+					{/if}
+				</div>
+			</div>
+		</div>
+
+		<div class="flex items-center gap-2">
+			<button
+				type="button"
+				onclick={shareRoomUrl}
+				class="cursor-pointer rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] px-2.5 py-1 text-xs font-medium shadow-[1.5px_1.5px_0px_#1a1917] hover:bg-[#f2eee6]"
+			>
+				{copiedUrl ? 'Link Copied!' : 'Invite'}
+			</button>
+			<ProfileBadge
+				compact={true}
+				onChange={(name, color) => client.syncProfile(profile.playerId, name, color)}
+			/>
+		</div>
+	</header>
+
+	{#if client.error}
+		<ScribblyBox seed={99} class="my-6 bg-[#faf8f4] p-6 text-center">
+			<p class="font-hand text-lg text-[#dc2626]">{client.error}</p>
+			<a href="/" class="mt-3 inline-block underline">Back to Landing Page</a>
+		</ScribblyBox>
+	{:else if !room}
+		<div class="flex flex-1 items-center justify-center py-16">
+			<p class="font-hand text-lg text-[#6e6a63]">Sketching room #{roomId}…</p>
+		</div>
+	{:else if room.status === 'lobby'}
+		<Lobby
+			{roomId}
+			hostPlayerId={room.host_player_id}
+			myPlayerId={profile.playerId}
+			myColor={profile.primaryColor}
+			{players}
+			onToggleReady={(r) => client.setReady(r)}
+			onStartGame={() => client.startGame()}
+		>
+			{#snippet configSlot()}
+				<div class="space-y-4">
+					<div class="flex items-center justify-between">
+						<h2 class="font-hand text-lg">Game Settings</h2>
+						{#if !isHost}
+							<span class="font-hand text-xs text-[#6e6a63]">Configured by host</span>
+						{/if}
+					</div>
+
+					<div>
+						<span class="mb-1.5 block text-xs font-medium text-[#6e6a63] uppercase">
+							Difficulty
+						</span>
+						<div class="grid grid-cols-4 gap-2">
+							{#each DIFFICULTIES as diff}
+								<button
+									type="button"
+									disabled={!isHost}
+									onclick={() => client.updateConfig({ difficulty: diff })}
+									class="cursor-pointer rounded border-[1.6px] border-[#1a1917] py-1.5 text-xs font-semibold capitalize transition disabled:cursor-not-allowed
+									{currentDifficulty === diff
+										? 'bg-[#1a1917] text-[#faf8f4] shadow-[2px_2px_0px_#6e6a63]'
+										: 'bg-[#faf8f4] text-[#1a1917] hover:bg-[#f2eee6]'}"
+								>
+									{diff}
+								</button>
+							{/each}
+						</div>
+					</div>
+
+					<div class="flex items-center justify-between border-t border-[#1a1917]/10 pt-3">
+						<div>
+							<div class="text-sm font-medium">Scoring & Streak Multipliers</div>
+							<p class="text-xs text-[#6e6a63]">
+								-10 for mistakes • 2×/5× points • 1.1× streak multiplier within 10s
+							</p>
+						</div>
+						<button
+							type="button"
+							disabled={!isHost}
+							onclick={() => client.updateConfig({ scoring_enabled: !scoringEnabled })}
+							class="cursor-pointer rounded-full border-[1.6px] border-[#1a1917] px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed
+							{scoringEnabled ? 'bg-[#1a1917] text-[#faf8f4]' : 'bg-[#faf8f4] text-[#6e6a63]'}"
+						>
+							{scoringEnabled ? 'Scoring ON' : 'Scoring OFF'}
+						</button>
+					</div>
+				</div>
+			{/snippet}
+		</Lobby>
+	{:else}
+		<!-- Active or Finished Sudoku Board View -->
+		<div class="mx-auto flex w-full max-w-md flex-1 flex-col justify-between gap-3">
+			<!-- Players & Live Score / Multiplier Bar -->
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<div class="flex flex-wrap items-center gap-2">
+					{#each players as p (p.player_id)}
+						{@const pColor = resolvePlayerColor(
+							p.player_id,
+							profile.playerId,
+							profile.primaryColor,
+							players
+						)}
+						{@const multRatio = getMultiplierRemainingRatio(p)}
+						{@const liveMult = getLiveMultiplier(p)}
+						<div
+							class="relative overflow-hidden rounded-md border-[1.6px] border-[#1a1917] bg-[#faf8f4] px-2.5 py-1 shadow-[1.5px_1.5px_0px_#1a1917]"
+						>
+							<div class="flex items-center gap-2">
+								<span
+									class="h-2.5 w-2.5 rounded-full border border-[#1a1917]"
+									style="background-color: {pColor};"
+								></span>
+								<span class="max-w-[92px] truncate text-xs font-semibold" style="color: {pColor};">
+									{p.name}
+								</span>
+
+								{#if scoringEnabled}
+									<span class="font-mono-num text-xs font-bold text-[#1a1917]">
+										{p.score}
+									</span>
+									{#if liveMult > 1.001}
+										<span
+											class="font-mono-num rounded px-1 py-0.2 text-[10px] font-bold text-[#faf8f4]"
+											style="background-color: {pColor};"
+										>
+											{liveMult.toFixed(2)}×
+										</span>
+									{/if}
+								{/if}
+							</div>
+
+							<!-- 10-second multiplier countdown bar -->
+							{#if scoringEnabled && multRatio > 0}
+								<div class="mt-1 h-1 w-full overflow-hidden rounded-full bg-[#1a1917]/10">
+									<div
+										class="h-full transition-all duration-100"
+										style="width: {Math.round(multRatio * 100)}%; background-color: {pColor};"
+									></div>
+								</div>
+							{/if}
+						</div>
+					{/each}
+				</div>
+
+				<div class="font-mono-num text-xs text-[#6e6a63]">
+					{sudokuState.filled_count ?? 0}/81
+				</div>
+			</div>
+
+			{#if room.status === 'finished'}
+				<ScribblyBox seed={55} class="bg-[#faf8f4] p-4 text-center">
+					<div class="font-hand text-xl">Board Completed!</div>
+					<p class="mt-0.5 text-xs text-[#6e6a63]">
+						Every cell has been solved collaboratively.
+					</p>
+					{#if isHost}
+						<div class="mt-3 flex justify-center gap-2">
+							<ScribblyButton onclick={() => client.startGame()} variant="primary">
+								New Board
+							</ScribblyButton>
+							<ScribblyButton onclick={() => client.returnToLobby()}>
+								Lobby Settings
+							</ScribblyButton>
+						</div>
+					{/if}
+				</ScribblyBox>
+			{/if}
+
+			<!-- 9x9 Scribbly Sudoku Grid -->
+			<div class="relative mx-auto aspect-square w-full max-w-[430px] select-none">
+				<!-- Grid cells -->
+				<div
+					class="grid h-full w-full grid-cols-9 grid-rows-9 bg-[#faf8f4] shadow-[4px_4px_0px_#1a1917]"
+					role="grid"
+					aria-label="Sudoku Board"
+				>
+					{#each cells as rowCells, r (r)}
+						{#each rowCells as cell, c (c)}
+							{@const isSelected = selectedRow === r && selectedCol === c}
+							{@const isSameNumber =
+								selectedValue !== null && cell.value !== null && cell.value === selectedValue}
+							{@const inPeerUnit = isPeerUnit(r, c)}
+							{@const cellNotes = notes[r]?.[c] ?? {}}
+							{@const isHardCell = Boolean(hardCells[r]?.[c]) && cell.value === null}
+							{@const flash = mistakeFlashes.find((f) => f.row === r && f.col === c)}
+							{@const popup = scorePopups.find((s) => s.row === r && s.col === c)}
+							{@const peerCursors = players.filter(
+								(p) =>
+									p.player_id !== profile.playerId &&
+									p.cursor?.row === r &&
+									p.cursor?.col === c
+							)}
+							{@const authorColor = cell.author_id
+								? resolvePlayerColor(
+										cell.author_id,
+										profile.playerId,
+										profile.primaryColor,
+										players
+									)
+								: '#1a1917'}
+
+							<button
+								type="button"
+								onclick={() => selectCell(r, c)}
+								aria-label="Row {r + 1} Column {c + 1}"
+								class="relative flex items-center justify-center p-0 focus:outline-none
+								{flash ? 'animate-mistake-shake bg-[#dc2626]/15' : ''}
+								{isSelected
+									? 'bg-[#1a1917]/12'
+									: isSameNumber
+										? 'bg-[#1a1917]/8'
+										: inPeerUnit
+											? 'bg-[#1a1917]/[0.03]'
+											: ''}"
+							>
+								<!-- Local selection outline in player's own color -->
+								{#if isSelected}
+									<span
+										class="pointer-events-none absolute inset-[2px] rounded-[3px] border-2"
+										style="border-color: {profile.primaryColor};"
+									></span>
+								{/if}
+
+								<!-- Other players' live cursors -->
+								{#each peerCursors as peer (peer.player_id)}
+									{@const peerColor = resolvePlayerColor(
+										peer.player_id,
+										profile.playerId,
+										profile.primaryColor,
+										players
+									)}
+									<span
+										class="pointer-events-none absolute inset-[3px] rounded-[3px] border-[1.8px] border-dashed opacity-85"
+										style="border-color: {peerColor};"
+									></span>
+								{/each}
+
+								<!-- Subtle indicator dot for 5pt difficult cells when scoring is enabled -->
+								{#if scoringEnabled && isHardCell && Object.keys(cellNotes).length === 0}
+									<span
+										title="Difficult cell (5 pts × multiplier)"
+										class="pointer-events-none absolute top-1 right-1 h-1 w-1 rounded-full bg-[#1a1917]/25"
+									></span>
+								{/if}
+
+								<!-- Cell Value -->
+								{#if cell.value !== null}
+									<span
+										class="{cell.given
+											? 'font-mono-num text-xl font-bold text-[#1a1917] sm:text-2xl'
+											: 'font-hand animate-scribble-pop text-2xl font-bold sm:text-[27px]'}"
+										style="color: {cell.given ? '#1a1917' : authorColor};"
+									>
+										{cell.value}
+									</span>
+								{:else if flash}
+									<!-- Rejected mistake flash -->
+									<span
+										class="font-hand text-2xl font-bold text-[#dc2626] line-through"
+									>
+										{flash.value}
+									</span>
+								{:else}
+									<!-- 1-9 Corner Notes in a 3x3 mini-grid -->
+									<div class="pointer-events-none grid h-full w-full grid-cols-3 grid-rows-3 p-[2px]">
+										{#each [1, 2, 3, 4, 5, 6, 7, 8, 9] as n (n)}
+											{@const noteAuthor = cellNotes[String(n)]}
+											<span
+												class="font-mono-num flex items-center justify-center text-[9px] leading-none font-bold sm:text-[10px]"
+												style="color: {noteAuthor
+													? resolvePlayerColor(
+															noteAuthor,
+															profile.playerId,
+															profile.primaryColor,
+															players
+														)
+													: 'transparent'};"
+											>
+												{noteAuthor ? n : ''}
+											</span>
+										{/each}
+									</div>
+								{/if}
+
+								<!-- Floating score delta popup (+points or -10 mistake) -->
+								{#if scoringEnabled && popup}
+									{@const popColor = resolvePlayerColor(
+										popup.player_id,
+										profile.playerId,
+										profile.primaryColor,
+										players
+									)}
+									<span
+										class="animate-float-score font-mono-num pointer-events-none absolute -top-3 z-30 rounded border border-[#1a1917] bg-[#faf8f4] px-1.5 py-0.5 text-[10px] font-bold shadow-sm"
+										style="color: {popColor};"
+									>
+										+{popup.points_delta}
+									</span>
+								{/if}
+
+								{#if scoringEnabled && flash}
+									<span
+										class="animate-float-score font-mono-num pointer-events-none absolute -top-3 z-30 rounded border border-[#dc2626] bg-[#faf8f4] px-1.5 py-0.5 text-[10px] font-bold text-[#dc2626] shadow-sm"
+									>
+										{flash.points_delta}
+									</span>
+								{/if}
+							</button>
+						{/each}
+					{/each}
+				</div>
+
+				<!-- Hand-drawn SVG grid lines overlay -->
+				<svg
+					class="pointer-events-none absolute inset-0 h-full w-full"
+					viewBox="0 0 900 900"
+					fill="none"
+					aria-hidden="true"
+				>
+					<!-- Outer border -->
+					<rect
+						x="2"
+						y="2"
+						width="896"
+						height="896"
+						stroke="#1a1917"
+						stroke-width="6"
+						style="filter: url(#scribble-filter);"
+					/>
+					<!-- Vertical & Horizontal lines -->
+					{#each [1, 2, 3, 4, 5, 6, 7, 8] as i (i)}
+						{@const pos = i * 100}
+						{@const isBlock = i % 3 === 0}
+						<line
+							x1={pos}
+							y1="0"
+							x2={pos}
+							y2="900"
+							stroke="#1a1917"
+							stroke-width={isBlock ? 5 : 1.7}
+							stroke-opacity={isBlock ? 0.95 : 0.32}
+							style="filter: url(#scribble-filter);"
+						/>
+						<line
+							x1="0"
+							y1={pos}
+							x2="900"
+							y2={pos}
+							stroke="#1a1917"
+							stroke-width={isBlock ? 5 : 1.7}
+							stroke-opacity={isBlock ? 0.95 : 0.32}
+							style="filter: url(#scribble-filter);"
+						/>
+					{/each}
+				</svg>
+			</div>
+
+			<!-- Mobile-First Controls & Numpad -->
+			<div class="space-y-2.5 pt-1">
+				<!-- Mode & Action Bar -->
+				<div class="flex items-center justify-between gap-2">
+					<button
+						type="button"
+						onclick={() => (noteMode = !noteMode)}
+						class="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border-[1.8px] border-[#1a1917] px-3 py-2 text-xs font-semibold transition active:scale-[0.98]
+						{noteMode
+							? 'bg-[#1a1917] text-[#faf8f4] shadow-[2px_2px_0px_#6e6a63]'
+							: 'bg-[#faf8f4] text-[#1a1917] shadow-[2px_2px_0px_#1a1917]'}"
+					>
+						<span>✎ Corner Notes: {noteMode ? 'ON' : 'OFF'}</span>
+						<span class="hidden text-[10px] opacity-70 sm:inline">(Space / N)</span>
+					</button>
+
+					<button
+						type="button"
+						onclick={clearSelectedCell}
+						class="cursor-pointer rounded-md border-[1.8px] border-[#1a1917] bg-[#faf8f4] px-3.5 py-2 text-xs font-semibold shadow-[2px_2px_0px_#1a1917] transition hover:bg-[#f2eee6] active:scale-[0.98]"
+					>
+						Clear Notes
+					</button>
+				</div>
+
+				<!-- 1-9 Touch Numpad -->
+				<div class="grid grid-cols-9 gap-1.5 sm:gap-2">
+					{#each [1, 2, 3, 4, 5, 6, 7, 8, 9] as digit (digit)}
+						{@const exhausted = !noteMode && (digitCounts[digit] ?? 0) >= 9}
+						<button
+							type="button"
+							disabled={exhausted}
+							onclick={() => enterDigit(digit)}
+							style="--my-color: {profile.primaryColor};"
+							class="relative flex h-12 cursor-pointer flex-col items-center justify-center rounded-md border-[1.8px] border-[#1a1917] bg-[#faf8f4] shadow-[2px_2px_0px_#1a1917] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 sm:h-13"
+						>
+							<span
+								class="font-hand text-xl leading-none font-bold"
+								style="color: {noteMode ? '#6e6a63' : profile.primaryColor};"
+							>
+								{digit}
+							</span>
+							<span class="font-mono-num mt-0.5 text-[9px] text-[#6e6a63]">
+								{9 - Math.min(9, digitCounts[digit] ?? 0)}
+							</span>
+						</button>
+					{/each}
+				</div>
+			</div>
+		</div>
+	{/if}
+</div>

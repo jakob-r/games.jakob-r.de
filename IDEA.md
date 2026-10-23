@@ -45,3 +45,11 @@ When the user enters games.jakob-r.de they can
 - For doing correct entries within 10 seconds user gets multiplier = 1.1 * multiplier
 - Multiplier is reset to 1 after 10 seconds.
 - Scoring can be turned off by the starting user.
+
+### Käsekästchen
+
+- The starting user creates a new game which will generate a unique game id url that they can share with others to invite them to join.
+- The starting player can decide how big the board should be.
+- The starting player can leave the board rectangular according to the measurements they have set or draw a custom shape within the measurements.
+- The game canvas is rectangular like the math paper.
+- 
