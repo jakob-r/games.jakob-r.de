@@ -73,11 +73,6 @@
 	let scoringEnabled = $derived(Boolean(room?.config?.scoring_enabled ?? true));
 	let currentDifficulty = $derived(String(room?.config?.difficulty ?? 'medium'));
 
-	let selectedValue = $derived.by(() => {
-		if (selectedRow === null || selectedCol === null) return null;
-		return cells[selectedRow]?.[selectedCol]?.value ?? null;
-	});
-
 	// Count how many of each digit (1..9) are already placed on the board
 	let digitCounts = $derived.by(() => {
 		const counts: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0 };
@@ -222,15 +217,6 @@
 			e.preventDefault();
 			selectCell(r, (c + 1) % 9);
 		}
-	}
-
-	function isPeerUnit(r: number, c: number): boolean {
-		if (selectedRow === null || selectedCol === null) return false;
-		if (r === selectedRow && c === selectedCol) return false;
-		const sameBlock =
-			Math.floor(r / 3) === Math.floor(selectedRow / 3) &&
-			Math.floor(c / 3) === Math.floor(selectedCol / 3);
-		return r === selectedRow || c === selectedCol || sameBlock;
 	}
 
 	function getMultiplierRemainingRatio(p: PlayerInfo): number {
@@ -448,20 +434,16 @@
 				</ScribblyBox>
 			{/if}
 
-			<!-- 9x9 Scribbly Sudoku Grid -->
+	<!-- 9x9 Sudoku Grid -->
 			<div class="relative mx-auto aspect-square w-full max-w-[430px] select-none">
-				<!-- Grid cells -->
 				<div
-					class="grid h-full w-full grid-cols-9 grid-rows-9 bg-[#faf8f4] shadow-[4px_4px_0px_#1a1917]"
+					class="grid h-full w-full grid-cols-9 grid-rows-9 border-[2.5px] border-[#1a1917] bg-[#faf8f4]"
 					role="grid"
 					aria-label="Sudoku Board"
 				>
 					{#each cells as rowCells, r (r)}
 						{#each rowCells as cell, c (c)}
 							{@const isSelected = selectedRow === r && selectedCol === c}
-							{@const isSameNumber =
-								selectedValue !== null && cell.value !== null && cell.value === selectedValue}
-							{@const inPeerUnit = isPeerUnit(r, c)}
 							{@const cellNotes = notes[r]?.[c] ?? {}}
 							{@const isHardCell = Boolean(hardCells[r]?.[c]) && cell.value === null}
 							{@const flash = mistakeFlashes.find((f) => f.row === r && f.col === c)}
@@ -480,25 +462,30 @@
 										players
 									)
 								: '#1a1917'}
+							{@const borderRight =
+								c === 8
+									? ''
+									: (c + 1) % 3 === 0
+										? 'border-r-[2.5px] border-r-[#1a1917]'
+										: 'border-r border-r-[#1a1917]/45'}
+							{@const borderBottom =
+								r === 8
+									? ''
+									: (r + 1) % 3 === 0
+										? 'border-b-[2.5px] border-b-[#1a1917]'
+										: 'border-b border-b-[#1a1917]/45'}
 
 							<button
 								type="button"
 								onclick={() => selectCell(r, c)}
 								aria-label="Row {r + 1} Column {c + 1}"
-								class="relative flex items-center justify-center p-0 focus:outline-none
-								{flash ? 'animate-mistake-shake bg-[#dc2626]/15' : ''}
-								{isSelected
-									? 'bg-[#1a1917]/12'
-									: isSameNumber
-										? 'bg-[#1a1917]/8'
-										: inPeerUnit
-											? 'bg-[#1a1917]/[0.03]'
-											: ''}"
+								class="relative flex items-center justify-center bg-[#faf8f4] p-0 focus:outline-none {borderRight} {borderBottom}
+								{flash ? 'animate-mistake-shake bg-[#dc2626]/15' : ''}"
 							>
 								<!-- Local selection outline in player's own color -->
 								{#if isSelected}
 									<span
-										class="pointer-events-none absolute inset-[2px] rounded-[3px] border-2"
+										class="pointer-events-none absolute inset-[2px] rounded-[2px] border-2"
 										style="border-color: {profile.primaryColor};"
 									></span>
 								{/if}
@@ -512,7 +499,7 @@
 										players
 									)}
 									<span
-										class="pointer-events-none absolute inset-[3px] rounded-[3px] border-[1.8px] border-dashed opacity-85"
+										class="pointer-events-none absolute inset-[3px] rounded-[2px] border-[1.8px] border-dashed opacity-85"
 										style="border-color: {peerColor};"
 									></span>
 								{/each}
@@ -591,50 +578,6 @@
 						{/each}
 					{/each}
 				</div>
-
-				<!-- Hand-drawn SVG grid lines overlay -->
-				<svg
-					class="pointer-events-none absolute inset-0 h-full w-full"
-					viewBox="0 0 900 900"
-					fill="none"
-					aria-hidden="true"
-				>
-					<!-- Outer border -->
-					<rect
-						x="2"
-						y="2"
-						width="896"
-						height="896"
-						stroke="#1a1917"
-						stroke-width="6"
-						style="filter: url(#scribble-filter);"
-					/>
-					<!-- Vertical & Horizontal lines -->
-					{#each [1, 2, 3, 4, 5, 6, 7, 8] as i (i)}
-						{@const pos = i * 100}
-						{@const isBlock = i % 3 === 0}
-						<line
-							x1={pos}
-							y1="0"
-							x2={pos}
-							y2="900"
-							stroke="#1a1917"
-							stroke-width={isBlock ? 5 : 1.7}
-							stroke-opacity={isBlock ? 0.95 : 0.32}
-							style="filter: url(#scribble-filter);"
-						/>
-						<line
-							x1="0"
-							y1={pos}
-							x2="900"
-							y2={pos}
-							stroke="#1a1917"
-							stroke-width={isBlock ? 5 : 1.7}
-							stroke-opacity={isBlock ? 0.95 : 0.32}
-							style="filter: url(#scribble-filter);"
-						/>
-					{/each}
-				</svg>
 			</div>
 
 			<!-- Mobile-First Controls & Numpad -->
