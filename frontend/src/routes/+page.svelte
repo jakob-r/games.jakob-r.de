@@ -110,9 +110,6 @@
 	<header class="mb-7 flex items-baseline justify-between border-b-2 border-[#1a1917] pb-3">
 		<div>
 			<h1 class="font-hand text-3xl tracking-tight sm:text-4xl">games.jakob-r.de</h1>
-			<p class="mt-0.5 text-xs text-[#6e6a63] sm:text-sm">
-				Small scribbly multiplayer games • no ads • no tracking
-			</p>
 		</div>
 	</header>
 
