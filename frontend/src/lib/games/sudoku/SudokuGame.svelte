@@ -53,7 +53,6 @@
 	let noteMode = $state<boolean>(false);
 	let mistakeFlashes = $state<MistakeFlash[]>([]);
 	let scorePopups = $state<ScorePopup[]>([]);
-	let copiedUrl = $state<boolean>(false);
 	let deletingRoom = $state<boolean>(false);
 	let nowTick = $state<number>(Date.now());
 	let flashCounter = 0;
@@ -234,17 +233,6 @@
 		return ratio > 0 ? p.multiplier : 1;
 	}
 
-	async function shareRoomUrl() {
-		if (typeof navigator === 'undefined') return;
-		try {
-			await navigator.clipboard.writeText(window.location.href);
-			copiedUrl = true;
-			setTimeout(() => (copiedUrl = false), 1800);
-		} catch {
-			// ignore
-		}
-	}
-
 	async function deleteRoom() {
 		if (!isHost || !profile.playerId || deletingRoom) return;
 		deletingRoom = true;
@@ -318,13 +306,6 @@
 					</svg>
 				</button>
 			{/if}
-			<button
-				type="button"
-				onclick={shareRoomUrl}
-				class="cursor-pointer rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] px-2.5 py-1 text-xs font-medium shadow-[1.5px_1.5px_0px_#1a1917] hover:bg-[#f2eee6]"
-			>
-				{copiedUrl ? 'Link Copied!' : 'Invite'}
-			</button>
 			<ProfileBadge
 				compact={true}
 				onChange={(name, color) => client.syncProfile(profile.playerId, name, color)}
