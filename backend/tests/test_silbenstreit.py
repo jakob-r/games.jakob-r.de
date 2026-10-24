@@ -24,9 +24,10 @@ def test_syllable_board_generation_and_q_accompaniment() -> None:
     """
     Verify board sizes 4..8 across all 4 languages (en, de, fr, es),
     integer letter scores in 1..10, at least one rare letter (score >= 6),
-    and that Q never appears without U on a generated board.
+    balanced vowel ratios (<= 48%), and that Q never appears without U on a generated board.
     """
     rng = random.Random(42)
+    vowels = set("AEIOU")
     for lang in SUPPORTED_LANGUAGES:
         for size in range(4, 9):
             letters, values = generate_board(size=size, language=lang, rng=rng)
@@ -38,6 +39,8 @@ def test_syllable_board_generation_and_q_accompaniment() -> None:
             assert all(len(ch) == 1 and ch.isalpha() and ch.isupper() for ch in flat_letters)
             assert all(isinstance(v, int) and 1 <= v <= 10 for v in flat_values)
             assert any(v >= 6 for v in flat_values)
+            vowel_ratio = sum(1 for ch in flat_letters if ch in vowels) / len(flat_letters)
+            assert 0.20 <= vowel_ratio <= 0.48
             if "Q" in flat_letters:
                 assert "U" in flat_letters
 
@@ -146,11 +149,13 @@ def test_protection_and_ownership_stealing() -> None:
     assert prot[0][0] is True  # (0,0) is surrounded by (0,1) and (1,0) which are both 'p1'
     assert prot[0][1] is False  # (0,2) and (1,1) are None
 
-    # Verify selecting a protected tile is rejected
+    # Verify p1 CAN reuse their own protected tile (0,0), while p2 CANNOT select p1's protected tile (0,0)
     state_with_prot = m2.state
     state_with_prot["owners"] = owners_grid
     state_with_prot["protected"] = prot
-    prot_attempt = game.apply_action(
+
+    # p1 reuses their own protected tile (0,0) 'C' to play "CAT" at (0,0),(0,1),(0,2) -> allowed!
+    own_prot_attempt = game.apply_action(
         state=state_with_prot,
         config=config,
         player_id="p1",
@@ -164,8 +169,27 @@ def test_protection_and_ownership_stealing() -> None:
         },
         player_multiplier=1.0,
     )
-    assert prot_attempt.is_correct_entry is False
-    assert prot_attempt.events[0]["reason"] == "protected_tile"
+    assert own_prot_attempt.is_correct_entry is True
+    assert own_prot_attempt.state["current_player_id"] == "p2"
+
+    # Now it is p2's turn: p2 tries to use p1's protected tile (0,0) 'C' -> rejected!
+    opp_prot_attempt = game.apply_action(
+        state=own_prot_attempt.state,
+        config=config,
+        player_id="p2",
+        action={
+            "type": "submit_word",
+            "positions": [
+                {"row": 0, "col": 0},
+                {"row": 0, "col": 1},
+                {"row": 0, "col": 2},
+                {"row": 0, "col": 3},
+            ],
+        },
+        player_multiplier=1.0,
+    )
+    assert opp_prot_attempt.is_correct_entry is False
+    assert opp_prot_attempt.events[0]["reason"] == "protected_tile"
 
 
 def test_game_ends_when_no_unowned_letters_remain() -> None:

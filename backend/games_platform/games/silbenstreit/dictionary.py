@@ -267,7 +267,9 @@ def extract_syllables(word: str) -> list[str]:
     if n <= 4:
         if "Q" in w and "QU" not in w:
             return []
-        if not any(ch in VOWELS or ch == "Y" for ch in w):
+        vowel_count = sum(1 for ch in w if ch in VOWELS)
+        max_vowels = 2 if ("QU" in w and n == 3) else max(1, n // 2)
+        if vowel_count == 0 or vowel_count > max_vowels:
             return []
         return [w]
 
@@ -325,7 +327,12 @@ def extract_syllables(word: str) -> list[str]:
             continue
         if "Q" in syl and "QU" not in syl:
             continue
-        if not any(ch in VOWELS or ch == "Y" for ch in syl):
+        vowel_count = sum(1 for ch in syl if ch in VOWELS)
+        # Every syllable must have at least 1 vowel and at least 1 consonant,
+        # and at most half vowels (e.g. 2-letter: 1V+1C; 3-letter: 1V+2C; 4-letter: <=2V+>=2C)
+        # Exception: 'QU' + 1 vowel in a 3-letter syllable (like QUE/QUI/QUA) has 2 vowels ('U' + vowel)
+        max_vowels = 2 if ("QU" in syl and len(syl) == 3) else max(1, len(syl) // 2)
+        if vowel_count == 0 or vowel_count > max_vowels:
             continue
         valid.append(syl)
 
@@ -381,7 +388,10 @@ def get_syllable_pool(language: str) -> SyllablePool:
 
     for syl in FALLBACK_SYLLABLES.get(lang, ()):
         if 2 <= len(syl) <= 4 and ("Q" not in syl or "QU" in syl):
-            raw_weights[syl] = raw_weights.get(syl, 0.0) + 1e-4
+            vowel_count = sum(1 for ch in syl if ch in VOWELS)
+            max_vowels = 2 if ("QU" in syl and len(syl) == 3) else max(1, len(syl) // 2)
+            if 1 <= vowel_count <= max_vowels:
+                raw_weights[syl] = raw_weights.get(syl, 0.0) + 1e-4
 
     by_length: dict[int, tuple[tuple[str, ...], tuple[float, ...]]] = {}
     rare_by_length: dict[int, tuple[tuple[str, ...], tuple[float, ...]]] = {}
@@ -429,7 +439,8 @@ def generate_board(
 ) -> tuple[list[list[str]], list[list[int]]]:
     """
     Generate a `size x size` grid of uppercase letters and their 1-10 rarity values
-    by sampling whole syllables (2..4 letters) according to dampened language frequencies.
+    by sampling whole syllables (2..4 letters) according to dampened language frequencies,
+    keeping a balanced vowel share (~30%..42%).
     """
     rng = rng or random.Random()
     lang = normalize_language(language)
@@ -439,35 +450,48 @@ def generate_board(
     total_cells = size * size
     sampled_letters: list[str] = []
 
-    # 1. Guarantee at least one rare-letter syllable (score >= 6, e.g. QU, X, Y, Z, J, K, V)
-    rare_lengths = [
-        length
-        for length in _allowed_syllable_lengths(total_cells)
-        if pool.rare_by_length.get(length, ((), ()))[0]
-    ]
-    if rare_lengths:
-        chosen_len = rng.choice(rare_lengths)
-        rare_sylls, rare_weights = pool.rare_by_length[chosen_len]
-        first_syl = rng.choices(rare_sylls, weights=rare_weights, k=1)[0]
-        sampled_letters.extend(first_syl)
+    for attempt in range(8):
+        candidate: list[str] = []
 
-    # 2. Fill remaining cells with whole syllables so no cluster (like QU) is ever truncated
-    while len(sampled_letters) < total_cells:
-        remaining = total_cells - len(sampled_letters)
-        valid_lengths = [
+        # 1. Guarantee at least one rare-letter syllable (score >= 6, e.g. QU, X, Y, Z, J, K, V)
+        rare_lengths = [
             length
-            for length in _allowed_syllable_lengths(remaining)
-            if pool.by_length.get(length, ((), ()))[0]
+            for length in _allowed_syllable_lengths(total_cells)
+            if pool.rare_by_length.get(length, ((), ()))[0]
         ]
-        if not valid_lengths:
-            # Safety fallback if remaining == 1 (unreachable by construction for total_cells >= 2)
-            sampled_letters.append(rng.choice(tuple(VOWELS)))
-            break
+        if rare_lengths:
+            len_weights = [4.0 if length == 3 else 1.5 for length in rare_lengths]
+            chosen_len = rng.choices(rare_lengths, weights=len_weights, k=1)[0]
+            rare_sylls, rare_weights = pool.rare_by_length[chosen_len]
+            first_syl = rng.choices(rare_sylls, weights=rare_weights, k=1)[0]
+            candidate.extend(first_syl)
 
-        chosen_len = rng.choice(valid_lengths)
-        sylls, weights = pool.by_length[chosen_len]
-        chosen_syl = rng.choices(sylls, weights=weights, k=1)[0]
-        sampled_letters.extend(chosen_syl)
+        # 2. Fill remaining cells with whole syllables so no cluster (like QU) is ever truncated
+        while len(candidate) < total_cells:
+            remaining = total_cells - len(candidate)
+            valid_lengths = [
+                length
+                for length in _allowed_syllable_lengths(remaining)
+                if pool.by_length.get(length, ((), ()))[0]
+            ]
+            if not valid_lengths:
+                candidate.append(rng.choice(tuple(VOWELS)))
+                break
+
+            # Strongly favor 3-letter (1 vowel + 2 consonants) syllables for natural consonant balance
+            len_weights = [
+                5.0 if length == 3 else (2.0 if length == 4 else 1.0)
+                for length in valid_lengths
+            ]
+            chosen_len = rng.choices(valid_lengths, weights=len_weights, k=1)[0]
+            sylls, weights = pool.by_length[chosen_len]
+            chosen_syl = rng.choices(sylls, weights=weights, k=1)[0]
+            candidate.extend(chosen_syl)
+
+        sampled_letters = candidate
+        vowel_ratio = sum(1 for ch in sampled_letters if ch in VOWELS) / total_cells
+        if 0.25 <= vowel_ratio <= 0.44 or attempt == 7:
+            break
 
     rng.shuffle(sampled_letters)
 

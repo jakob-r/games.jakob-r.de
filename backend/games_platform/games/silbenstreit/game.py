@@ -295,7 +295,7 @@ class SilbenstreitGame:
                                 }
                             ],
                         )
-                    if protected[r][c]:
+                    if protected[r][c] and owners[r][c] != player_id:
                         return ActionOutcome(
                             state=next_state,
                             events=[

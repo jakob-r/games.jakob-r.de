@@ -58,6 +58,8 @@
 	let deletingRoom = $state<boolean>(false);
 	let leavingRoom = $state<boolean>(false);
 	let selectedTiles = $state<TileCoord[]>([]);
+	let dragFromIndex = $state<number | null>(null);
+	let dragOverIndex = $state<number | null>(null);
 	let rejectReason = $state<string | null>(null);
 	let rejectShake = $state<boolean>(false);
 
@@ -115,12 +117,18 @@
 
 	function formatRejectionReason(reason: string, word: string): string {
 		if (reason === 'too_short') return 'Word must have at least 2 letters.';
-		if (reason === 'protected_tile') return 'Protected tiles cannot be selected.';
+		if (reason === 'protected_tile') return "Opponent's protected tiles cannot be selected.";
 		if (reason === 'already_played') return `"${word}" has already been played.`;
 		if (reason === 'not_in_dictionary')
 			return `"${word}" is not in the ${formatLanguageLabel(boardLang)} dictionary.`;
 		if (reason === 'not_your_turn') return 'Wait for your turn.';
 		return 'Invalid word.';
+	}
+
+	function isTileBlockedForMe(row: number, col: number): boolean {
+		const isProtected = protectedGrid[row]?.[col] ?? false;
+		const ownerId = owners[row]?.[col] ?? null;
+		return isProtected && ownerId !== profile.playerId;
 	}
 
 	function updateSize(size: number) {
@@ -140,7 +148,7 @@
 
 	function toggleTile(row: number, col: number) {
 		if (!isMyTurn || room?.status !== 'playing') return;
-		if (protectedGrid[row]?.[col]) return;
+		if (isTileBlockedForMe(row, col)) return;
 
 		rejectReason = null;
 		const existingIdx = selectedTiles.findIndex((t) => t.row === row && t.col === col);
@@ -155,6 +163,40 @@
 	function removeComposedAt(index: number) {
 		rejectReason = null;
 		selectedTiles = selectedTiles.filter((_, i) => i !== index);
+	}
+
+	function moveComposedTile(fromIdx: number, toIdx: number) {
+		if (fromIdx === toIdx || fromIdx < 0 || toIdx < 0) return;
+		if (fromIdx >= selectedTiles.length || toIdx >= selectedTiles.length) return;
+		const next = [...selectedTiles];
+		const [moved] = next.splice(fromIdx, 1);
+		next.splice(toIdx, 0, moved);
+		selectedTiles = next;
+		rejectReason = null;
+	}
+
+	function handleChipDragStart(e: DragEvent, index: number) {
+		dragFromIndex = index;
+		dragOverIndex = index;
+		if (e.dataTransfer) {
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', String(index));
+		}
+	}
+
+	function handleChipDragOver(e: DragEvent, index: number) {
+		e.preventDefault();
+		if (dragFromIndex === null) return;
+		if (dragFromIndex !== index) {
+			moveComposedTile(dragFromIndex, index);
+			dragFromIndex = index;
+		}
+		dragOverIndex = index;
+	}
+
+	function handleChipDragEnd() {
+		dragFromIndex = null;
+		dragOverIndex = null;
 	}
 
 	function clearSelection() {
@@ -214,7 +256,7 @@
 				for (let c = 0; c < boardSize; c++) {
 					if (
 						letters[r]?.[c] === letter &&
-						!protectedGrid[r]?.[c] &&
+						!isTileBlockedForMe(r, c) &&
 						!selectedKeySet.has(`${r},${c}`)
 					) {
 						e.preventDefault();
@@ -553,6 +595,7 @@
 							{@const val = values[r]?.[c] ?? 1}
 							{@const ownerId = owners[r]?.[c] ?? null}
 							{@const isProtected = protectedGrid[r]?.[c] ?? false}
+							{@const blockedForMe = isTileBlockedForMe(r, c)}
 							{@const isSelected = selectedKeySet.has(`${r},${c}`)}
 							{@const ownerColor = ownerId
 								? resolvePlayerColor(ownerId, profile.playerId, profile.primaryColor, players)
@@ -563,11 +606,11 @@
 								r === boardSize - 1 ? '' : 'border-b border-b-[#1a1917]/30'}
 							<button
 								type="button"
-								disabled={!isMyTurn || isProtected || room.status !== 'playing'}
+								disabled={!isMyTurn || blockedForMe || room.status !== 'playing'}
 								onclick={() => toggleTile(r, c)}
 								aria-label="Row {r + 1} Column {c + 1}: {letter} ({val} points)"
 								class="silben-cell relative flex items-center justify-center p-0 focus:outline-none {borderRight} {borderBottom}
-								{isProtected
+								{blockedForMe
 									? 'cursor-not-allowed'
 									: isMyTurn && room.status === 'playing'
 										? 'cursor-pointer'
@@ -595,12 +638,12 @@
 				</div>
 			</div>
 
-			<!-- Word Composer Bar -->
+			<!-- Word Composer Bar (Supports Drag & Drop Reordering + Click to Remove) -->
 			{#if room.status === 'playing'}
 				<div
 					class="border-[1.8px] border-[#1a1917] bg-[#faf8f4] px-3 py-2.5 {rejectShake ? 'animate-mistake-shake' : ''}"
 				>
-					<div class="flex min-h-[34px] items-center justify-between gap-2">
+					<div class="flex min-h-[38px] items-center justify-between gap-2">
 						{#if selectedTiles.length === 0}
 							<span class="text-xs text-[#6e6a63]">
 								{isMyTurn
@@ -608,18 +651,28 @@
 									: 'Waiting for opponent…'}
 							</span>
 						{:else}
-							<div class="flex flex-wrap items-baseline gap-2">
-								<span class="silben-word-preview text-xl font-semibold tracking-wider text-[#1a1917]">
-									{#each selectedTiles as pos, idx (`${pos.row},${pos.col}`)}
-										<button
-											type="button"
-											onclick={() => removeComposedAt(idx)}
-											title="Remove letter"
-											class="cursor-pointer px-0.5 hover:line-through"
-										>{letters[pos.row]?.[pos.col] ?? ''}</button>
-									{/each}
-								</span>
-								<span class="font-mono-num text-xs text-[#6e6a63]">
+							<div
+								class="flex flex-wrap items-center gap-1.5"
+								role="list"
+								aria-label="Selected word letters (drag to reorder, click to remove)"
+							>
+								{#each selectedTiles as pos, idx (`${pos.row},${pos.col}`)}
+									{@const ch = letters[pos.row]?.[pos.col] ?? ''}
+									<button
+										type="button"
+										draggable="true"
+										ondragstart={(e) => handleChipDragStart(e, idx)}
+										ondragover={(e) => handleChipDragOver(e, idx)}
+										ondragend={handleChipDragEnd}
+										onclick={() => removeComposedAt(idx)}
+										title="Drag to reorder or click to remove"
+										class="silben-word-chip flex h-9 w-8 cursor-grab items-center justify-center border border-[#1a1917] bg-[#f3efe6] text-lg font-semibold text-[#1a1917] select-none active:cursor-grabbing
+										{dragOverIndex === idx ? 'ring-2 ring-[#1a1917]' : ''}"
+									>
+										{ch}
+									</button>
+								{/each}
+								<span class="font-mono-num ml-1 text-xs text-[#6e6a63]">
 									{composedPoints} pts
 								</span>
 							</div>
@@ -717,7 +770,7 @@
 		font-size: clamp(0.6rem, 17cqi, 0.85rem);
 	}
 
-	.silben-word-preview {
+	.silben-word-chip {
 		font-family: Arial, Helvetica, system-ui, -apple-system, sans-serif;
 	}
 </style>
