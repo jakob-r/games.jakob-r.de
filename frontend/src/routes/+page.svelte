@@ -16,6 +16,8 @@
 			scoring_enabled?: boolean;
 			width?: number;
 			height?: number;
+			size?: number;
+			language?: string;
 		};
 		score: number;
 		player_count: number;
@@ -34,6 +36,7 @@
 	let creatingSudoku = $state<boolean>(false);
 	let creatingKaese = $state<boolean>(false);
 	let creatingMines = $state<boolean>(false);
+	let creatingSilben = $state<boolean>(false);
 	let deletingRoomId = $state<string | null>(null);
 	let leavingRoomId = $state<string | null>(null);
 	let recentRooms = $state<RecentRoom[]>([]);
@@ -147,6 +150,34 @@
 		}
 	}
 
+	async function createSilbenstreitRoom() {
+		if (creatingSilben) return;
+		creatingSilben = true;
+		try {
+			const res = await fetch('/api/rooms', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					game_slug: 'silbenstreit',
+					host_player_id: profile.playerId,
+					host_name: profile.name,
+					host_color: profile.primaryColor,
+					config: {
+						size: 5,
+						language: 'de',
+						scoring_enabled: true
+					}
+				})
+			});
+			if (res.ok) {
+				const room = await res.json();
+				await goto(`/silbenstreit/${room.room_id}`);
+			}
+		} finally {
+			creatingSilben = false;
+		}
+	}
+
 	async function handleJoinByCode(e: SubmitEvent) {
 		e.preventDefault();
 		joinError = null;
@@ -207,6 +238,7 @@
 		if (slug === 'kaesekaestchen') return 'Käsekästchen';
 		if (slug === 'sudoku') return 'Sudoku';
 		if (slug === 'minesweeper') return 'Minesweeper';
+		if (slug === 'silbenstreit') return 'Silbenstreit';
 		return slug;
 	}
 
@@ -215,6 +247,11 @@
 			const w = item.config?.width ?? 6;
 			const h = item.config?.height ?? 6;
 			return `${w}×${h}`;
+		}
+		if (item.game_slug === 'silbenstreit') {
+			const sz = item.config?.size ?? 5;
+			const lang = (item.config?.language ?? 'de').toUpperCase();
+			return `${sz}×${sz} • ${lang}`;
 		}
 		return item.config?.difficulty ?? 'medium';
 	}
@@ -395,6 +432,51 @@
 					class="w-full sm:w-auto"
 				>
 					{creatingMines ? 'Creating Room…' : 'New Minesweeper →'}
+				</ScribblyButton>
+			</div>
+		</ScribblyBox>
+
+		<!-- Section 2D: Silbenstreit -->
+		<ScribblyBox seed={39} class="bg-[#faf8f4] p-4 sm:p-6">
+			<div class="flex items-center justify-between gap-2">
+				<h2 class="font-hand text-2xl">Silbenstreit</h2>
+				<span
+					title="2 players"
+					aria-label="2 players"
+					class="inline-flex items-center gap-1 text-xs font-medium text-[#6e6a63]"
+				>
+					<svg
+						class="h-4 w-4"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+						<circle cx="9" cy="7" r="4" />
+						<path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+						<path d="M16 3.13a4 4 0 0 1 0 7.75" />
+					</svg>
+					<span class="font-mono-num">2</span>
+				</span>
+			</div>
+
+			<p class="mt-1.5 text-sm text-[#6e6a63]">
+				Claim letter tiles with valid words, steal opponent tiles, and surround your letters to protect them.
+			</p>
+
+			<div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+				<ScribblyButton
+					onclick={createSilbenstreitRoom}
+					disabled={creatingSilben}
+					variant="primary"
+					accentColor={profile.primaryColor}
+					class="w-full sm:w-auto"
+				>
+					{creatingSilben ? 'Creating Room…' : 'New Silbenstreit →'}
 				</ScribblyButton>
 			</div>
 		</ScribblyBox>

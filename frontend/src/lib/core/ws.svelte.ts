@@ -97,6 +97,27 @@ export type ServerEvent =
 			cells?: { row: number; col: number; adjacent: number }[];
 	  }
 	| {
+			type: 'word_played';
+			word: string;
+			player_id: string;
+			positions: { row: number; col: number }[];
+			word_points: number;
+			points_delta: number;
+			next_player_id: string | null;
+	  }
+	| {
+			type: 'word_rejected';
+			player_id: string;
+			word: string;
+			reason: string;
+	  }
+	| {
+			type: 'turn_passed';
+			player_id: string;
+			next_player_id: string | null;
+			consecutive_passes: number;
+	  }
+	| {
 			type: 'cursor_update';
 			player_id: string;
 			row: number | null;

@@ -54,6 +54,12 @@ To share components across games while allowing any game to be extracted and run
      - `standalone.py`: Standalone FastAPI entrypoint (`uv run uvicorn games_platform.games.minesweeper.standalone:app`).
    - **Frontend (`frontend/src/lib/games/minesweeper/`)**:
      - `MinesweeperGame.svelte`: Mobile-first dig/flag modes, long-press flagging, player-colored flags, boom FX on mine hits, and challenge confirm for opponent flags.
+   - **Backend (`backend/games_platform/games/silbenstreit/`)**:
+     - `dictionary.py`: `wordfreq`-backed dictionary validation, per-language `1–10` letter rarity scores, and syllable-sampled board generator (`4×4` to `8×8` in `de`, `en`, `fr`, `es`) ensuring orthographic clusters like `QU` stay accompanied.
+     - `game.py`: `SilbenstreitGame` implementing `GameDefinition` (round-based word submission, tile ownership transfer, `extra_score_deltas` board-ownership scoring, orthogonal tile protection, and word reuse prevention).
+     - `standalone.py`: Standalone FastAPI entrypoint (`uv run uvicorn games_platform.games.silbenstreit.standalone:app`).
+   - **Frontend (`frontend/src/lib/games/silbenstreit/`)**:
+     - `SilbenstreitGame.svelte`: Mobile-first `4×4`–`8×8` scribbly letter grid with rarity badges, protected tile indicators, keyboard & tap word composer, and played words history.
 
 `ActionOutcome.extra_score_deltas` lets a single action credit other players (minesweeper flag challenges); `RoomManager` applies those deltas after the actor's score update.
 
