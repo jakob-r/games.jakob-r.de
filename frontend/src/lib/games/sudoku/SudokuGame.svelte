@@ -252,15 +252,17 @@
 	}
 
 	async function leaveRoom() {
-		if (!profile.playerId || leavingRoom) return;
+		if (isHost || !profile.playerId || leavingRoom) return;
 		leavingRoom = true;
 		try {
-			await fetch(
+			const res = await fetch(
 				`/api/rooms/${encodeURIComponent(roomId)}/players/${encodeURIComponent(profile.playerId)}`,
 				{ method: 'DELETE' }
 			);
-			client.disconnect();
-			await goto('/');
+			if (res.ok) {
+				client.disconnect();
+				await goto('/');
+			}
 		} finally {
 			leavingRoom = false;
 		}
@@ -297,16 +299,6 @@
 		</div>
 
 		<div class="flex items-center gap-2">
-			<button
-				type="button"
-				onclick={leaveRoom}
-				disabled={leavingRoom}
-				title="Leave this game"
-				aria-label="Leave this game"
-				class="inline-flex cursor-pointer items-center justify-center rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] px-2 py-1 text-xs font-medium text-[#6e6a63] shadow-[1.5px_1.5px_0px_#1a1917] transition hover:border-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-50"
-			>
-				Leave
-			</button>
 			{#if isHost}
 				<button
 					type="button"
@@ -332,6 +324,17 @@
 						<line x1="10" y1="11" x2="10" y2="17" />
 						<line x1="14" y1="11" x2="14" y2="17" />
 					</svg>
+				</button>
+			{:else if room}
+				<button
+					type="button"
+					onclick={leaveRoom}
+					disabled={leavingRoom}
+					title="Leave this game"
+					aria-label="Leave this game"
+					class="inline-flex cursor-pointer items-center justify-center rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] px-2 py-1 text-xs font-medium text-[#6e6a63] shadow-[1.5px_1.5px_0px_#1a1917] transition hover:border-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-50"
+				>
+					Leave
 				</button>
 			{/if}
 			<ProfileBadge
@@ -359,7 +362,7 @@
 			{players}
 			onToggleReady={(r) => client.setReady(r)}
 			onStartGame={() => client.startGame()}
-			onLeaveRoom={leaveRoom}
+			onLeaveRoom={isHost ? undefined : leaveRoom}
 		>
 			{#snippet configSlot()}
 				<div class="space-y-4">

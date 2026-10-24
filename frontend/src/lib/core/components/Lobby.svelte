@@ -139,7 +139,7 @@
 				>
 					{me?.is_ready ? 'Not Ready' : 'Ready'}
 				</ScribblyButton>
-				{#if onLeaveRoom}
+				{#if onLeaveRoom && !isHost}
 					<ScribblyButton onclick={onLeaveRoom} variant="danger">
 						Leave Game
 					</ScribblyButton>

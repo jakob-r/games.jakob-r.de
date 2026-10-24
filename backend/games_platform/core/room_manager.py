@@ -144,6 +144,8 @@ class RoomManager:
             room = await self.db.get_room(room_id)
             if room is None:
                 return False
+            if room["host_player_id"] == player_id:
+                raise PermissionError("The creator of this room cannot leave it.")
 
             removed = await self.db.remove_room_player(room_id, player_id)
             conns = [
@@ -169,11 +171,6 @@ class RoomManager:
                 self.cursors.pop(room_id, None)
                 empty_room = True
             else:
-                new_host = (
-                    remaining[0]["player_id"]
-                    if room["host_player_id"] == player_id
-                    else None
-                )
                 new_state: dict[str, Any] | None = None
                 if isinstance(room["state"], dict) and "turn_order" in room["state"]:
                     state = dict(room["state"])
@@ -195,10 +192,9 @@ class RoomManager:
                             )
                         new_state = state
 
-                if new_host is not None or new_state is not None:
+                if new_state is not None:
                     await self.db.update_room(
                         room_id,
-                        host_player_id=new_host,
                         state=new_state,
                     )
                 await self.broadcast_room_state(room_id)
@@ -315,36 +311,38 @@ class RoomManager:
     ) -> RoomConnection:
         await websocket.accept()
         conn = RoomConnection(websocket=websocket, player_id=player_id)
-        self.connections.setdefault(room_id, []).append(conn)
-        await self.db.upsert_room_player(
-            room_id=room_id,
-            player_id=player_id,
-            name=name,
-            color=color,
-        )
-        room = await self.db.get_room(room_id)
-        if (
-            room is not None
-            and room["status"] == "playing"
-            and isinstance(room["state"], dict)
-            and "turn_order" in room["state"]
-        ):
-            state = dict(room["state"])
-            turn_order: list[str] = list(state.get("turn_order") or [])
-            if player_id not in turn_order:
-                turn_order.append(player_id)
-                state["turn_order"] = turn_order
-                if not state.get("current_player_id"):
-                    state["current_player_id"] = turn_order[0]
-                await self.db.update_room(room_id, state=state)
-        await self.broadcast_room_state(room_id)
+        async with self._get_lock(room_id):
+            self.connections.setdefault(room_id, []).append(conn)
+            await self.db.upsert_room_player(
+                room_id=room_id,
+                player_id=player_id,
+                name=name,
+                color=color,
+            )
+            room = await self.db.get_room(room_id)
+            if (
+                room is not None
+                and room["status"] == "playing"
+                and isinstance(room["state"], dict)
+                and "turn_order" in room["state"]
+            ):
+                state = dict(room["state"])
+                turn_order: list[str] = list(state.get("turn_order") or [])
+                if player_id not in turn_order:
+                    turn_order.append(player_id)
+                    state["turn_order"] = turn_order
+                    if not state.get("current_player_id"):
+                        state["current_player_id"] = turn_order[0]
+                    await self.db.update_room(room_id, state=state)
+            await self.broadcast_room_state(room_id)
         return conn
 
     async def disconnect(self, room_id: str, conn: RoomConnection) -> None:
-        self._remove_connection(room_id, conn)
-        if room_id in self.cursors and conn.player_id in self.cursors[room_id]:
-            del self.cursors[room_id][conn.player_id]
-        await self.broadcast_room_state(room_id)
+        async with self._get_lock(room_id):
+            self._remove_connection(room_id, conn)
+            if room_id in self.cursors and conn.player_id in self.cursors[room_id]:
+                del self.cursors[room_id][conn.player_id]
+            await self.broadcast_room_state(room_id)
 
     async def handle_client_message(
         self,

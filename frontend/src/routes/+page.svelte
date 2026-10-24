@@ -217,6 +217,8 @@
 
 	async function leaveRoom(roomId: string) {
 		if (!profile.playerId || leavingRoomId) return;
+		const target = recentRooms.find((r) => r.room_id === roomId);
+		if (target?.host_player_id === profile.playerId) return;
 		leavingRoomId = roomId;
 		try {
 			const res = await fetch(
@@ -530,16 +532,6 @@
 								>
 									{item.status === 'finished' ? 'View' : 'Resume →'}
 								</a>
-								<button
-									type="button"
-									onclick={() => leaveRoom(item.room_id)}
-									disabled={leavingRoomId === item.room_id}
-									title="Leave this game"
-									aria-label="Leave room #{item.room_id}"
-									class="inline-flex cursor-pointer items-center justify-center rounded border-[1.6px] border-[#1a1917] bg-[#faf8f4] px-2 py-1.5 text-xs font-medium text-[#6e6a63] shadow-[1.5px_1.5px_0px_#1a1917] transition hover:border-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-50"
-								>
-									Leave
-								</button>
 								{#if item.host_player_id === profile.playerId}
 									<button
 										type="button"
@@ -565,6 +557,17 @@
 											<line x1="10" y1="11" x2="10" y2="17" />
 											<line x1="14" y1="11" x2="14" y2="17" />
 										</svg>
+									</button>
+								{:else}
+									<button
+										type="button"
+										onclick={() => leaveRoom(item.room_id)}
+										disabled={leavingRoomId === item.room_id}
+										title="Leave this game"
+										aria-label="Leave room #{item.room_id}"
+										class="inline-flex cursor-pointer items-center justify-center rounded border-[1.6px] border-[#1a1917] bg-[#faf8f4] px-2 py-1.5 text-xs font-medium text-[#6e6a63] shadow-[1.5px_1.5px_0px_#1a1917] transition hover:border-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-50"
+									>
+										Leave
 									</button>
 								{/if}
 							</div>

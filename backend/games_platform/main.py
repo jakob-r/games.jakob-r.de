@@ -183,7 +183,10 @@ def create_app(
         room_id: str,
         player_id: str,
     ) -> dict[str, Any]:
-        left = await manager.leave_room(room_id=room_id, player_id=player_id)
+        try:
+            left = await manager.leave_room(room_id=room_id, player_id=player_id)
+        except PermissionError as e:
+            raise HTTPException(status_code=403, detail=str(e)) from e
         if not left:
             raise HTTPException(status_code=404, detail="Room or player not found")
         return {"status": "left", "room_id": room_id, "player_id": player_id}

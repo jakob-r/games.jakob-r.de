@@ -147,9 +147,12 @@ def test_full_multiplayer_sudoku_room_lifecycle() -> None:
         assert stats_res.status_code == 200
         assert stats_res.json()["summary"]["rooms_joined"] >= 1
 
-        # 5. Non-host cannot delete the room, but can leave it
+        # 5. Non-host cannot delete the room, but can leave it; creator cannot leave the room
         forbidden_del = client.delete(f"/api/rooms/{room_id}?player_id=peer_2")
         assert forbidden_del.status_code == 403
+
+        forbidden_host_leave = client.delete(f"/api/rooms/{room_id}/players/host_1")
+        assert forbidden_host_leave.status_code == 403
 
         leave_res = client.delete(f"/api/rooms/{room_id}/players/peer_2")
         assert leave_res.status_code == 200
