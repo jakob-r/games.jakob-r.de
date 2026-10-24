@@ -24,6 +24,7 @@ When the user enters games.jakob-r.de they can
 ## Common parts
 
 - Color logic: A user sets their primary color and sees other players with their primary color. If the others player color is too similar it will be adjusted. For this we have a function opponent_color(my_color, their_color) which returns a color that is not too similar to my_color or their_color.
+- Player removal: As a room creator, clicking on another player's name opens a confirmation modal to remove them from the room.
 
 ## Games
 

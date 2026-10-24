@@ -90,6 +90,11 @@ class ReturnToLobbyMessage(BaseModel):
     type: Literal["return_to_lobby"] = "return_to_lobby"
 
 
+class RemovePlayerMessage(BaseModel):
+    type: Literal["remove_player"] = "remove_player"
+    player_id: str = Field(min_length=1)
+
+
 class GameActionMessage(BaseModel):
     type: Literal["game_action"] = "game_action"
     action: dict[str, Any]
@@ -107,6 +112,7 @@ type ClientMessage = Annotated[
     | UpdateConfigMessage
     | StartGameMessage
     | ReturnToLobbyMessage
+    | RemovePlayerMessage
     | GameActionMessage
     | CursorMoveMessage,
     Field(discriminator="type"),

@@ -128,6 +128,11 @@ export type ServerEvent =
 			room_id: string;
 	  }
 	| {
+			type: 'player_removed';
+			room_id: string;
+			player_id: string;
+	  }
+	| {
 			type: 'error';
 			message: string;
 	  };
@@ -209,6 +214,9 @@ export class RoomSocketClient {
 				} else if (data.type === 'room_deleted') {
 					this.manualClose = true;
 					this.error = 'This game session was permanently deleted.';
+				} else if (data.type === 'player_removed' && data.player_id === this.playerId) {
+					this.manualClose = true;
+					this.error = 'You were removed from this room by the host.';
 				} else if (data.type === 'error') {
 					this.error = data.message;
 				}
@@ -222,9 +230,11 @@ export class RoomSocketClient {
 
 		socket.onclose = (ev) => {
 			this.connected = false;
-			if (this.manualClose || ev.code === 4004 || ev.code === 4000) {
+			if (this.manualClose || ev.code === 4004 || ev.code === 4003 || ev.code === 4000) {
 				if (ev.code === 4004) {
 					this.error = 'Room not found.';
+				} else if (ev.code === 4003 && !this.error) {
+					this.error = 'You were removed from this room by the host.';
 				}
 				return;
 			}
@@ -274,6 +284,15 @@ export class RoomSocketClient {
 
 	returnToLobby(): void {
 		this.send({ type: 'return_to_lobby' });
+	}
+
+	async removePlayer(targetPlayerId: string): Promise<boolean> {
+		if (!this.roomId || !this.playerId) return false;
+		const res = await fetch(
+			`/api/rooms/${encodeURIComponent(this.roomId)}/players/${encodeURIComponent(targetPlayerId)}?actor_id=${encodeURIComponent(this.playerId)}`,
+			{ method: 'DELETE' }
+		);
+		return res.ok;
 	}
 
 	sendAction(action: Record<string, unknown>): void {

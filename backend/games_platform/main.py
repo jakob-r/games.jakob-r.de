@@ -182,14 +182,20 @@ def create_app(
     async def leave_room(
         room_id: str,
         player_id: str,
+        actor_id: str | None = Query(default=None),
     ) -> dict[str, Any]:
         try:
-            left = await manager.leave_room(room_id=room_id, player_id=player_id)
+            left = await manager.leave_room(
+                room_id=room_id,
+                player_id=player_id,
+                actor_id=actor_id,
+            )
         except PermissionError as e:
             raise HTTPException(status_code=403, detail=str(e)) from e
         if not left:
             raise HTTPException(status_code=404, detail="Room or player not found")
-        return {"status": "left", "room_id": room_id, "player_id": player_id}
+        status_label = "removed" if actor_id and actor_id != player_id else "left"
+        return {"status": status_label, "room_id": room_id, "player_id": player_id}
 
     @app.get("/api/players/{player_id}/recent")
     async def get_player_recent_rooms(

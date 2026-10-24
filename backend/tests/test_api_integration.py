@@ -147,12 +147,42 @@ def test_full_multiplayer_sudoku_room_lifecycle() -> None:
         assert stats_res.status_code == 200
         assert stats_res.json()["summary"]["rooms_joined"] >= 1
 
-        # 5. Non-host cannot delete the room, but can leave it; creator cannot leave the room
+        # 5. Non-host cannot delete the room or remove other players; creator can remove other players; creator cannot leave the room
         forbidden_del = client.delete(f"/api/rooms/{room_id}?player_id=peer_2")
         assert forbidden_del.status_code == 403
 
         forbidden_host_leave = client.delete(f"/api/rooms/{room_id}/players/host_1")
         assert forbidden_host_leave.status_code == 403
+
+        forbidden_peer_kick = client.delete(
+            f"/api/rooms/{room_id}/players/host_1?actor_id=peer_2"
+        )
+        assert forbidden_peer_kick.status_code == 403
+
+        # Join a third player and have host remove them
+        ws_url_3 = f"/ws/sudoku/{room_id}?player_id=peer_3&name=Charlie&color=%2316a34a"
+        with client.websocket_connect(ws_url_3) as ws3:
+            _ = ws3.receive_json()
+            non_host_kick = client.delete(
+                f"/api/rooms/{room_id}/players/peer_3?actor_id=peer_2"
+            )
+            assert non_host_kick.status_code == 403
+
+            host_kick = client.delete(
+                f"/api/rooms/{room_id}/players/peer_3?actor_id=host_1"
+            )
+            assert host_kick.status_code == 200
+            assert host_kick.json() == {
+                "status": "removed",
+                "room_id": room_id,
+                "player_id": "peer_3",
+            }
+            removed_msg = ws3.receive_json()
+            assert removed_msg == {
+                "type": "player_removed",
+                "room_id": room_id,
+                "player_id": "peer_3",
+            }
 
         leave_res = client.delete(f"/api/rooms/{room_id}/players/peer_2")
         assert leave_res.status_code == 200

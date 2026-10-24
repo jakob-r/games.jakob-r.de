@@ -18,6 +18,7 @@ from games_platform.core.protocol import (
     GameActionMessage,
     GameDefinition,
     PlayerSyncMessage,
+    RemovePlayerMessage,
     ReturnToLobbyMessage,
     SetReadyMessage,
     StartGameMessage,
@@ -138,70 +139,112 @@ class RoomManager:
         self.locks.pop(room_id, None)
         return deleted
 
-    async def leave_room(self, room_id: str, player_id: str) -> bool:
+    async def _remove_player_locked(
+        self,
+        room: dict[str, Any],
+        player_id: str,
+        *,
+        actor_id: str | None = None,
+    ) -> tuple[bool, bool]:
+        """Remove a player while holding the room lock. Returns (removed, empty_room)."""
+        room_id = room["id"]
+        effective_actor = actor_id or player_id
+
+        if effective_actor == player_id:
+            if room["host_player_id"] == player_id:
+                raise PermissionError("The creator of this room cannot leave it.")
+        else:
+            if room["host_player_id"] != effective_actor:
+                raise PermissionError("Only the creator of this room can remove other players.")
+            if room["host_player_id"] == player_id:
+                raise PermissionError("The creator of this room cannot be removed.")
+
+        is_kicked = effective_actor != player_id
+        removed = await self.db.remove_room_player(room_id, player_id)
+        conns = [
+            c for c in self.connections.get(room_id, []) if c.player_id == player_id
+        ]
+        for conn in conns:
+            self._remove_connection(room_id, conn)
+            try:
+                if is_kicked:
+                    await conn.websocket.send_json(
+                        {
+                            "type": "player_removed",
+                            "room_id": room_id,
+                            "player_id": player_id,
+                        }
+                    )
+                await conn.websocket.close(
+                    code=4003 if is_kicked else 4000,
+                    reason="Removed by host" if is_kicked else "Left room",
+                )
+            except (RuntimeError, OSError) as e:
+                logger.debug("WebSocket close failed for %s: %s", conn.player_id, repr(e))
+
+        if room_id in self.cursors:
+            self.cursors[room_id].pop(player_id, None)
+
+        if not removed:
+            return False, False
+
+        remaining = await self.db.get_room_players(room_id)
+        if not remaining:
+            await self.db.delete_room(room_id)
+            self.connections.pop(room_id, None)
+            self.cursors.pop(room_id, None)
+            return True, True
+
+        new_state: dict[str, Any] | None = None
+        if isinstance(room["state"], dict) and "turn_order" in room["state"]:
+            state = dict(room["state"])
+            old_order: list[str] = list(state.get("turn_order") or [])
+            if player_id in old_order:
+                old_idx = old_order.index(player_id)
+                new_order = [pid for pid in old_order if pid != player_id]
+                state["turn_order"] = new_order
+                if not new_order:
+                    state["current_turn_index"] = 0
+                    state["current_player_id"] = None
+                elif state.get("current_player_id") == player_id:
+                    next_idx = old_idx % len(new_order)
+                    state["current_turn_index"] = next_idx
+                    state["current_player_id"] = new_order[next_idx]
+                elif state.get("current_player_id") in new_order:
+                    state["current_turn_index"] = new_order.index(
+                        state["current_player_id"]
+                    )
+                new_state = state
+
+        if new_state is not None:
+            await self.db.update_room(
+                room_id,
+                state=new_state,
+            )
+        await self.broadcast_room_state(room_id)
+        return True, False
+
+    async def leave_room(
+        self,
+        room_id: str,
+        player_id: str,
+        *,
+        actor_id: str | None = None,
+    ) -> bool:
         empty_room = False
         async with self._get_lock(room_id):
             room = await self.db.get_room(room_id)
             if room is None:
                 return False
-            if room["host_player_id"] == player_id:
-                raise PermissionError("The creator of this room cannot leave it.")
-
-            removed = await self.db.remove_room_player(room_id, player_id)
-            conns = [
-                c for c in self.connections.get(room_id, []) if c.player_id == player_id
-            ]
-            for conn in conns:
-                self._remove_connection(room_id, conn)
-                try:
-                    await conn.websocket.close(code=4000, reason="Left room")
-                except (RuntimeError, OSError) as e:
-                    logger.debug("WebSocket close failed for %s: %s", conn.player_id, repr(e))
-
-            if room_id in self.cursors:
-                self.cursors[room_id].pop(player_id, None)
-
-            if not removed:
-                return False
-
-            remaining = await self.db.get_room_players(room_id)
-            if not remaining:
-                await self.db.delete_room(room_id)
-                self.connections.pop(room_id, None)
-                self.cursors.pop(room_id, None)
-                empty_room = True
-            else:
-                new_state: dict[str, Any] | None = None
-                if isinstance(room["state"], dict) and "turn_order" in room["state"]:
-                    state = dict(room["state"])
-                    old_order: list[str] = list(state.get("turn_order") or [])
-                    if player_id in old_order:
-                        old_idx = old_order.index(player_id)
-                        new_order = [pid for pid in old_order if pid != player_id]
-                        state["turn_order"] = new_order
-                        if not new_order:
-                            state["current_turn_index"] = 0
-                            state["current_player_id"] = None
-                        elif state.get("current_player_id") == player_id:
-                            next_idx = old_idx % len(new_order)
-                            state["current_turn_index"] = next_idx
-                            state["current_player_id"] = new_order[next_idx]
-                        elif state.get("current_player_id") in new_order:
-                            state["current_turn_index"] = new_order.index(
-                                state["current_player_id"]
-                            )
-                        new_state = state
-
-                if new_state is not None:
-                    await self.db.update_room(
-                        room_id,
-                        state=new_state,
-                    )
-                await self.broadcast_room_state(room_id)
+            removed, empty_room = await self._remove_player_locked(
+                room,
+                player_id,
+                actor_id=actor_id,
+            )
 
         if empty_room:
             self.locks.pop(room_id, None)
-        return True
+        return removed
 
     async def cleanup_expired_rooms(self) -> list[str]:
         deleted_ids = await self.db.cleanup_expired_rooms()
@@ -427,6 +470,18 @@ class RoomManager:
                         return
                     await self.db.update_room(room_id, status="lobby", state={})
                     await self.broadcast_room_state(room_id)
+
+                case RemovePlayerMessage():
+                    try:
+                        await self._remove_player_locked(
+                            room,
+                            msg.player_id,
+                            actor_id=conn.player_id,
+                        )
+                    except PermissionError as e:
+                        await conn.websocket.send_json(
+                            {"type": "error", "message": str(e)}
+                        )
 
                 case CursorMoveMessage():
                     self.cursors.setdefault(room_id, {})[conn.player_id] = {

@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { resolvePlayerColor } from '$lib/core/color';
 	import type { PlayerInfo } from '$lib/core/ws.svelte';
+	import RemovePlayerModal from './RemovePlayerModal.svelte';
 	import ScribblyBox from './ScribblyBox.svelte';
 	import ScribblyButton from './ScribblyButton.svelte';
 
@@ -14,6 +15,7 @@
 		onToggleReady,
 		onStartGame,
 		onLeaveRoom,
+		onRemovePlayer,
 		startLabel = 'Start Game →',
 		configSlot
 	}: {
@@ -25,15 +27,20 @@
 		onToggleReady: (ready: boolean) => void;
 		onStartGame: () => void;
 		onLeaveRoom?: () => void;
+		onRemovePlayer?: (playerId: string) => Promise<unknown> | unknown;
 		startLabel?: string;
 		configSlot?: Snippet;
 	} = $props();
 
 	let copied = $state(false);
+	let playerToRemove = $state<PlayerInfo | null>(null);
 
 	let me = $derived(players.find((p) => p.player_id === myPlayerId));
 	let isHost = $derived(hostPlayerId === myPlayerId);
 	let shareUrl = $derived(typeof window !== 'undefined' ? window.location.href : '');
+	let activePlayerToRemove = $derived(
+		playerToRemove ? (players.find((p) => p.player_id === playerToRemove?.player_id) ?? null) : null
+	);
 
 	async function copyInviteUrl() {
 		if (typeof navigator === 'undefined') return;
@@ -93,15 +100,28 @@
 		<ul class="divide-y divide-[#1a1917]/10">
 			{#each players as player (player.player_id)}
 				{@const displayColor = resolvePlayerColor(player.player_id, myPlayerId, myColor, players)}
+				{@const canRemove = isHost && player.player_id !== myPlayerId && Boolean(onRemovePlayer)}
 				<li class="flex items-center justify-between py-2.5">
 					<div class="flex items-center gap-2.5">
 						<span
 							class="h-4 w-4 rounded-full border-[1.6px] border-[#1a1917]"
 							style="background-color: {displayColor};"
 						></span>
-						<span class="font-medium" style="color: {displayColor};">
-							{player.name}
-						</span>
+						{#if canRemove}
+							<button
+								type="button"
+								onclick={() => (playerToRemove = player)}
+								title="Click to remove {player.name}"
+								class="cursor-pointer font-medium underline-offset-2 hover:underline"
+								style="color: {displayColor};"
+							>
+								{player.name}
+							</button>
+						{:else}
+							<span class="font-medium" style="color: {displayColor};">
+								{player.name}
+							</span>
+						{/if}
 						{#if player.player_id === myPlayerId}
 							<span class="rounded border border-[#1a1917]/30 px-1.5 py-0.5 text-[10px] uppercase">
 								you
@@ -158,3 +178,12 @@
 		</div>
 	</ScribblyBox>
 </div>
+
+<RemovePlayerModal
+	player={activePlayerToRemove}
+	{myPlayerId}
+	{myColor}
+	{players}
+	onConfirm={(playerId) => onRemovePlayer?.(playerId)}
+	onClose={() => (playerToRemove = null)}
+/>

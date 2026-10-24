@@ -31,12 +31,12 @@ To share components across games while allowing any game to be extracted and run
    - **Backend (`backend/games_platform/core/`)**:
      - `db.py`: Psycopg 3 `AsyncConnectionPool`, schema initialization (`rooms`, `room_players`, `player_stats`), and expired room cleanup (2 days without moves, 1 year with moves).
      - `protocol.py`: `GameDefinition` protocol and Pydantic v2 discriminated unions for WebSocket/REST messages.
-     - `room_manager.py`: WebSocket room/lobby lifecycle, non-creator player leave handling (creators cannot leave a room, only delete it), 10-second streak multiplier tracking (`1.1x` starting after first right entry), and PostgreSQL state persistence.
+     - `room_manager.py`: WebSocket room/lobby lifecycle, non-creator player leave handling and host player removal (creators cannot leave a room, only delete it or remove other players), 10-second streak multiplier tracking (`1.1x` starting after first right entry), and PostgreSQL state persistence.
    - **Frontend (`frontend/src/lib/core/`)**:
      - `profile.svelte.ts`: Player profile store (`localStorage` UUID, name configuration tracking, and primary color).
      - `color.ts`: Perceptual OKLCH similarity check and preset-palette `opponent_color(my_color, their_color)` resolver.
      - `ws.svelte.ts`: Auto-reconnecting typed WebSocket client.
-     - `components/`: `ScribblyBox.svelte`, `ScribblyButton.svelte`, `ProfileBadge.svelte`, `NamePromptModal.svelte`, and shared `Lobby.svelte`.
+     - `components/`: `ScribblyBox.svelte`, `ScribblyButton.svelte`, `ProfileBadge.svelte`, `NamePromptModal.svelte`, `RemovePlayerModal.svelte`, `PlayerBar.svelte`, `RoomShell.svelte`, and shared `Lobby.svelte`.
 2. **Self-Contained Game Modules (`games/<slug>`)**:
    - **Backend (`backend/games_platform/games/sudoku/`)**:
      - `generator.py`: 9x9 Sudoku generator with MRV uniqueness solver and cell difficulty classifier.

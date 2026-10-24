@@ -1,10 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
 	import { resolvePlayerColor } from '$lib/core/color';
-	import Lobby from '$lib/core/components/Lobby.svelte';
-	import NamePromptModal from '$lib/core/components/NamePromptModal.svelte';
-	import ProfileBadge from '$lib/core/components/ProfileBadge.svelte';
+	import PlayerBar from '$lib/core/components/PlayerBar.svelte';
+	import RoomShell from '$lib/core/components/RoomShell.svelte';
 	import ScribblyBox from '$lib/core/components/ScribblyBox.svelte';
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
 	import { profile } from '$lib/core/profile.svelte';
@@ -55,8 +53,6 @@
 		{ code: 'es', label: 'Español' }
 	];
 
-	let deletingRoom = $state<boolean>(false);
-	let leavingRoom = $state<boolean>(false);
 	let selectedTiles = $state<TileCoord[]>([]);
 	let dragFromIndex = $state<number | null>(null);
 	let dragOverIndex = $state<number | null>(null);
@@ -278,38 +274,6 @@
 		return '#faf8f4';
 	}
 
-	async function deleteRoom() {
-		if (!isHost || !profile.playerId || deletingRoom) return;
-		deletingRoom = true;
-		try {
-			const res = await fetch(
-				`/api/rooms/${encodeURIComponent(roomId)}?player_id=${encodeURIComponent(profile.playerId)}`,
-				{ method: 'DELETE' }
-			);
-			if (res.ok) {
-				client.disconnect();
-				await goto('/');
-			}
-		} finally {
-			deletingRoom = false;
-		}
-	}
-
-	async function leaveRoom() {
-		if (!profile.playerId || leavingRoom) return;
-		leavingRoom = true;
-		try {
-			await fetch(
-				`/api/rooms/${encodeURIComponent(roomId)}/players/${encodeURIComponent(profile.playerId)}`,
-				{ method: 'DELETE' }
-			);
-			client.disconnect();
-			await goto('/');
-		} finally {
-			leavingRoom = false;
-		}
-	}
-
 	onMount(() => {
 		profile.init();
 		client.connect({
@@ -346,411 +310,294 @@
 	});
 </script>
 
-<NamePromptModal onConfirm={(name, color) => client.syncProfile(profile.playerId, name, color)} />
-
-<div class="mx-auto flex w-full max-w-3xl flex-1 flex-col px-3 py-3 sm:px-6 sm:py-5">
-	<!-- Top Header -->
-	<header class="mb-3 flex items-center justify-between gap-2">
-		<div class="flex items-center gap-2.5">
-			<a
-				href="/"
-				class="inline-flex items-center gap-1 rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] px-2.5 py-1 text-xs font-medium shadow-[1.5px_1.5px_0px_#1a1917] hover:bg-[#f2eee6]"
-			>
-				← Home
-			</a>
-			<div>
-				<h1 class="font-hand text-lg leading-none sm:text-xl">Silbenstreit</h1>
-				<div class="font-mono-num flex items-center gap-2 text-[11px] text-[#6e6a63]">
-					<span>#{roomId}</span>
-					<span>•</span>
-					<span>{boardSize}×{boardSize}</span>
-					<span>•</span>
-					<span class="uppercase">{boardLang}</span>
-					{#if !client.connected}
-						<span class="text-[#dc2626]">• reconnecting…</span>
-					{/if}
-				</div>
-			</div>
-		</div>
-
-		<div class="flex items-center gap-2">
-			<button
-				type="button"
-				onclick={leaveRoom}
-				disabled={leavingRoom}
-				title="Leave this game"
-				aria-label="Leave this game"
-				class="inline-flex cursor-pointer items-center justify-center rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] px-2 py-1 text-xs font-medium text-[#6e6a63] shadow-[1.5px_1.5px_0px_#1a1917] transition hover:border-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-50"
-			>
-				Leave
-			</button>
-			{#if isHost}
-				<button
-					type="button"
-					onclick={deleteRoom}
-					disabled={deletingRoom}
-					title="Permanently delete this session"
-					aria-label="Permanently delete this session"
-					class="inline-flex cursor-pointer items-center justify-center rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] p-1.5 text-[#6e6a63] shadow-[1.5px_1.5px_0px_#1a1917] transition hover:border-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-50"
-				>
-					<svg
-						class="h-3.5 w-3.5"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						aria-hidden="true"
-					>
-						<path d="M3 6h18" />
-						<path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-						<path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-						<line x1="10" y1="11" x2="10" y2="17" />
-						<line x1="14" y1="11" x2="14" y2="17" />
-					</svg>
-				</button>
+<RoomShell
+	{client}
+	{roomId}
+	title="Silbenstreit"
+	subtitleItems={[`${boardSize}×${boardSize}`, boardLang.toUpperCase()]}
+>
+	{#snippet configSlot()}
+		<div class="space-y-4">
+			{#if !isHost}
+				<div class="font-hand text-right text-xs text-[#6e6a63]">Configured by host</div>
 			{/if}
-			<ProfileBadge
-				compact={true}
-				onChange={(name, color) => client.syncProfile(profile.playerId, name, color)}
-			/>
-		</div>
-	</header>
 
-	{#if client.error}
-		<ScribblyBox seed={99} class="my-6 bg-[#faf8f4] p-6 text-center">
-			<p class="font-hand text-lg text-[#dc2626]">{client.error}</p>
-			<a href="/" class="mt-3 inline-block underline">Back to Landing Page</a>
-		</ScribblyBox>
-	{:else if !room}
-		<div class="flex flex-1 items-center justify-center py-16">
-			<p class="font-hand text-lg text-[#6e6a63]">Sketching room #{roomId}…</p>
-		</div>
-	{:else if room.status === 'lobby'}
-		<Lobby
-			{roomId}
-			hostPlayerId={room.host_player_id}
-			myPlayerId={profile.playerId}
-			myColor={profile.primaryColor}
-			{players}
-			onToggleReady={(r) => client.setReady(r)}
-			onStartGame={() => client.startGame()}
-			onLeaveRoom={leaveRoom}
-		>
-			{#snippet configSlot()}
-				<div class="space-y-4">
-					{#if !isHost}
-						<div class="font-hand text-right text-xs text-[#6e6a63]">Configured by host</div>
-					{/if}
-
-					<!-- Grid Size (4x4 to 8x8) -->
-					<div>
-						<span class="mb-1.5 block text-xs font-medium text-[#6e6a63] uppercase">
-							Board Size ({cfgSize}×{cfgSize})
-						</span>
-						<div class="flex flex-wrap gap-1.5">
-							{#each SIZES as sz (sz)}
-								<button
-									type="button"
-									disabled={!isHost}
-									onclick={() => updateSize(sz)}
-									class="font-mono-num cursor-pointer rounded border border-[#1a1917] px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed
-									{cfgSize === sz
-										? 'bg-[#1a1917] text-[#faf8f4]'
-										: 'bg-[#faf8f4] text-[#1a1917] hover:bg-[#f2eee6]'}"
-								>
-									{sz}×{sz}
-								</button>
-							{/each}
-						</div>
-					</div>
-
-					<!-- Language Selection -->
-					<div>
-						<span class="mb-1.5 block text-xs font-medium text-[#6e6a63] uppercase">
-							Dictionary Language
-						</span>
-						<div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-							{#each LANGUAGES as lang (lang.code)}
-								<button
-									type="button"
-									disabled={!isHost}
-									onclick={() => updateLanguage(lang.code)}
-									class="cursor-pointer rounded border border-[#1a1917] px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed
-									{cfgLanguage === lang.code
-										? 'bg-[#1a1917] text-[#faf8f4]'
-										: 'bg-[#faf8f4] text-[#1a1917] hover:bg-[#f2eee6]'}"
-								>
-									{lang.label}
-								</button>
-							{/each}
-						</div>
-					</div>
-
-					<!-- Scoring Toggle -->
-					<div class="flex items-center justify-between border-t border-[#1a1917]/15 pt-3">
-						<div>
-							<div class="text-xs font-semibold uppercase">Rarity Scoring (1–10)</div>
-							<div class="text-xs text-[#6e6a63]">
-								Rare letters score up to 10 points while owned.
-							</div>
-						</div>
+			<!-- Grid Size (4x4 to 8x8) -->
+			<div>
+				<span class="mb-1.5 block text-xs font-medium text-[#6e6a63] uppercase">
+					Board Size ({cfgSize}×{cfgSize})
+				</span>
+				<div class="flex flex-wrap gap-1.5">
+					{#each SIZES as sz (sz)}
 						<button
 							type="button"
 							disabled={!isHost}
-							onclick={() => updateScoring(!cfgScoring)}
-							class="cursor-pointer rounded border border-[#1a1917] px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed
-							{cfgScoring ? 'bg-[#1a1917] text-[#faf8f4]' : 'bg-[#faf8f4] text-[#6e6a63]'}"
+							onclick={() => updateSize(sz)}
+							class="font-mono-num cursor-pointer rounded border border-[#1a1917] px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed
+							{cfgSize === sz
+								? 'bg-[#1a1917] text-[#faf8f4]'
+								: 'bg-[#faf8f4] text-[#1a1917] hover:bg-[#f2eee6]'}"
 						>
-							{cfgScoring ? 'Enabled' : 'Off'}
+							{sz}×{sz}
 						</button>
+					{/each}
+				</div>
+			</div>
+
+			<!-- Language Selection -->
+			<div>
+				<span class="mb-1.5 block text-xs font-medium text-[#6e6a63] uppercase">
+					Dictionary Language
+				</span>
+				<div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+					{#each LANGUAGES as lang (lang.code)}
+						<button
+							type="button"
+							disabled={!isHost}
+							onclick={() => updateLanguage(lang.code)}
+							class="cursor-pointer rounded border border-[#1a1917] px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed
+							{cfgLanguage === lang.code
+								? 'bg-[#1a1917] text-[#faf8f4]'
+								: 'bg-[#faf8f4] text-[#1a1917] hover:bg-[#f2eee6]'}"
+						>
+							{lang.label}
+						</button>
+					{/each}
+				</div>
+			</div>
+
+			<!-- Scoring Toggle -->
+			<div class="flex items-center justify-between border-t border-[#1a1917]/15 pt-3">
+				<div>
+					<div class="text-xs font-semibold uppercase">Rarity Scoring (1–10)</div>
+					<div class="text-xs text-[#6e6a63]">
+						Rare letters score up to 10 points while owned.
 					</div>
 				</div>
-			{/snippet}
-		</Lobby>
-	{:else}
-		<!-- Active or Finished Silbenstreit View -->
-		<div class="mx-auto flex w-full max-w-[440px] flex-1 flex-col gap-3">
-			<!-- Players & Turn Status Bar -->
-			<div class="flex flex-wrap items-center justify-between gap-2">
-				<div class="flex flex-wrap items-center gap-2">
-					{#each players as p (p.player_id)}
-						{@const pColor = resolvePlayerColor(
-							p.player_id,
+				<button
+					type="button"
+					disabled={!isHost}
+					onclick={() => updateScoring(!cfgScoring)}
+					class="cursor-pointer rounded border border-[#1a1917] px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed
+					{cfgScoring ? 'bg-[#1a1917] text-[#faf8f4]' : 'bg-[#faf8f4] text-[#6e6a63]'}"
+				>
+					{cfgScoring ? 'Enabled' : 'Off'}
+				</button>
+			</div>
+		</div>
+	{/snippet}
+
+	<!-- Active or Finished Silbenstreit View -->
+	<div class="mx-auto flex w-full max-w-[440px] flex-1 flex-col gap-3">
+		<PlayerBar
+			{players}
+			hostPlayerId={room?.host_player_id ?? ''}
+			myPlayerId={profile.playerId}
+			myColor={profile.primaryColor}
+			scoringEnabled={cfgScoring}
+			showTurnBadge={room?.status === 'playing'}
+			{currentPlayerId}
+			statusText="{gameState.unowned_count ?? 0} open"
+			onRemovePlayer={(id) => client.removePlayer(id)}
+		/>
+
+		{#if room?.status === 'finished'}
+			<ScribblyBox seed={59} class="bg-[#faf8f4] p-4 text-center">
+				<div class="font-hand text-xl">
+					{#if winners.length === 1}
+						{winners[0].name} wins ({winners[0].score} pts)!
+					{:else if winners.length > 1}
+						It's a tie! ({winners.map((w) => w.name).join(' & ')} — {winners[0].score} pts)
+					{:else}
+						Game Over!
+					{/if}
+				</div>
+				{#if isHost}
+					<div class="mt-3 flex justify-center gap-2">
+						<ScribblyButton onclick={() => client.startGame()} variant="primary">
+							Play Again
+						</ScribblyButton>
+						<ScribblyButton onclick={() => client.returnToLobby()}>
+							Lobby
+						</ScribblyButton>
+					</div>
+				{/if}
+			</ScribblyBox>
+		{/if}
+
+		<!-- Simple Flat Letter Grid -->
+		<div class="relative mx-auto aspect-square w-full select-none">
+			<div
+				class="grid h-full w-full border-[2px] border-[#1a1917] bg-[#faf8f4]"
+				style="
+					grid-template-columns: repeat({boardSize}, minmax(0, 1fr));
+					grid-template-rows: repeat({boardSize}, minmax(0, 1fr));
+				"
+				role="grid"
+				aria-label="Silbenstreit Letter Grid"
+			>
+				{#each Array.from({ length: boardSize }, (_, r) => r) as r (r)}
+					{#each Array.from({ length: boardSize }, (_, c) => c) as c (c)}
+						{@const letter = letters[r]?.[c] ?? ''}
+						{@const val = values[r]?.[c] ?? 1}
+						{@const ownerId = owners[r]?.[c] ?? null}
+						{@const isProtected = protectedGrid[r]?.[c] ?? false}
+						{@const blockedForMe = isTileBlockedForMe(r, c)}
+						{@const isSelected = selectedKeySet.has(`${r},${c}`)}
+						{@const ownerColor = ownerId
+							? resolvePlayerColor(ownerId, profile.playerId, profile.primaryColor, players)
+							: null}
+						{@const borderRight =
+							c === boardSize - 1 ? '' : 'border-r border-r-[#1a1917]/30'}
+						{@const borderBottom =
+							r === boardSize - 1 ? '' : 'border-b border-b-[#1a1917]/30'}
+						<button
+							type="button"
+							disabled={!isMyTurn || blockedForMe || room?.status !== 'playing'}
+							onclick={() => toggleTile(r, c)}
+							aria-label="Row {r + 1} Column {c + 1}: {letter} ({val} points)"
+							class="silben-cell relative flex items-center justify-center p-0 focus:outline-none {borderRight} {borderBottom}
+							{blockedForMe
+								? 'cursor-not-allowed'
+								: isMyTurn && room?.status === 'playing'
+									? 'cursor-pointer'
+									: 'cursor-default'}"
+							style="background-color: {getCellBackground(ownerColor, isProtected)};"
+						>
+							{#if isSelected}
+								<span
+									class="pointer-events-none absolute inset-[2px] border-2 border-[#1a1917]"
+								></span>
+							{/if}
+
+							<span class="silben-letter text-[#1a1917]">
+								{letter}
+							</span>
+
+							<span
+								class="silben-value font-mono-num pointer-events-none absolute right-1 bottom-0.5 leading-none text-[#1a1917]/65"
+							>
+								{val}
+							</span>
+						</button>
+					{/each}
+				{/each}
+			</div>
+		</div>
+
+		<!-- Word Composer Bar (Supports Drag & Drop Reordering + Click to Remove) -->
+		{#if room?.status === 'playing'}
+			<div
+				class="border-[1.8px] border-[#1a1917] bg-[#faf8f4] px-3 py-2.5 {rejectShake ? 'animate-mistake-shake' : ''}"
+			>
+				<div class="flex min-h-[38px] items-center justify-between gap-2">
+					{#if selectedTiles.length === 0}
+						<span class="text-xs text-[#6e6a63]">
+							{isMyTurn
+								? 'Select letters to form a word…'
+								: 'Waiting for opponent…'}
+						</span>
+					{:else}
+						<div
+							class="flex flex-wrap items-center gap-1.5"
+							role="list"
+							aria-label="Selected word letters (drag to reorder, click to remove)"
+						>
+							{#each selectedTiles as pos, idx (`${pos.row},${pos.col}`)}
+								{@const ch = letters[pos.row]?.[pos.col] ?? ''}
+								<button
+									type="button"
+									draggable="true"
+									ondragstart={(e) => handleChipDragStart(e, idx)}
+									ondragover={(e) => handleChipDragOver(e, idx)}
+									ondragend={handleChipDragEnd}
+									onclick={() => removeComposedAt(idx)}
+									title="Drag to reorder or click to remove"
+									class="silben-word-chip flex h-9 w-8 cursor-grab items-center justify-center border border-[#1a1917] bg-[#f3efe6] text-lg font-semibold text-[#1a1917] select-none active:cursor-grabbing
+									{dragOverIndex === idx ? 'ring-2 ring-[#1a1917]' : ''}"
+								>
+									{ch}
+								</button>
+							{/each}
+							<span class="font-mono-num ml-1 text-xs text-[#6e6a63]">
+								{composedPoints} pts
+							</span>
+						</div>
+
+						<button
+							type="button"
+							onclick={clearSelection}
+							class="cursor-pointer text-xs text-[#6e6a63] underline hover:text-[#1a1917]"
+						>
+							Clear
+						</button>
+					{/if}
+				</div>
+
+				{#if composedAlreadyPlayed}
+					<p class="mt-1 text-xs font-medium text-[#dc2626]">
+						"{composedWord}" was already played.
+					</p>
+				{/if}
+
+				{#if rejectReason}
+					<p class="mt-1 text-xs font-medium text-[#dc2626]">
+						{rejectReason}
+					</p>
+				{/if}
+
+				<div class="mt-2 flex items-center justify-between gap-2 border-t border-[#1a1917]/15 pt-2">
+					<ScribblyButton
+						onclick={submitWord}
+						disabled={!isMyTurn || selectedTiles.length < 2 || composedAlreadyPlayed}
+						variant="primary"
+						accentColor={profile.primaryColor}
+					>
+						Submit Word
+					</ScribblyButton>
+
+					<ScribblyButton
+						onclick={passTurn}
+						disabled={!isMyTurn || selectedTiles.length > 0}
+						title="Pass turn if no valid word can be formed"
+					>
+						Pass Turn
+					</ScribblyButton>
+				</div>
+			</div>
+		{/if}
+
+		<!-- Played Words List -->
+		{#if playedWords.length > 0}
+			<div class="border-[1.6px] border-[#1a1917] bg-[#faf8f4] px-3 py-2.5">
+				<div class="mb-1.5 text-[11px] font-semibold tracking-wide text-[#6e6a63] uppercase">
+					Played Words ({playedWords.length})
+				</div>
+				<div class="flex max-h-[120px] flex-wrap gap-1.5 overflow-y-auto">
+					{#each [...playedWords].reverse() as entry (entry.move_number)}
+						{@const entryColor = resolvePlayerColor(
+							entry.player_id,
 							profile.playerId,
 							profile.primaryColor,
 							players
 						)}
-						{@const isTurn = room.status === 'playing' && p.player_id === currentPlayerId}
-						<div
-							class="relative flex items-center gap-2 rounded border-[1.6px] border-[#1a1917] px-2.5 py-1 transition
-							{isTurn ? 'bg-[#faf8f4] font-semibold' : 'bg-[#faf8f4]/70 opacity-80'}"
-							style="border-left: 4px solid {pColor};"
+						<span
+							class="inline-flex items-center gap-1.5 border border-[#1a1917]/25 px-2 py-0.5 text-xs"
+							style="background-color: color-mix(in oklab, {entryColor} 20%, #faf8f4);"
 						>
-							<span class="max-w-[110px] truncate text-xs font-semibold text-[#1a1917]">
-								{p.name}
+							<span class="font-semibold tracking-wide text-[#1a1917]">
+								{entry.word}
 							</span>
-							{#if cfgScoring}
-								<span class="font-mono-num text-xs font-bold text-[#1a1917]">
-									{p.score}
-								</span>
-							{/if}
-							{#if isTurn}
-								<span
-									class="rounded px-1.5 py-0.2 text-[10px] font-bold text-[#faf8f4]"
-									style="background-color: {pColor};"
-								>
-									turn
-								</span>
-							{/if}
-						</div>
-					{/each}
-				</div>
-
-				<div class="font-mono-num text-xs text-[#6e6a63]">
-					{gameState.unowned_count ?? 0} open
-				</div>
-			</div>
-
-			{#if room.status === 'finished'}
-				<ScribblyBox seed={59} class="bg-[#faf8f4] p-4 text-center">
-					<div class="font-hand text-xl">
-						{#if winners.length === 1}
-							{winners[0].name} wins ({winners[0].score} pts)!
-						{:else if winners.length > 1}
-							It's a tie! ({winners.map((w) => w.name).join(' & ')} — {winners[0].score} pts)
-						{:else}
-							Game Over!
-						{/if}
-					</div>
-					{#if isHost}
-						<div class="mt-3 flex justify-center gap-2">
-							<ScribblyButton onclick={() => client.startGame()} variant="primary">
-								Play Again
-							</ScribblyButton>
-							<ScribblyButton onclick={() => client.returnToLobby()}>
-								Lobby
-							</ScribblyButton>
-						</div>
-					{/if}
-				</ScribblyBox>
-			{/if}
-
-			<!-- Simple Flat Letter Grid -->
-			<div class="relative mx-auto aspect-square w-full select-none">
-				<div
-					class="grid h-full w-full border-[2px] border-[#1a1917] bg-[#faf8f4]"
-					style="
-						grid-template-columns: repeat({boardSize}, minmax(0, 1fr));
-						grid-template-rows: repeat({boardSize}, minmax(0, 1fr));
-					"
-					role="grid"
-					aria-label="Silbenstreit Letter Grid"
-				>
-					{#each Array.from({ length: boardSize }, (_, r) => r) as r (r)}
-						{#each Array.from({ length: boardSize }, (_, c) => c) as c (c)}
-							{@const letter = letters[r]?.[c] ?? ''}
-							{@const val = values[r]?.[c] ?? 1}
-							{@const ownerId = owners[r]?.[c] ?? null}
-							{@const isProtected = protectedGrid[r]?.[c] ?? false}
-							{@const blockedForMe = isTileBlockedForMe(r, c)}
-							{@const isSelected = selectedKeySet.has(`${r},${c}`)}
-							{@const ownerColor = ownerId
-								? resolvePlayerColor(ownerId, profile.playerId, profile.primaryColor, players)
-								: null}
-							{@const borderRight =
-								c === boardSize - 1 ? '' : 'border-r border-r-[#1a1917]/30'}
-							{@const borderBottom =
-								r === boardSize - 1 ? '' : 'border-b border-b-[#1a1917]/30'}
-							<button
-								type="button"
-								disabled={!isMyTurn || blockedForMe || room.status !== 'playing'}
-								onclick={() => toggleTile(r, c)}
-								aria-label="Row {r + 1} Column {c + 1}: {letter} ({val} points)"
-								class="silben-cell relative flex items-center justify-center p-0 focus:outline-none {borderRight} {borderBottom}
-								{blockedForMe
-									? 'cursor-not-allowed'
-									: isMyTurn && room.status === 'playing'
-										? 'cursor-pointer'
-										: 'cursor-default'}"
-								style="background-color: {getCellBackground(ownerColor, isProtected)};"
-							>
-								{#if isSelected}
-									<span
-										class="pointer-events-none absolute inset-[2px] border-2 border-[#1a1917]"
-									></span>
-								{/if}
-
-								<span class="silben-letter text-[#1a1917]">
-									{letter}
-								</span>
-
-								<span
-									class="silben-value font-mono-num pointer-events-none absolute right-1 bottom-0.5 leading-none text-[#1a1917]/65"
-								>
-									{val}
-								</span>
-							</button>
-						{/each}
+							<span class="font-mono-num text-[10px] text-[#1a1917]/65">
+								{entry.points_delta >= 0 ? `+${entry.points_delta}` : entry.points_delta}
+							</span>
+						</span>
 					{/each}
 				</div>
 			</div>
-
-			<!-- Word Composer Bar (Supports Drag & Drop Reordering + Click to Remove) -->
-			{#if room.status === 'playing'}
-				<div
-					class="border-[1.8px] border-[#1a1917] bg-[#faf8f4] px-3 py-2.5 {rejectShake ? 'animate-mistake-shake' : ''}"
-				>
-					<div class="flex min-h-[38px] items-center justify-between gap-2">
-						{#if selectedTiles.length === 0}
-							<span class="text-xs text-[#6e6a63]">
-								{isMyTurn
-									? 'Select letters to form a word…'
-									: 'Waiting for opponent…'}
-							</span>
-						{:else}
-							<div
-								class="flex flex-wrap items-center gap-1.5"
-								role="list"
-								aria-label="Selected word letters (drag to reorder, click to remove)"
-							>
-								{#each selectedTiles as pos, idx (`${pos.row},${pos.col}`)}
-									{@const ch = letters[pos.row]?.[pos.col] ?? ''}
-									<button
-										type="button"
-										draggable="true"
-										ondragstart={(e) => handleChipDragStart(e, idx)}
-										ondragover={(e) => handleChipDragOver(e, idx)}
-										ondragend={handleChipDragEnd}
-										onclick={() => removeComposedAt(idx)}
-										title="Drag to reorder or click to remove"
-										class="silben-word-chip flex h-9 w-8 cursor-grab items-center justify-center border border-[#1a1917] bg-[#f3efe6] text-lg font-semibold text-[#1a1917] select-none active:cursor-grabbing
-										{dragOverIndex === idx ? 'ring-2 ring-[#1a1917]' : ''}"
-									>
-										{ch}
-									</button>
-								{/each}
-								<span class="font-mono-num ml-1 text-xs text-[#6e6a63]">
-									{composedPoints} pts
-								</span>
-							</div>
-
-							<button
-								type="button"
-								onclick={clearSelection}
-								class="cursor-pointer text-xs text-[#6e6a63] underline hover:text-[#1a1917]"
-							>
-								Clear
-							</button>
-						{/if}
-					</div>
-
-					{#if composedAlreadyPlayed}
-						<p class="mt-1 text-xs font-medium text-[#dc2626]">
-							"{composedWord}" was already played.
-						</p>
-					{/if}
-
-					{#if rejectReason}
-						<p class="mt-1 text-xs font-medium text-[#dc2626]">
-							{rejectReason}
-						</p>
-					{/if}
-
-					<div class="mt-2 flex items-center justify-between gap-2 border-t border-[#1a1917]/15 pt-2">
-						<ScribblyButton
-							onclick={submitWord}
-							disabled={!isMyTurn || selectedTiles.length < 2 || composedAlreadyPlayed}
-							variant="primary"
-							accentColor={profile.primaryColor}
-						>
-							Submit Word
-						</ScribblyButton>
-
-						<ScribblyButton
-							onclick={passTurn}
-							disabled={!isMyTurn || selectedTiles.length > 0}
-							title="Pass turn if no valid word can be formed"
-						>
-							Pass Turn
-						</ScribblyButton>
-					</div>
-				</div>
-			{/if}
-
-			<!-- Played Words List -->
-			{#if playedWords.length > 0}
-				<div class="border-[1.6px] border-[#1a1917] bg-[#faf8f4] px-3 py-2.5">
-					<div class="mb-1.5 text-[11px] font-semibold tracking-wide text-[#6e6a63] uppercase">
-						Played Words ({playedWords.length})
-					</div>
-					<div class="flex max-h-[120px] flex-wrap gap-1.5 overflow-y-auto">
-						{#each [...playedWords].reverse() as entry (entry.move_number)}
-							{@const entryColor = resolvePlayerColor(
-								entry.player_id,
-								profile.playerId,
-								profile.primaryColor,
-								players
-							)}
-							<span
-								class="inline-flex items-center gap-1.5 border border-[#1a1917]/25 px-2 py-0.5 text-xs"
-								style="background-color: color-mix(in oklab, {entryColor} 20%, #faf8f4);"
-							>
-								<span class="font-semibold tracking-wide text-[#1a1917]">
-									{entry.word}
-								</span>
-								<span class="font-mono-num text-[10px] text-[#1a1917]/65">
-									{entry.points_delta >= 0 ? `+${entry.points_delta}` : entry.points_delta}
-								</span>
-							</span>
-						{/each}
-					</div>
-				</div>
-			{/if}
-		</div>
-	{/if}
-</div>
+		{/if}
+	</div>
+</RoomShell>
 
 <style>
 	.silben-cell {
