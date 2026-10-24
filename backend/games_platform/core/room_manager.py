@@ -138,6 +138,91 @@ class RoomManager:
         self.locks.pop(room_id, None)
         return deleted
 
+    async def leave_room(self, room_id: str, player_id: str) -> bool:
+        empty_room = False
+        async with self._get_lock(room_id):
+            room = await self.db.get_room(room_id)
+            if room is None:
+                return False
+
+            removed = await self.db.remove_room_player(room_id, player_id)
+            conns = [
+                c for c in self.connections.get(room_id, []) if c.player_id == player_id
+            ]
+            for conn in conns:
+                self._remove_connection(room_id, conn)
+                try:
+                    await conn.websocket.close(code=4000, reason="Left room")
+                except (RuntimeError, OSError) as e:
+                    logger.debug("WebSocket close failed for %s: %s", conn.player_id, repr(e))
+
+            if room_id in self.cursors:
+                self.cursors[room_id].pop(player_id, None)
+
+            if not removed:
+                return False
+
+            remaining = await self.db.get_room_players(room_id)
+            if not remaining:
+                await self.db.delete_room(room_id)
+                self.connections.pop(room_id, None)
+                self.cursors.pop(room_id, None)
+                empty_room = True
+            else:
+                new_host = (
+                    remaining[0]["player_id"]
+                    if room["host_player_id"] == player_id
+                    else None
+                )
+                new_state: dict[str, Any] | None = None
+                if isinstance(room["state"], dict) and "turn_order" in room["state"]:
+                    state = dict(room["state"])
+                    old_order: list[str] = list(state.get("turn_order") or [])
+                    if player_id in old_order:
+                        old_idx = old_order.index(player_id)
+                        new_order = [pid for pid in old_order if pid != player_id]
+                        state["turn_order"] = new_order
+                        if not new_order:
+                            state["current_turn_index"] = 0
+                            state["current_player_id"] = None
+                        elif state.get("current_player_id") == player_id:
+                            next_idx = old_idx % len(new_order)
+                            state["current_turn_index"] = next_idx
+                            state["current_player_id"] = new_order[next_idx]
+                        elif state.get("current_player_id") in new_order:
+                            state["current_turn_index"] = new_order.index(
+                                state["current_player_id"]
+                            )
+                        new_state = state
+
+                if new_host is not None or new_state is not None:
+                    await self.db.update_room(
+                        room_id,
+                        host_player_id=new_host,
+                        state=new_state,
+                    )
+                await self.broadcast_room_state(room_id)
+
+        if empty_room:
+            self.locks.pop(room_id, None)
+        return True
+
+    async def cleanup_expired_rooms(self) -> list[str]:
+        deleted_ids = await self.db.cleanup_expired_rooms()
+        for room_id in deleted_ids:
+            conns = list(self.connections.pop(room_id, []))
+            self.cursors.pop(room_id, None)
+            self.locks.pop(room_id, None)
+            for conn in conns:
+                try:
+                    await conn.websocket.send_json(
+                        {"type": "room_deleted", "room_id": room_id}
+                    )
+                    await conn.websocket.close(code=4004, reason="Room expired")
+                except (RuntimeError, OSError) as e:
+                    logger.debug("WebSocket close failed for %s: %s", conn.player_id, repr(e))
+        return deleted_ids
+
     def _connected_player_ids(self, room_id: str) -> set[str]:
         return {c.player_id for c in self.connections.get(room_id, [])}
 
@@ -383,13 +468,11 @@ class RoomManager:
         stored_mult = float(player_row["multiplier"])
         scoring_enabled = bool(room["config"].get("scoring_enabled", True))
 
-        # Multiplier rule from idea.md:
-        # - For doing correct entries within 10 seconds user gets multiplier = 1.1 * multiplier
-        # - Multiplier is reset to 1 after 10 seconds.
-        if last_correct_at is not None and (now - last_correct_at).total_seconds() <= MULTIPLIER_WINDOW_SECONDS:
-            active_multiplier = round(stored_mult * MULTIPLIER_FACTOR, 4)
-        else:
-            active_multiplier = 1.0
+        # Multiplier rule:
+        # - Starts at 1.0 for the first right entry, then becomes 1.1 after the first right entry,
+        #   so subsequent right entries within 10 seconds get 1.1x, 1.21x, etc.
+        # - Multiplier is reset to 1.0 after 10 seconds or on a mistake.
+        active_multiplier = compute_effective_multiplier(stored_mult, last_correct_at, now)
 
         outcome = game.apply_action(
             state=room["state"],
@@ -418,7 +501,7 @@ class RoomManager:
         elif outcome.is_correct_entry:
             if scoring_enabled:
                 new_score = round(new_score + outcome.points_delta, 2)
-            new_mult = active_multiplier
+            new_mult = round(active_multiplier * MULTIPLIER_FACTOR, 4)
             new_last_correct = now
             await self.db.update_player_score(
                 room_id,

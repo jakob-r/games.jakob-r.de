@@ -24,6 +24,7 @@ class ProfileStore {
 	playerId = $state<string>('');
 	name = $state<string>('Scribbly Fox');
 	primaryColor = $state<string>(PRESET_PLAYER_COLORS[0].hex);
+	nameConfigured = $state<boolean>(false);
 	hydrated = $state<boolean>(false);
 
 	init(): void {
@@ -36,12 +37,14 @@ class ProfileStore {
 		}
 		this.playerId = storedId;
 
-		let storedName = localStorage.getItem(STORAGE_KEY_NAME);
-		if (!storedName) {
-			storedName = generateDefaultName();
-			localStorage.setItem(STORAGE_KEY_NAME, storedName);
+		const storedName = localStorage.getItem(STORAGE_KEY_NAME);
+		if (storedName && storedName.trim()) {
+			this.name = storedName.trim();
+			this.nameConfigured = true;
+		} else {
+			this.name = generateDefaultName();
+			this.nameConfigured = false;
 		}
-		this.name = storedName;
 
 		let storedColor = localStorage.getItem(STORAGE_KEY_COLOR);
 		if (!storedColor) {
@@ -58,6 +61,7 @@ class ProfileStore {
 		// Callers that need a fallback should pass it explicitly or use ensureName().
 		if (!trimmed) return;
 		this.name = trimmed;
+		this.nameConfigured = true;
 		if (typeof window !== 'undefined') {
 			localStorage.setItem(STORAGE_KEY_NAME, this.name);
 		}
@@ -65,8 +69,15 @@ class ProfileStore {
 
 	ensureName(): string {
 		const trimmed = this.name.trim();
-		if (trimmed) return trimmed;
+		if (trimmed) {
+			this.nameConfigured = true;
+			if (typeof window !== 'undefined') {
+				localStorage.setItem(STORAGE_KEY_NAME, trimmed);
+			}
+			return trimmed;
+		}
 		this.name = 'Player';
+		this.nameConfigured = true;
 		if (typeof window !== 'undefined') {
 			localStorage.setItem(STORAGE_KEY_NAME, this.name);
 		}

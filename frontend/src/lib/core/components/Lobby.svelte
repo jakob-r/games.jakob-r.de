@@ -13,6 +13,7 @@
 		players,
 		onToggleReady,
 		onStartGame,
+		onLeaveRoom,
 		startLabel = 'Start Game →',
 		configSlot
 	}: {
@@ -23,6 +24,7 @@
 		players: PlayerInfo[];
 		onToggleReady: (ready: boolean) => void;
 		onStartGame: () => void;
+		onLeaveRoom?: () => void;
 		startLabel?: string;
 		configSlot?: Snippet;
 	} = $props();
@@ -129,13 +131,20 @@
 		</ul>
 
 		<div class="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#1a1917]/15 pt-4">
-			<ScribblyButton
-				onclick={() => onToggleReady(!(me?.is_ready ?? false))}
-				variant={me?.is_ready ? 'default' : 'primary'}
-				accentColor={myColor}
-			>
-				{me?.is_ready ? 'Not Ready' : 'Ready'}
-			</ScribblyButton>
+			<div class="flex items-center gap-2">
+				<ScribblyButton
+					onclick={() => onToggleReady(!(me?.is_ready ?? false))}
+					variant={me?.is_ready ? 'default' : 'primary'}
+					accentColor={myColor}
+				>
+					{me?.is_ready ? 'Not Ready' : 'Ready'}
+				</ScribblyButton>
+				{#if onLeaveRoom}
+					<ScribblyButton onclick={onLeaveRoom} variant="danger">
+						Leave Game
+					</ScribblyButton>
+				{/if}
+			</div>
 
 			{#if isHost}
 				<ScribblyButton onclick={onStartGame} variant="primary" accentColor="#1a1917">

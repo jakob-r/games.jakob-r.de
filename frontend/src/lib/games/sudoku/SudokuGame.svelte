@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { resolvePlayerColor } from '$lib/core/color';
 	import Lobby from '$lib/core/components/Lobby.svelte';
+	import NamePromptModal from '$lib/core/components/NamePromptModal.svelte';
 	import ProfileBadge from '$lib/core/components/ProfileBadge.svelte';
 	import ScribblyBox from '$lib/core/components/ScribblyBox.svelte';
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
@@ -54,6 +55,7 @@
 	let mistakeFlashes = $state<MistakeFlash[]>([]);
 	let scorePopups = $state<ScorePopup[]>([]);
 	let deletingRoom = $state<boolean>(false);
+	let leavingRoom = $state<boolean>(false);
 	let nowTick = $state<number>(Date.now());
 	let flashCounter = 0;
 
@@ -68,7 +70,6 @@
 	let sudokuState = $derived((room?.state ?? {}) as SudokuPublicState);
 	let cells = $derived(sudokuState.cells ?? []);
 	let notes = $derived(sudokuState.notes ?? []);
-	let hardCells = $derived(sudokuState.hard_cells ?? []);
 	let players = $derived<PlayerInfo[]>(room?.players ?? []);
 	let isHost = $derived(room?.host_player_id === profile.playerId);
 	let scoringEnabled = $derived(Boolean(room?.config?.scoring_enabled ?? true));
@@ -249,9 +250,26 @@
 			deletingRoom = false;
 		}
 	}
+
+	async function leaveRoom() {
+		if (!profile.playerId || leavingRoom) return;
+		leavingRoom = true;
+		try {
+			await fetch(
+				`/api/rooms/${encodeURIComponent(roomId)}/players/${encodeURIComponent(profile.playerId)}`,
+				{ method: 'DELETE' }
+			);
+			client.disconnect();
+			await goto('/');
+		} finally {
+			leavingRoom = false;
+		}
+	}
 </script>
 
 <svelte:window onkeydown={handleKeyDown} />
+
+<NamePromptModal onConfirm={(name, color) => client.syncProfile(profile.playerId, name, color)} />
 
 <div class="mx-auto flex w-full max-w-3xl flex-1 flex-col px-3 py-3 sm:px-6 sm:py-5">
 	<!-- Top Header -->
@@ -279,6 +297,16 @@
 		</div>
 
 		<div class="flex items-center gap-2">
+			<button
+				type="button"
+				onclick={leaveRoom}
+				disabled={leavingRoom}
+				title="Leave this game"
+				aria-label="Leave this game"
+				class="inline-flex cursor-pointer items-center justify-center rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] px-2 py-1 text-xs font-medium text-[#6e6a63] shadow-[1.5px_1.5px_0px_#1a1917] transition hover:border-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-50"
+			>
+				Leave
+			</button>
 			{#if isHost}
 				<button
 					type="button"
@@ -331,6 +359,7 @@
 			{players}
 			onToggleReady={(r) => client.setReady(r)}
 			onStartGame={() => client.startGame()}
+			onLeaveRoom={leaveRoom}
 		>
 			{#snippet configSlot()}
 				<div class="space-y-4">
@@ -395,40 +424,32 @@
 						{@const multRatio = getMultiplierRemainingRatio(p)}
 						{@const liveMult = getLiveMultiplier(p)}
 						<div
-							class="relative overflow-hidden rounded-md border-[1.6px] border-[#1a1917] bg-[#faf8f4] px-2.5 py-1 shadow-[1.5px_1.5px_0px_#1a1917]"
+							class="relative flex h-7 items-center gap-2 overflow-hidden rounded-md border-[1.6px] border-[#1a1917] bg-[#faf8f4] px-2.5 shadow-[1.5px_1.5px_0px_#1a1917]"
 						>
-							<div class="flex items-center gap-2">
-								<span
-									class="h-2.5 w-2.5 rounded-full border border-[#1a1917]"
-									style="background-color: {pColor};"
-								></span>
-								<span class="max-w-[92px] truncate text-xs font-semibold" style="color: {pColor};">
-									{p.name}
+							<span
+								class="h-2.5 w-2.5 shrink-0 rounded-full border border-[#1a1917]"
+								style="background-color: {pColor};"
+							></span>
+							<span class="max-w-[92px] truncate text-xs font-semibold" style="color: {pColor};">
+								{p.name}
+							</span>
+
+							{#if scoringEnabled}
+								<span class="font-mono-num text-xs font-bold text-[#1a1917]">
+									{p.score}
 								</span>
-
-								{#if scoringEnabled}
-									<span class="font-mono-num text-xs font-bold text-[#1a1917]">
-										{p.score}
-									</span>
-									{#if liveMult > 1.001}
+								{#if liveMult > 1.001 && multRatio > 0}
+									<span
+										class="font-mono-num relative inline-flex h-4 items-center overflow-hidden rounded border border-[#1a1917]/50 bg-[#1a1917]/10 px-1.5 text-[10px] leading-none font-bold text-[#1a1917]"
+										title="Streak multiplier ({Math.ceil(multRatio * 10)}s left)"
+									>
 										<span
-											class="font-mono-num rounded px-1 py-0.2 text-[10px] font-bold text-[#faf8f4]"
-											style="background-color: {pColor};"
-										>
-											{liveMult.toFixed(2)}×
-										</span>
-									{/if}
+											class="pointer-events-none absolute inset-y-0 left-0 opacity-35 transition-all duration-100"
+											style="width: {Math.round(multRatio * 100)}%; background-color: {pColor};"
+										></span>
+										<span class="relative z-10">{Number(liveMult.toFixed(2))}×</span>
+									</span>
 								{/if}
-							</div>
-
-							<!-- 10-second multiplier countdown bar -->
-							{#if scoringEnabled && multRatio > 0}
-								<div class="mt-1 h-1 w-full overflow-hidden rounded-full bg-[#1a1917]/10">
-									<div
-										class="h-full transition-all duration-100"
-										style="width: {Math.round(multRatio * 100)}%; background-color: {pColor};"
-									></div>
-								</div>
 							{/if}
 						</div>
 					{/each}
@@ -466,7 +487,6 @@
 						{#each rowCells as cell, c (c)}
 							{@const isSelected = selectedRow === r && selectedCol === c}
 							{@const cellNotes = notes[r]?.[c] ?? {}}
-							{@const isHardCell = Boolean(hardCells[r]?.[c]) && cell.value === null}
 							{@const flash = mistakeFlashes.find((f) => f.row === r && f.col === c)}
 							{@const popup = scorePopups.find((s) => s.row === r && s.col === c)}
 							{@const peerCursors = players.filter(
@@ -524,14 +544,6 @@
 										style="border-color: {peerColor};"
 									></span>
 								{/each}
-
-								<!-- Subtle indicator dot for 5pt difficult cells when scoring is enabled -->
-								{#if scoringEnabled && isHardCell && Object.keys(cellNotes).length === 0}
-									<span
-										title="Difficult cell (5 pts × multiplier)"
-										class="pointer-events-none absolute top-1 right-1 h-1 w-1 rounded-full bg-[#1a1917]/25"
-									></span>
-								{/if}
 
 								<!-- Cell Value -->
 								{#if cell.value !== null}

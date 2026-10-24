@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -12,6 +14,7 @@ from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnec
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from psycopg import Error as PsycopgError
 
 from games_platform.core.db import Database, db
 from games_platform.core.protocol import CreateRoomRequest, GameDefinition
@@ -78,12 +81,26 @@ def create_app(
         if slug in ALL_GAMES:
             manager.register_game(ALL_GAMES[slug])
 
+    async def _periodic_cleanup() -> None:
+        while True:
+            try:
+                deleted = await manager.cleanup_expired_rooms()
+                if deleted:
+                    logger.info("Auto-deleted %d expired room(s): %s", len(deleted), deleted)
+            except (PsycopgError, OSError, RuntimeError) as e:
+                logger.error("Error cleaning up expired rooms: %s", repr(e))
+            await asyncio.sleep(3600)
+
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         await active_db.connect()
+        cleanup_task = asyncio.create_task(_periodic_cleanup())
         try:
             yield
         finally:
+            cleanup_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await cleanup_task
             await active_db.close()
 
     app = FastAPI(
@@ -158,6 +175,16 @@ def create_app(
         if not deleted:
             raise HTTPException(status_code=404, detail="Room not found")
         return {"status": "deleted", "room_id": room_id}
+
+    @app.delete("/api/rooms/{room_id}/players/{player_id}")
+    async def leave_room(
+        room_id: str,
+        player_id: str,
+    ) -> dict[str, Any]:
+        left = await manager.leave_room(room_id=room_id, player_id=player_id)
+        if not left:
+            raise HTTPException(status_code=404, detail="Room or player not found")
+        return {"status": "left", "room_id": room_id, "player_id": player_id}
 
     @app.get("/api/players/{player_id}/recent")
     async def get_player_recent_rooms(

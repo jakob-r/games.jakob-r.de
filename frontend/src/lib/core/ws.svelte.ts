@@ -201,7 +201,7 @@ export class RoomSocketClient {
 
 		socket.onclose = (ev) => {
 			this.connected = false;
-			if (this.manualClose || ev.code === 4004) {
+			if (this.manualClose || ev.code === 4004 || ev.code === 4000) {
 				if (ev.code === 4004) {
 					this.error = 'Room not found.';
 				}

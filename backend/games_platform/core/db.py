@@ -149,6 +149,7 @@ class Database:
         status: str | None = None,
         config: dict[str, Any] | None = None,
         state: dict[str, Any] | None = None,
+        host_player_id: str | None = None,
     ) -> dict[str, Any] | None:
         pool = self._require_pool()
         sets: list[str] = ["updated_at = NOW()"]
@@ -162,6 +163,9 @@ class Database:
         if state is not None:
             sets.append("state = %s")
             params.append(Jsonb(state))
+        if host_player_id is not None:
+            sets.append("host_player_id = %s")
+            params.append(host_player_id)
         params.append(room_id)
 
         query = f"""
@@ -228,6 +232,54 @@ class Database:
             )
             row = await cur.fetchone()
             return row is not None
+
+    async def remove_room_player(self, room_id: str, player_id: str) -> bool:
+        pool = self._require_pool()
+        async with pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                DELETE FROM room_players
+                WHERE room_id = %s AND player_id = %s
+                RETURNING player_id
+                """,
+                (room_id, player_id),
+            )
+            row = await cur.fetchone()
+            return row is not None
+
+    async def cleanup_expired_rooms(self) -> list[str]:
+        """
+        Delete rooms that:
+        - Have no moves and haven't been updated for > 2 days.
+        - Have moves and haven't been updated for > 1 year.
+        """
+        pool = self._require_pool()
+        has_moves_expr = """(
+            status != 'lobby'
+            AND (
+                COALESCE((state->>'history_count')::int, 0) > 0
+                OR COALESCE((state->>'move_count')::int, 0) > 0
+                OR COALESCE((state->>'safe_revealed')::int, 0) > 0
+                OR COALESCE((state->>'mines_hit')::int, 0) > 0
+                OR COALESCE((state->>'mines_placed')::boolean, FALSE) IS TRUE
+            )
+        )"""
+        query = f"""
+            DELETE FROM rooms
+            WHERE (
+                NOT {has_moves_expr}
+                AND updated_at < NOW() - INTERVAL '2 days'
+            )
+            OR (
+                {has_moves_expr}
+                AND updated_at < NOW() - INTERVAL '1 year'
+            )
+            RETURNING id
+        """
+        async with pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(query)
+            rows = await cur.fetchall()
+            return [str(r["id"]) for r in rows]
 
     async def set_player_ready(self, room_id: str, player_id: str, is_ready: bool) -> None:
         pool = self._require_pool()

@@ -13,7 +13,7 @@ General product concept lives in `idea.md`.
   - **Rough.js** + inline **SVG** with `stroke-dasharray`/`stroke-dashoffset` animations and subtle SVG displacement filters (`#scribble-filter`) for a minimalistic, hand-drawn scribbly look.
 - **Color System (`opponent_color`)**:
   - **OKLCH perceptual color space** in `frontend/src/lib/core/color.ts` for `opponent_color(my_color, their_color)`.
-  - Ensures perceptual color distance and contrast remain uniform while keeping the UI monochrome by default and using color strictly where helpful (player identity, semantic feedback).
+  - Keeps other players' colors unchanged unless they are perceptually too similar to `my_color`, in which case it deterministically assigns a distinct color from `PRESET_PLAYER_COLORS`.
 - **Build & Package Manager**: **Vite** + **pnpm**; production uses `@sveltejs/adapter-static` (SPA fallback) so FastAPI can serve the built site.
 
 ### Backend
@@ -29,14 +29,14 @@ To share components across games while allowing any game to be extracted and run
 
 1. **Core Layer (`core`)**:
    - **Backend (`backend/games_platform/core/`)**:
-     - `db.py`: Psycopg 3 `AsyncConnectionPool` and schema initialization (`rooms`, `room_players`, `player_stats`).
+     - `db.py`: Psycopg 3 `AsyncConnectionPool`, schema initialization (`rooms`, `room_players`, `player_stats`), and expired room cleanup (2 days without moves, 1 year with moves).
      - `protocol.py`: `GameDefinition` protocol and Pydantic v2 discriminated unions for WebSocket/REST messages.
-     - `room_manager.py`: WebSocket room/lobby lifecycle, 10-second streak multiplier tracking (`1.1x`), and PostgreSQL state persistence.
+     - `room_manager.py`: WebSocket room/lobby lifecycle, player leave/host-transfer handling, 10-second streak multiplier tracking (`1.1x` starting after first right entry), and PostgreSQL state persistence.
    - **Frontend (`frontend/src/lib/core/`)**:
-     - `profile.svelte.ts`: Player profile store (`localStorage` UUID, name, and primary color).
-     - `color.ts`: Perceptual OKLCH `opponent_color(my_color, their_color)` resolver.
+     - `profile.svelte.ts`: Player profile store (`localStorage` UUID, name configuration tracking, and primary color).
+     - `color.ts`: Perceptual OKLCH similarity check and preset-palette `opponent_color(my_color, their_color)` resolver.
      - `ws.svelte.ts`: Auto-reconnecting typed WebSocket client.
-     - `components/`: `ScribblyBox.svelte`, `ScribblyButton.svelte`, `ProfileBadge.svelte`, and shared `Lobby.svelte`.
+     - `components/`: `ScribblyBox.svelte`, `ScribblyButton.svelte`, `ProfileBadge.svelte`, `NamePromptModal.svelte`, and shared `Lobby.svelte`.
 2. **Self-Contained Game Modules (`games/<slug>`)**:
    - **Backend (`backend/games_platform/games/sudoku/`)**:
      - `generator.py`: 9x9 Sudoku generator with MRV uniqueness solver and cell difficulty classifier.

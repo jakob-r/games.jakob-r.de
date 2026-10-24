@@ -169,6 +169,7 @@ class MinesweeperGame:
             "cells": cells,
             "safe_revealed": 0,
             "mines_hit": 0,
+            "move_count": 0,
         }
 
     def get_public_view(self, state: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
@@ -396,6 +397,7 @@ class MinesweeperGame:
             cell["revealed_by"] = player_id
             cell["flag_owner_id"] = None
             state["mines_hit"] = int(state.get("mines_hit", 0)) + 1
+            state["move_count"] = int(state.get("move_count", 0)) + 1
             pts = POINTS_MINE_HIT if scoring_enabled else 0.0
             return ActionOutcome(
                 state=state,
@@ -415,6 +417,8 @@ class MinesweeperGame:
 
         revealed = self._flood_reveal(state, row, col, player_id)
         count = len(revealed)
+        if count > 0:
+            state["move_count"] = int(state.get("move_count", 0)) + 1
         pts = (POINTS_REVEAL * count) if scoring_enabled else 0.0
         return ActionOutcome(
             state=state,
@@ -451,6 +455,7 @@ class MinesweeperGame:
         # Flags allowed before mines are placed (first dig places mines)
         cell["status"] = "flagged"
         cell["flag_owner_id"] = player_id
+        state["move_count"] = int(state.get("move_count", 0)) + 1
         pts = POINTS_FLAG if scoring_enabled else 0.0
         finished = self._is_finished(state) if state.get("mines_placed") else False
         return ActionOutcome(
@@ -485,6 +490,7 @@ class MinesweeperGame:
 
         cell["status"] = "hidden"
         cell["flag_owner_id"] = None
+        state["move_count"] = int(state.get("move_count", 0)) + 1
         pts = POINTS_UNFLAG if scoring_enabled else 0.0
         return ActionOutcome(
             state=state,
@@ -521,6 +527,7 @@ class MinesweeperGame:
         if not state.get("mines_placed"):
             self._ensure_mines(state, row, col)
 
+        state["move_count"] = int(state.get("move_count", 0)) + 1
         mines = self._mine_set(state)
         was_correct = _key(row, col) in mines
         transfer = POINTS_CHALLENGE if scoring_enabled else 0.0

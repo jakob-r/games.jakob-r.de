@@ -35,6 +35,7 @@
 	let creatingKaese = $state<boolean>(false);
 	let creatingMines = $state<boolean>(false);
 	let deletingRoomId = $state<string | null>(null);
+	let leavingRoomId = $state<string | null>(null);
 	let recentRooms = $state<RecentRoom[]>([]);
 	let stats = $state<PlayerStatsSummary | null>(null);
 	let joinCode = $state<string>('');
@@ -180,6 +181,25 @@
 			console.error('Failed to delete room:', e);
 		} finally {
 			deletingRoomId = null;
+		}
+	}
+
+	async function leaveRoom(roomId: string) {
+		if (!profile.playerId || leavingRoomId) return;
+		leavingRoomId = roomId;
+		try {
+			const res = await fetch(
+				`/api/rooms/${encodeURIComponent(roomId)}/players/${encodeURIComponent(profile.playerId)}`,
+				{ method: 'DELETE' }
+			);
+			if (res.ok) {
+				recentRooms = recentRooms.filter((r) => r.room_id !== roomId);
+				await loadPlayerDashboard();
+			}
+		} catch (e) {
+			console.error('Failed to leave room:', e);
+		} finally {
+			leavingRoomId = null;
 		}
 	}
 
@@ -428,6 +448,16 @@
 								>
 									{item.status === 'finished' ? 'View' : 'Resume →'}
 								</a>
+								<button
+									type="button"
+									onclick={() => leaveRoom(item.room_id)}
+									disabled={leavingRoomId === item.room_id}
+									title="Leave this game"
+									aria-label="Leave room #{item.room_id}"
+									class="inline-flex cursor-pointer items-center justify-center rounded border-[1.6px] border-[#1a1917] bg-[#faf8f4] px-2 py-1.5 text-xs font-medium text-[#6e6a63] shadow-[1.5px_1.5px_0px_#1a1917] transition hover:border-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-50"
+								>
+									Leave
+								</button>
 								{#if item.host_player_id === profile.playerId}
 									<button
 										type="button"

@@ -112,42 +112,46 @@ export function perceptualDistance(a: Oklch, b: Oklch): number {
 	return Math.sqrt(dl * dl + da * da + db * db);
 }
 
+export function isColorSimilar(hexA: string, hexB: string): boolean {
+	const a = hexToOklch(hexA);
+	const b = hexToOklch(hexB);
+	return perceptualDistance(a, b) < 0.14 || hueDistance(a.h, b.h) < 42;
+}
+
+function hashSeed(input: string): number {
+	let h = 2166136261;
+	for (let i = 0; i < input.length; i++) {
+		h ^= input.charCodeAt(i);
+		h = Math.imul(h, 16777619);
+	}
+	return h >>> 0;
+}
+
 /**
- * Compute an opponent color that is not too similar to `my_color` (and adjusted from `their_color`
- * when needed), as specified in `idea.md`:
- *
- * `opponent_color(my_color, their_color)` returns a color that is readable on the paper
- * canvas and perceptually distinct from `my_color`.
+ * Compute an opponent color that is not too similar to `my_color`:
+ * - If `their_color` is already distinct from `my_color`, return `their_color` unchanged.
+ * - Otherwise, pick a color from `PRESET_PLAYER_COLORS` that is distinct from `my_color`.
  */
-export function opponent_color(my_color: string, their_color: string): string {
-	const mine = hexToOklch(my_color);
-	const theirs = hexToOklch(their_color);
-
-	// Ensure readable lightness and vivid ink chroma on light paper (#faf8f4)
-	const safeL = Math.max(0.42, Math.min(0.62, theirs.l));
-	const safeC = Math.max(0.14, Math.min(0.24, theirs.c));
-
-	const dist = perceptualDistance(mine, { l: safeL, c: safeC, h: theirs.h });
-	const hDiff = hueDistance(mine.h, theirs.h);
-
-	// If their color is already perceptually distinct from my_color, keep their hue!
-	if (dist >= 0.14 && hDiff >= 42) {
-		return oklchToHex({ l: safeL, c: safeC, h: theirs.h });
+export function opponent_color(
+	my_color: string,
+	their_color: string,
+	seed?: string,
+	avoidColors: string[] = []
+): string {
+	if (!isColorSimilar(my_color, their_color)) {
+		return their_color;
 	}
 
-	// Otherwise, shift their hue using the golden-angle offset (137.5 deg) so it is
-	// guaranteed to be distinct from both `my_color` and the original `their_color`.
-	let candidateHue = (theirs.h + 137.5) % 360;
-	if (hueDistance(mine.h, candidateHue) < 48) {
-		candidateHue = (mine.h + 137.5) % 360;
-	}
+	const distinctFromMine = PRESET_PLAYER_COLORS.map((p) => p.hex).filter(
+		(hex) => !isColorSimilar(my_color, hex)
+	);
+	const pool = distinctFromMine.length > 0 ? distinctFromMine : PRESET_PLAYER_COLORS.map((p) => p.hex);
 
-	const altL = mine.l > 0.52 ? 0.45 : 0.56;
-	return oklchToHex({
-		l: altL,
-		c: Math.max(0.16, safeC),
-		h: candidateHue
-	});
+	const unusedPool = pool.filter((hex) => !avoidColors.some((u) => isColorSimilar(u, hex)));
+	const candidates = unusedPool.length > 0 ? unusedPool : pool;
+
+	const idx = hashSeed(seed ?? their_color) % candidates.length;
+	return candidates[idx];
 }
 
 /**
@@ -162,6 +166,11 @@ export function resolvePlayerColor(
 	if (!targetPlayerId) return '#1a1917';
 	if (targetPlayerId === myPlayerId) return myColor;
 	const found = players.find((p) => p.player_id === targetPlayerId);
-	if (!found) return opponent_color(myColor, '#dc2626');
-	return opponent_color(myColor, found.color);
+	if (!found) return opponent_color(myColor, myColor, targetPlayerId);
+
+	const otherColors = players
+		.filter((p) => p.player_id !== myPlayerId && p.player_id !== targetPlayerId)
+		.map((p) => p.color);
+
+	return opponent_color(myColor, found.color, targetPlayerId, otherColors);
 }
