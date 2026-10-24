@@ -68,6 +68,7 @@ class RoomManager:
         self.games: dict[str, GameDefinition] = {}
         self.connections: dict[str, list[RoomConnection]] = {}
         self.cursors: dict[str, dict[str, dict[str, int | None]]] = {}
+        self.midgame_inactive_players: dict[str, set[str]] = {}
         self.locks: dict[str, asyncio.Lock] = {}
 
     def register_game(self, game: GameDefinition) -> None:
@@ -127,6 +128,7 @@ class RoomManager:
             deleted = await self.db.delete_room(room_id)
             conns = list(self.connections.pop(room_id, []))
             self.cursors.pop(room_id, None)
+            self.midgame_inactive_players.pop(room_id, None)
             for conn in conns:
                 try:
                     await conn.websocket.send_json(
@@ -184,6 +186,10 @@ class RoomManager:
 
         if room_id in self.cursors:
             self.cursors[room_id].pop(player_id, None)
+        if room_id in self.midgame_inactive_players:
+            self.midgame_inactive_players[room_id].discard(player_id)
+            if not self.midgame_inactive_players[room_id]:
+                self.midgame_inactive_players.pop(room_id, None)
 
         if not removed:
             return False, False
@@ -193,6 +199,7 @@ class RoomManager:
             await self.db.delete_room(room_id)
             self.connections.pop(room_id, None)
             self.cursors.pop(room_id, None)
+            self.midgame_inactive_players.pop(room_id, None)
             return True, True
 
         new_state: dict[str, Any] | None = None
@@ -251,6 +258,7 @@ class RoomManager:
         for room_id in deleted_ids:
             conns = list(self.connections.pop(room_id, []))
             self.cursors.pop(room_id, None)
+            self.midgame_inactive_players.pop(room_id, None)
             self.locks.pop(room_id, None)
             for conn in conns:
                 try:
@@ -355,6 +363,8 @@ class RoomManager:
         await websocket.accept()
         conn = RoomConnection(websocket=websocket, player_id=player_id)
         async with self._get_lock(room_id):
+            existing_players = await self.db.get_room_players(room_id)
+            was_existing = any(p["player_id"] == player_id for p in existing_players)
             self.connections.setdefault(room_id, []).append(conn)
             await self.db.upsert_room_player(
                 room_id=room_id,
@@ -363,29 +373,49 @@ class RoomManager:
                 color=color,
             )
             room = await self.db.get_room(room_id)
-            if (
-                room is not None
-                and room["status"] == "playing"
-                and isinstance(room["state"], dict)
-                and "turn_order" in room["state"]
-            ):
-                state = dict(room["state"])
-                turn_order: list[str] = list(state.get("turn_order") or [])
-                if player_id not in turn_order:
-                    turn_order.append(player_id)
-                    state["turn_order"] = turn_order
-                    if not state.get("current_player_id"):
-                        state["current_player_id"] = turn_order[0]
-                    await self.db.update_room(room_id, state=state)
+            if room is not None and room["status"] == "playing":
+                if not was_existing and player_id != room["host_player_id"]:
+                    self.midgame_inactive_players.setdefault(room_id, set()).add(player_id)
+                if isinstance(room["state"], dict) and "turn_order" in room["state"]:
+                    state = dict(room["state"])
+                    turn_order: list[str] = list(state.get("turn_order") or [])
+                    if player_id not in turn_order:
+                        turn_order.append(player_id)
+                        state["turn_order"] = turn_order
+                        if not state.get("current_player_id"):
+                            state["current_player_id"] = turn_order[0]
+                        await self.db.update_room(room_id, state=state)
             await self.broadcast_room_state(room_id)
         return conn
 
     async def disconnect(self, room_id: str, conn: RoomConnection) -> None:
+        empty_room = False
         async with self._get_lock(room_id):
             self._remove_connection(room_id, conn)
             if room_id in self.cursors and conn.player_id in self.cursors[room_id]:
                 del self.cursors[room_id][conn.player_id]
-            await self.broadcast_room_state(room_id)
+
+            still_connected = conn.player_id in self._connected_player_ids(room_id)
+            inactive_set = self.midgame_inactive_players.get(room_id)
+            if not still_connected and inactive_set and conn.player_id in inactive_set:
+                inactive_set.discard(conn.player_id)
+                if not inactive_set:
+                    self.midgame_inactive_players.pop(room_id, None)
+                room = await self.db.get_room(room_id)
+                if room is not None and room["host_player_id"] != conn.player_id:
+                    _, empty_room = await self._remove_player_locked(
+                        room,
+                        conn.player_id,
+                    )
+                    if empty_room:
+                        pass
+                else:
+                    await self.broadcast_room_state(room_id)
+            else:
+                await self.broadcast_room_state(room_id)
+
+        if empty_room:
+            self.locks.pop(room_id, None)
 
     async def handle_client_message(
         self,
@@ -410,6 +440,11 @@ class RoomManager:
 
             match msg:
                 case PlayerSyncMessage():
+                    old_player_id = conn.player_id
+                    existing_players = await self.db.get_room_players(room_id)
+                    was_existing = any(
+                        p["player_id"] == msg.player_id for p in existing_players
+                    )
                     conn.player_id = msg.player_id
                     await self.db.upsert_room_player(
                         room_id=room_id,
@@ -417,19 +452,29 @@ class RoomManager:
                         name=msg.name,
                         color=msg.color,
                     )
-                    if (
-                        room["status"] == "playing"
-                        and isinstance(room["state"], dict)
-                        and "turn_order" in room["state"]
-                    ):
-                        state = dict(room["state"])
-                        turn_order: list[str] = list(state.get("turn_order") or [])
-                        if msg.player_id not in turn_order:
-                            turn_order.append(msg.player_id)
-                            state["turn_order"] = turn_order
-                            if not state.get("current_player_id"):
-                                state["current_player_id"] = turn_order[0]
-                            await self.db.update_room(room_id, state=state)
+                    if room["status"] == "playing":
+                        inactive_set = self.midgame_inactive_players.get(room_id)
+                        if (
+                            inactive_set is not None
+                            and old_player_id in inactive_set
+                            and old_player_id != msg.player_id
+                        ):
+                            inactive_set.discard(old_player_id)
+                            if msg.player_id != room["host_player_id"]:
+                                inactive_set.add(msg.player_id)
+                        elif not was_existing and msg.player_id != room["host_player_id"]:
+                            self.midgame_inactive_players.setdefault(room_id, set()).add(
+                                msg.player_id
+                            )
+                        if isinstance(room["state"], dict) and "turn_order" in room["state"]:
+                            state = dict(room["state"])
+                            turn_order: list[str] = list(state.get("turn_order") or [])
+                            if msg.player_id not in turn_order:
+                                turn_order.append(msg.player_id)
+                                state["turn_order"] = turn_order
+                                if not state.get("current_player_id"):
+                                    state["current_player_id"] = turn_order[0]
+                                await self.db.update_room(room_id, state=state)
                     await self.broadcast_room_state(room_id)
 
                 case SetReadyMessage():
@@ -455,6 +500,7 @@ class RoomManager:
                             {"type": "error", "message": "Only the host can start the game."}
                         )
                         return
+                    self.midgame_inactive_players.pop(room_id, None)
                     players_rows = await self.db.get_room_players(room_id)
                     player_ids = [p["player_id"] for p in players_rows]
                     initial_state = game.create_initial_state(
@@ -468,6 +514,7 @@ class RoomManager:
                 case ReturnToLobbyMessage():
                     if room["host_player_id"] != conn.player_id:
                         return
+                    self.midgame_inactive_players.pop(room_id, None)
                     await self.db.update_room(room_id, status="lobby", state={})
                     await self.broadcast_room_state(room_id)
 
@@ -534,6 +581,17 @@ class RoomManager:
             action=action,
             player_multiplier=active_multiplier,
         )
+
+        if (
+            outcome.is_correct_entry
+            or outcome.is_mistake
+            or outcome.state != room["state"]
+        ):
+            inactive_set = self.midgame_inactive_players.get(room_id)
+            if inactive_set is not None:
+                inactive_set.discard(player_id)
+                if not inactive_set:
+                    self.midgame_inactive_players.pop(room_id, None)
 
         new_score = float(player_row["score"])
         new_mult = stored_mult

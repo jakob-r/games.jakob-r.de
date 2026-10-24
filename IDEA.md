@@ -25,6 +25,7 @@ When the user enters games.jakob-r.de they can
 
 - Color logic: A user sets their primary color and sees other players with their primary color. If the others player color is too similar it will be adjusted. For this we have a function opponent_color(my_color, their_color) which returns a color that is not too similar to my_color or their_color.
 - Player removal: As a room creator, clicking on another player's name opens a confirmation modal to remove them from the room.
+- Idle mid-game joiners: If a new player enters a running game, does nothing, and closes the browser window, they automatically leave the room.
 
 ## Games
 

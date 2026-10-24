@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+import anyio
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -281,7 +282,8 @@ def create_app(
         except (RuntimeError, OSError, ValueError) as e:
             logger.error("WebSocket error in room %s: %s", room_id, repr(e))
         finally:
-            await manager.disconnect(room_id, conn)
+            with anyio.CancelScope(shield=True):
+                await manager.disconnect(room_id, conn)
 
     # After API/WS routes so the SPA catch-all does not shadow them.
     _mount_static(app)

@@ -89,8 +89,8 @@ def test_full_multiplayer_sudoku_room_lifecycle() -> None:
             # Verify multiplier becomes 1.1 after first right entry and applies 1.1x on second right entry
             room_row = client.app.state.db
             # Fetch solution from db to make two valid moves
-            import asyncio
-            db_room = asyncio.run(room_row.get_room(room_id))
+            assert client.portal is not None
+            db_room = client.portal.call(room_row.get_room, room_id)
             assert db_room is not None
             solution = db_room["state"]["solution"]
 
@@ -136,6 +136,19 @@ def test_full_multiplayer_sudoku_room_lifecycle() -> None:
             _ = ws2.receive_json()
             bob_after_2 = next(p for p in state_after_2["players"] if p["player_id"] == "peer_2")
             assert bob_after_2["multiplier"] == 1.21
+
+            # Join a new player into the running game, do nothing, and disconnect -> auto-leaves the room
+            ws_url_spectator = f"/ws/sudoku/{room_id}?player_id=peer_idle&name=IdleSpectator&color=%239333ea"
+            with client.websocket_connect(ws_url_spectator) as ws_idle:
+                joined_snap_1 = ws1.receive_json()
+                _ = ws2.receive_json()
+                joined_snap_idle = ws_idle.receive_json()
+                assert any(p["player_id"] == "peer_idle" for p in joined_snap_1["players"])
+                assert any(p["player_id"] == "peer_idle" for p in joined_snap_idle["players"])
+
+            left_snap_1 = ws1.receive_json()
+            _ = ws2.receive_json()
+            assert all(p["player_id"] != "peer_idle" for p in left_snap_1["players"])
 
         # 4. Check recent rooms & stats endpoints
         recent_res = client.get("/api/players/host_1/recent")
@@ -204,8 +217,6 @@ def test_full_multiplayer_sudoku_room_lifecycle() -> None:
 
 
 def test_room_expiration_cleanup() -> None:
-    import asyncio
-
     test_db = Database()
     app = create_app(database=test_db)
 
@@ -244,7 +255,8 @@ def test_room_expiration_cleanup() -> None:
                 )
             return await app.state.room_manager.cleanup_expired_rooms()
 
-        deleted = asyncio.run(_backdate())
+        assert client.portal is not None
+        deleted = client.portal.call(_backdate)
         assert r1 in deleted
         assert r3 in deleted
         assert r2 not in deleted
