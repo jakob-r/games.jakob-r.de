@@ -71,6 +71,23 @@ When the user enters games.jakob-r.de they can
 - Flags are shown in the planting player's color. Players can only remove their own flags; opponent flags can be challenged.
 - The game finishes when all safe cells are revealed **or** every mine is secured (correctly flagged or already revealed).
 
+### Silbenstreit
+
+- Configurable 4x4, to 8x8 grid of letters.
+- Letters drawn randomly but slightly proportional to language frequencies. Replacements are allowed. Still make sure to include rare letters.
+- 2 players, round based game.
+- At the start user can choose from english, german, french or spanish.
+- In a turn a player forms a valid word from the language dictionary.
+- Every letter in the word becomes "owned" by the player.
+- "Owned" letters score points and become colored in the player's color.
+- Scores of letters are higher the more rare the letter is: Integer between 1 and 10.
+- A owned letter that is completely surrounded by letters of the same color is "protected".
+- In a turn a player can select "owned" and unowned letters but not "protected" letters.
+- The game ends when there are no more unowned letters.
+- Words must follow classic Scrabble-style rules.
+- A played word cannot be reused.
+- Players can see the list of all played words.
+
 #### Scoring
 
 - Reveal a safe cell: `+1` per newly revealed cell (including flood-fill).
