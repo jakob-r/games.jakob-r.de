@@ -266,3 +266,125 @@ def test_room_expiration_cleanup() -> None:
         assert client.get(f"/api/rooms/{r3}").status_code == 404
         client.delete(f"/api/rooms/{r2}?player_id=u1")
 
+
+def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
+    test_db = Database()
+    app = create_app(database=test_db)
+    dispatched: list[dict[str, object]] = []
+
+    def fake_webpush(
+        *,
+        subscription_info,
+        data,
+        vapid_private_key,
+        vapid_claims,
+        ttl=86400,
+    ):
+        dispatched.append(
+            {
+                "subscription_info": subscription_info,
+                "data": data,
+                "vapid_private_key": vapid_private_key,
+                "vapid_claims": vapid_claims,
+                "ttl": ttl,
+            }
+        )
+
+    monkeypatch.setattr("games_platform.core.push.webpush", fake_webpush)
+
+    with TestClient(app) as client:
+        # 1. Fetch VAPID public key
+        key_res = client.get("/api/notifications/vapid-public-key")
+        assert key_res.status_code == 200
+        pub_key = key_res.json()["public_key"]
+        assert isinstance(pub_key, str) and len(pub_key) >= 80
+
+        # 2. Create a Silbenstreit room
+        room_res = client.post(
+            "/api/rooms",
+            json={
+                "game_slug": "silbenstreit",
+                "host_player_id": "host_1",
+                "host_name": "Alice",
+                "host_color": "#2563eb",
+                "config": {"size": 5, "language": "de"},
+            },
+        )
+        assert room_res.status_code == 200
+        room_id = room_res.json()["room_id"]
+
+        # 3. Subscribe peer_2 to Web Push notifications for this room
+        status_before = client.get(
+            f"/api/rooms/{room_id}/notifications/status?player_id=peer_2"
+        )
+        assert status_before.status_code == 200
+        assert status_before.json()["subscribed"] is False
+
+        sub_res = client.post(
+            f"/api/rooms/{room_id}/notifications/subscribe",
+            json={
+                "player_id": "peer_2",
+                "endpoint": "https://push.example.test/sub/peer2",
+                "keys": {
+                    "p256dh": "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQ",
+                    "auth": "tBHItJI5svbpez7KI4CCXg",
+                },
+            },
+        )
+        assert sub_res.status_code == 200
+        assert sub_res.json()["status"] == "subscribed"
+
+        status_after = client.get(
+            f"/api/rooms/{room_id}/notifications/status?player_id=peer_2"
+        )
+        assert status_after.status_code == 200
+        assert status_after.json() == {
+            "room_id": room_id,
+            "player_id": "peer_2",
+            "subscribed": True,
+            "count": 1,
+        }
+
+        # 4. Connect both players, start the game, and have host_1 pass turn -> peer_2 gets notified
+        ws_url_1 = f"/ws/silbenstreit/{room_id}?player_id=host_1&name=Alice&color=%232563eb"
+        ws_url_2 = f"/ws/silbenstreit/{room_id}?player_id=peer_2&name=Bob&color=%23dc2626"
+
+        with client.websocket_connect(ws_url_1) as ws1, client.websocket_connect(ws_url_2) as ws2:
+            _ = ws1.receive_json()
+            _ = ws1.receive_json()
+            _ = ws2.receive_json()
+
+            ws1.send_json({"type": "start_game"})
+            _ = ws1.receive_json()
+            _ = ws2.receive_json()
+
+            # Host passes turn -> turn advances to peer_2
+            ws1.send_json({"type": "game_action", "action": {"type": "pass_turn"}})
+            _ = ws1.receive_json()  # turn_passed event
+            _ = ws2.receive_json()
+            _ = ws1.receive_json()  # room_state
+            _ = ws2.receive_json()
+
+        assert len(dispatched) == 1
+        assert (
+            dispatched[0]["subscription_info"]["endpoint"]  # type: ignore[index]
+            == "https://push.example.test/sub/peer2"
+        )
+        assert "Alice passed their turn" in str(dispatched[0]["data"])
+        assert f"/{room_id}" in str(dispatched[0]["data"])
+
+        # 5. Unsubscribe peer_2 and verify status
+        unsub_res = client.delete(
+            f"/api/rooms/{room_id}/notifications/subscribe?player_id=peer_2"
+        )
+        assert unsub_res.status_code == 200
+        assert unsub_res.json()["deleted"] == 1
+
+        status_final = client.get(
+            f"/api/rooms/{room_id}/notifications/status?player_id=peer_2"
+        )
+        assert status_final.json()["subscribed"] is False
+
+        client.delete(f"/api/rooms/{room_id}?player_id=host_1")
+
+

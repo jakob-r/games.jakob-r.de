@@ -15,6 +15,7 @@
 		subtitleItems = [],
 		maxWidthClass = 'max-w-3xl',
 		startLabel = 'Start Game →',
+		headerActions,
 		configSlot,
 		children
 	}: {
@@ -24,6 +25,7 @@
 		subtitleItems?: string[];
 		maxWidthClass?: string;
 		startLabel?: string;
+		headerActions?: Snippet;
 		configSlot?: Snippet;
 		children: Snippet;
 	} = $props();
@@ -98,6 +100,9 @@
 		</div>
 
 		<div class="flex items-center gap-2">
+			{#if headerActions}
+				{@render headerActions()}
+			{/if}
 			{#if isHost}
 				<button
 					type="button"

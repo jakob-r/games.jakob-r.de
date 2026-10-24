@@ -5,6 +5,7 @@
 	import RoomShell from '$lib/core/components/RoomShell.svelte';
 	import ScribblyBox from '$lib/core/components/ScribblyBox.svelte';
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
+	import TurnNotificationBell from '$lib/core/components/TurnNotificationBell.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 	import { RoomSocketClient, type PlayerInfo, type ServerEvent } from '$lib/core/ws.svelte';
 
@@ -79,6 +80,12 @@
 	let playedWords = $derived<PlayedWordEntry[]>(gameState.played_words ?? []);
 	let currentPlayerId = $derived(gameState.current_player_id ?? null);
 	let isMyTurn = $derived(room?.status === 'playing' && currentPlayerId === profile.playerId);
+	let turnNotificationHint = $derived.by(() => {
+		const last = gameState.last_move;
+		if (!last) return '';
+		const actor = players.find((p) => p.player_id === last.player_id)?.name ?? 'Opponent';
+		return `${actor} played "${last.word}" (${last.word_points} pts). Your move!`;
+	});
 
 	// Word being composed
 	let composedWord = $derived(
@@ -316,6 +323,18 @@
 	title="Silbenstreit"
 	subtitleItems={[`${boardSize}×${boardSize}`, boardLang.toUpperCase()]}
 >
+	{#snippet headerActions()}
+		<TurnNotificationBell
+			{roomId}
+			playerId={profile.playerId}
+			gameSlug="silbenstreit"
+			gameTitle="Silbenstreit"
+			{isMyTurn}
+			isPlaying={room?.status === 'playing'}
+			turnHint={turnNotificationHint}
+		/>
+	{/snippet}
+
 	{#snippet configSlot()}
 		<div class="space-y-4">
 			{#if !isHost}

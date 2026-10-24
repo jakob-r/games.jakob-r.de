@@ -56,6 +56,27 @@ CREATE TABLE IF NOT EXISTS player_stats (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (player_id, game_slug)
 );
+
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id BIGSERIAL PRIMARY KEY,
+    room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    player_id TEXT NOT NULL,
+    endpoint TEXT NOT NULL,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (room_id, player_id, endpoint)
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_room_player
+    ON push_subscriptions(room_id, player_id);
 """
 
 
@@ -238,6 +259,13 @@ class Database:
         async with pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
+                DELETE FROM push_subscriptions
+                WHERE room_id = %s AND player_id = %s
+                """,
+                (room_id, player_id),
+            )
+            await cur.execute(
+                """
                 DELETE FROM room_players
                 WHERE room_id = %s AND player_id = %s
                 RETURNING player_id
@@ -404,6 +432,113 @@ class Database:
                 ORDER BY game_slug ASC
                 """,
                 (player_id,),
+            )
+            rows = await cur.fetchall()
+            return [dict(r) for r in rows]
+
+    async def get_app_setting(self, key: str) -> dict[str, Any] | None:
+        pool = self._require_pool()
+        async with pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT value
+                FROM app_settings
+                WHERE key = %s
+                """,
+                (key,),
+            )
+            row = await cur.fetchone()
+            if not row or not isinstance(row["value"], dict):
+                return None
+            return dict(row["value"])
+
+    async def set_app_setting(self, key: str, value: dict[str, Any]) -> dict[str, Any]:
+        pool = self._require_pool()
+        async with pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                INSERT INTO app_settings (key, value, updated_at)
+                VALUES (%s, %s, NOW())
+                ON CONFLICT (key) DO UPDATE
+                SET value = EXCLUDED.value,
+                    updated_at = NOW()
+                RETURNING value
+                """,
+                (key, Jsonb(value)),
+            )
+            row = await cur.fetchone()
+            assert row is not None
+            return dict(row["value"])
+
+    async def upsert_push_subscription(
+        self,
+        *,
+        room_id: str,
+        player_id: str,
+        endpoint: str,
+        p256dh: str,
+        auth: str,
+    ) -> dict[str, Any]:
+        pool = self._require_pool()
+        async with pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                INSERT INTO push_subscriptions (room_id, player_id, endpoint, p256dh, auth, updated_at)
+                VALUES (%s, %s, %s, %s, %s, NOW())
+                ON CONFLICT (room_id, player_id, endpoint) DO UPDATE
+                SET p256dh = EXCLUDED.p256dh,
+                    auth = EXCLUDED.auth,
+                    updated_at = NOW()
+                RETURNING id, room_id, player_id, endpoint, p256dh, auth, created_at, updated_at
+                """,
+                (room_id, player_id, endpoint, p256dh, auth),
+            )
+            row = await cur.fetchone()
+            assert row is not None
+            return dict(row)
+
+    async def delete_push_subscriptions(
+        self,
+        *,
+        room_id: str,
+        player_id: str,
+        endpoint: str | None = None,
+    ) -> int:
+        pool = self._require_pool()
+        async with pool.connection() as conn, conn.cursor() as cur:
+            if endpoint:
+                await cur.execute(
+                    """
+                    DELETE FROM push_subscriptions
+                    WHERE room_id = %s AND player_id = %s AND endpoint = %s
+                    """,
+                    (room_id, player_id, endpoint),
+                )
+            else:
+                await cur.execute(
+                    """
+                    DELETE FROM push_subscriptions
+                    WHERE room_id = %s AND player_id = %s
+                    """,
+                    (room_id, player_id),
+                )
+            return cur.rowcount or 0
+
+    async def get_push_subscriptions(
+        self,
+        room_id: str,
+        player_id: str,
+    ) -> list[dict[str, Any]]:
+        pool = self._require_pool()
+        async with pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT id, room_id, player_id, endpoint, p256dh, auth, created_at, updated_at
+                FROM push_subscriptions
+                WHERE room_id = %s AND player_id = %s
+                ORDER BY updated_at DESC
+                """,
+                (room_id, player_id),
             )
             rows = await cur.fetchall()
             return [dict(r) for r in rows]

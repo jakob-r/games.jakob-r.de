@@ -24,6 +24,7 @@ from games_platform.core.protocol import (
     StartGameMessage,
     UpdateConfigMessage,
 )
+from games_platform.core.push import WebPushService, format_turn_notification
 
 logger = logging.getLogger(__name__)
 
@@ -63,13 +64,51 @@ class RoomConnection:
 class RoomManager:
     """Manages active WebSocket connections and coordinates state persistence per room."""
 
-    def __init__(self, db: Database) -> None:
+    def __init__(self, db: Database, push_service: WebPushService | None = None) -> None:
         self.db = db
+        self.push = push_service or WebPushService(db)
         self.games: dict[str, GameDefinition] = {}
         self.connections: dict[str, list[RoomConnection]] = {}
         self.cursors: dict[str, dict[str, dict[str, int | None]]] = {}
         self.midgame_inactive_players: dict[str, set[str]] = {}
         self.locks: dict[str, asyncio.Lock] = {}
+        self._push_tasks: set[asyncio.Task[Any]] = set()
+
+    def mark_player_active(self, room_id: str, player_id: str) -> None:
+        """Mark a player as active in a room so closing their tab won't auto-remove them."""
+        inactive_set = self.midgame_inactive_players.get(room_id)
+        if inactive_set is not None:
+            inactive_set.discard(player_id)
+            if not inactive_set:
+                self.midgame_inactive_players.pop(room_id, None)
+
+    def _schedule_turn_push(
+        self,
+        *,
+        room_id: str,
+        game: GameDefinition,
+        target_player_id: str,
+        actor_name: str | None = None,
+        events: list[dict[str, Any]] | None = None,
+        reason: str = "action",
+    ) -> None:
+        payload = format_turn_notification(
+            game_slug=game.slug,
+            game_title=game.title,
+            room_id=room_id,
+            actor_name=actor_name,
+            events=events,
+            reason=reason,
+        )
+        task = asyncio.create_task(
+            self.push.send_to_player(
+                room_id=room_id,
+                player_id=target_player_id,
+                payload=payload,
+            )
+        )
+        self._push_tasks.add(task)
+        task.add_done_callback(self._push_tasks.discard)
 
     def register_game(self, game: GameDefinition) -> None:
         self.games[game.slug] = game
@@ -203,8 +242,11 @@ class RoomManager:
             return True, True
 
         new_state: dict[str, Any] | None = None
+        prev_turn_player_id: str | None = None
+        next_turn_player_id: str | None = None
         if isinstance(room["state"], dict) and "turn_order" in room["state"]:
             state = dict(room["state"])
+            prev_turn_player_id = state.get("current_player_id")
             old_order: list[str] = list(state.get("turn_order") or [])
             if player_id in old_order:
                 old_idx = old_order.index(player_id)
@@ -221,6 +263,7 @@ class RoomManager:
                     state["current_turn_index"] = new_order.index(
                         state["current_player_id"]
                     )
+                next_turn_player_id = state.get("current_player_id")
                 new_state = state
 
         if new_state is not None:
@@ -228,6 +271,18 @@ class RoomManager:
                 room_id,
                 state=new_state,
             )
+            if (
+                room["status"] == "playing"
+                and next_turn_player_id
+                and next_turn_player_id != prev_turn_player_id
+            ):
+                game = self.get_game(room["game_slug"])
+                self._schedule_turn_push(
+                    room_id=room_id,
+                    game=game,
+                    target_player_id=str(next_turn_player_id),
+                    reason="player_left",
+                )
         await self.broadcast_room_state(room_id)
         return True, False
 
@@ -510,6 +565,18 @@ class RoomManager:
                     await self.db.reset_room_scores(room_id)
                     await self.db.update_room(room_id, status="playing", state=initial_state)
                     await self.broadcast_room_state(room_id)
+                    opening_player_id = (
+                        initial_state.get("current_player_id")
+                        if isinstance(initial_state, dict)
+                        else None
+                    )
+                    if opening_player_id and opening_player_id != conn.player_id:
+                        self._schedule_turn_push(
+                            room_id=room_id,
+                            game=game,
+                            target_player_id=str(opening_player_id),
+                            reason="game_started",
+                        )
 
                 case ReturnToLobbyMessage():
                     if room["host_player_id"] != conn.player_id:
@@ -574,6 +641,11 @@ class RoomManager:
         # - Multiplier is reset to 1.0 after 10 seconds or on a mistake.
         active_multiplier = compute_effective_multiplier(stored_mult, last_correct_at, now)
 
+        prev_turn_player_id = (
+            room["state"].get("current_player_id")
+            if isinstance(room["state"], dict)
+            else None
+        )
         outcome = game.apply_action(
             state=room["state"],
             config=room["config"],
@@ -587,11 +659,7 @@ class RoomManager:
             or outcome.is_mistake
             or outcome.state != room["state"]
         ):
-            inactive_set = self.midgame_inactive_players.get(room_id)
-            if inactive_set is not None:
-                inactive_set.discard(player_id)
-                if not inactive_set:
-                    self.midgame_inactive_players.pop(room_id, None)
+            self.mark_player_active(room_id, player_id)
 
         new_score = float(player_row["score"])
         new_mult = stored_mult
@@ -648,3 +716,23 @@ class RoomManager:
             await self.broadcast(room_id, event)
 
         await self.broadcast_room_state(room_id)
+
+        next_turn_player_id = (
+            outcome.state.get("current_player_id")
+            if isinstance(outcome.state, dict)
+            else None
+        )
+        if (
+            not outcome.is_finished
+            and next_turn_player_id
+            and next_turn_player_id != player_id
+            and next_turn_player_id != prev_turn_player_id
+        ):
+            self._schedule_turn_push(
+                room_id=room_id,
+                game=game,
+                target_player_id=str(next_turn_player_id),
+                actor_name=str(player_row.get("name") or "Player"),
+                events=outcome.events,
+                reason="action",
+            )
