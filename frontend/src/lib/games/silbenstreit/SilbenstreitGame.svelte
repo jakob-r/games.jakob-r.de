@@ -60,7 +60,6 @@
 	let selectedTiles = $state<TileCoord[]>([]);
 	let rejectReason = $state<string | null>(null);
 	let rejectShake = $state<boolean>(false);
-	let lastPlayedPopup = $state<{ word: string; delta: number; player_id: string } | null>(null);
 
 	let room = $derived(client.room);
 	let gameState = $derived((room?.state ?? {}) as SilbenPublicState);
@@ -82,10 +81,6 @@
 	let playedWords = $derived<PlayedWordEntry[]>(gameState.played_words ?? []);
 	let currentPlayerId = $derived(gameState.current_player_id ?? null);
 	let isMyTurn = $derived(room?.status === 'playing' && currentPlayerId === profile.playerId);
-	let currentPlayer = $derived(players.find((p) => p.player_id === currentPlayerId) ?? null);
-	let currentTurnColor = $derived(
-		resolvePlayerColor(currentPlayerId, profile.playerId, profile.primaryColor, players)
-	);
 
 	// Word being composed
 	let composedWord = $derived(
@@ -99,19 +94,9 @@
 			playedWords.some((entry) => entry.word.toUpperCase() === composedWord.toUpperCase())
 	);
 
-	// Map of "row,col" -> 1-based step index in current selection
-	let selectionOrderMap = $derived.by(() => {
-		const map = new Map<string, number>();
-		selectedTiles.forEach((pos, idx) => {
-			map.set(`${pos.row},${pos.col}`, idx + 1);
-		});
-		return map;
-	});
-
-	// Last played word coordinates for subtle highlight
-	let lastMoveSet = $derived.by(() => {
+	let selectedKeySet = $derived.by(() => {
 		const set = new Set<string>();
-		for (const pos of gameState.last_move?.positions ?? []) {
+		for (const pos of selectedTiles) {
 			set.add(`${pos.row},${pos.col}`);
 		}
 		return set;
@@ -160,7 +145,6 @@
 		rejectReason = null;
 		const existingIdx = selectedTiles.findIndex((t) => t.row === row && t.col === col);
 		if (existingIdx !== -1) {
-			// If tapping the last tile, pop it; if tapping an earlier selected tile, remove it
 			selectedTiles = selectedTiles.filter((_, idx) => idx !== existingIdx);
 			return;
 		}
@@ -226,13 +210,12 @@
 
 		const letter = e.key.toUpperCase();
 		if (/^[A-Z]$/.test(letter)) {
-			// Find first unselected, unprotected tile matching `letter`
 			for (let r = 0; r < boardSize; r++) {
 				for (let c = 0; c < boardSize; c++) {
 					if (
 						letters[r]?.[c] === letter &&
 						!protectedGrid[r]?.[c] &&
-						!selectionOrderMap.has(`${r},${c}`)
+						!selectedKeySet.has(`${r},${c}`)
 					) {
 						e.preventDefault();
 						rejectReason = null;
@@ -244,9 +227,14 @@
 		}
 	}
 
-	function getPlayerName(playerId: string | null | undefined): string {
-		if (!playerId) return 'Player';
-		return players.find((p) => p.player_id === playerId)?.name ?? 'Player';
+	function getCellBackground(ownerColor: string | null, isProtected: boolean): string {
+		if (isProtected && ownerColor) {
+			return `color-mix(in oklab, ${ownerColor} 62%, #d8d3c8)`;
+		}
+		if (ownerColor) {
+			return `color-mix(in oklab, ${ownerColor} 26%, #faf8f4)`;
+		}
+		return '#faf8f4';
 	}
 
 	async function deleteRoom() {
@@ -267,17 +255,15 @@
 	}
 
 	async function leaveRoom() {
-		if (isHost || !profile.playerId || leavingRoom) return;
+		if (!profile.playerId || leavingRoom) return;
 		leavingRoom = true;
 		try {
-			const res = await fetch(
+			await fetch(
 				`/api/rooms/${encodeURIComponent(roomId)}/players/${encodeURIComponent(profile.playerId)}`,
 				{ method: 'DELETE' }
 			);
-			if (res.ok) {
-				client.disconnect();
-				await goto('/');
-			}
+			client.disconnect();
+			await goto('/');
 		} finally {
 			leavingRoom = false;
 		}
@@ -297,16 +283,6 @@
 			if (ev.type === 'word_played') {
 				selectedTiles = [];
 				rejectReason = null;
-				lastPlayedPopup = {
-					word: ev.word,
-					delta: ev.points_delta,
-					player_id: ev.player_id
-				};
-				setTimeout(() => {
-					if (lastPlayedPopup?.word === ev.word) {
-						lastPlayedPopup = null;
-					}
-				}, 1800);
 			} else if (ev.type === 'word_rejected' && ev.player_id === profile.playerId) {
 				rejectReason = formatRejectionReason(ev.reason, ev.word);
 				rejectShake = true;
@@ -331,7 +307,7 @@
 
 <NamePromptModal onConfirm={(name, color) => client.syncProfile(profile.playerId, name, color)} />
 
-<div class="mx-auto flex w-full max-w-4xl flex-1 flex-col px-3 py-3 sm:px-6 sm:py-5">
+<div class="mx-auto flex w-full max-w-3xl flex-1 flex-col px-3 py-3 sm:px-6 sm:py-5">
 	<!-- Top Header -->
 	<header class="mb-3 flex items-center justify-between gap-2">
 		<div class="flex items-center gap-2.5">
@@ -357,6 +333,16 @@
 		</div>
 
 		<div class="flex items-center gap-2">
+			<button
+				type="button"
+				onclick={leaveRoom}
+				disabled={leavingRoom}
+				title="Leave this game"
+				aria-label="Leave this game"
+				class="inline-flex cursor-pointer items-center justify-center rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] px-2 py-1 text-xs font-medium text-[#6e6a63] shadow-[1.5px_1.5px_0px_#1a1917] transition hover:border-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-50"
+			>
+				Leave
+			</button>
 			{#if isHost}
 				<button
 					type="button"
@@ -382,17 +368,6 @@
 						<line x1="10" y1="11" x2="10" y2="17" />
 						<line x1="14" y1="11" x2="14" y2="17" />
 					</svg>
-				</button>
-			{:else if room}
-				<button
-					type="button"
-					onclick={leaveRoom}
-					disabled={leavingRoom}
-					title="Leave this game"
-					aria-label="Leave this game"
-					class="inline-flex cursor-pointer items-center justify-center rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] px-2 py-1 text-xs font-medium text-[#6e6a63] shadow-[1.5px_1.5px_0px_#1a1917] transition hover:border-[#dc2626] hover:bg-[#fef2f2] hover:text-[#dc2626] disabled:cursor-not-allowed disabled:opacity-50"
-				>
-					Leave
 				</button>
 			{/if}
 			<ProfileBadge
@@ -420,7 +395,7 @@
 			{players}
 			onToggleReady={(r) => client.setReady(r)}
 			onStartGame={() => client.startGame()}
-			onLeaveRoom={isHost ? undefined : leaveRoom}
+			onLeaveRoom={leaveRoom}
 		>
 			{#snippet configSlot()}
 				<div class="space-y-4">
@@ -495,8 +470,8 @@
 		</Lobby>
 	{:else}
 		<!-- Active or Finished Silbenstreit View -->
-		<div class="flex flex-1 flex-col gap-3">
-			<!-- Players & Turn Bar -->
+		<div class="mx-auto flex w-full max-w-[440px] flex-1 flex-col gap-3">
+			<!-- Players & Turn Status Bar -->
 			<div class="flex flex-wrap items-center justify-between gap-2">
 				<div class="flex flex-wrap items-center gap-2">
 					{#each players as p (p.player_id)}
@@ -508,17 +483,11 @@
 						)}
 						{@const isTurn = room.status === 'playing' && p.player_id === currentPlayerId}
 						<div
-							class="relative flex items-center gap-2 rounded-md border-[1.8px] border-[#1a1917] px-2.5 py-1 transition
-							{isTurn
-								? 'bg-[#faf8f4] shadow-[2.5px_2.5px_0px_#1a1917]'
-								: 'bg-[#faf8f4]/70 opacity-85 shadow-[1px_1px_0px_#1a1917]'}"
-							style={isTurn ? `border-color: ${pColor};` : ''}
+							class="relative flex items-center gap-2 rounded border-[1.6px] border-[#1a1917] px-2.5 py-1 transition
+							{isTurn ? 'bg-[#faf8f4] font-semibold' : 'bg-[#faf8f4]/70 opacity-80'}"
+							style="border-left: 4px solid {pColor};"
 						>
-							<span
-								class="h-2.5 w-2.5 rounded-full border border-[#1a1917]"
-								style="background-color: {pColor};"
-							></span>
-							<span class="max-w-[110px] truncate text-xs font-semibold" style="color: {pColor};">
+							<span class="max-w-[110px] truncate text-xs font-semibold text-[#1a1917]">
 								{p.name}
 							</span>
 							{#if cfgScoring}
@@ -538,14 +507,11 @@
 					{/each}
 				</div>
 
-				<div class="font-mono-num flex items-center gap-2 text-xs text-[#6e6a63]">
-					<span>{formatLanguageLabel(boardLang)}</span>
-					<span>•</span>
-					<span>{gameState.unowned_count ?? 0} unowned left</span>
+				<div class="font-mono-num text-xs text-[#6e6a63]">
+					{gameState.unowned_count ?? 0} open
 				</div>
 			</div>
 
-			<!-- Game Over or Turn Banner -->
 			{#if room.status === 'finished'}
 				<ScribblyBox seed={59} class="bg-[#faf8f4] p-4 text-center">
 					<div class="font-hand text-xl">
@@ -568,282 +534,190 @@
 						</div>
 					{/if}
 				</ScribblyBox>
-			{:else}
-				<div
-					class="flex flex-wrap items-center justify-between gap-2 rounded-md border-[1.6px] border-[#1a1917] bg-[#faf8f4] px-3 py-2 text-xs shadow-[1.5px_1.5px_0px_#1a1917]"
-				>
-					{#if isMyTurn}
-						<div class="flex items-center gap-2 font-semibold" style="color: {profile.primaryColor};">
-							<span
-								class="inline-block h-2.5 w-2.5 rounded-full border border-[#1a1917]"
-								style="background-color: {profile.primaryColor};"
-							></span>
-							<span>Your turn — tap unprotected tiles to spell a {formatLanguageLabel(boardLang)} word</span>
-						</div>
-					{:else if currentPlayer}
-						<div class="flex items-center gap-2">
-							<span
-								class="inline-block h-2.5 w-2.5 rounded-full border border-[#1a1917]"
-								style="background-color: {currentTurnColor};"
-							></span>
-							<span>
-								<strong style="color: {currentTurnColor};">{currentPlayer.name}</strong>'s turn
-							</span>
-						</div>
-					{:else}
-						<span class="text-[#6e6a63]">Waiting for player…</span>
-					{/if}
-
-					{#if lastPlayedPopup}
-						{@const popColor = resolvePlayerColor(
-							lastPlayedPopup.player_id,
-							profile.playerId,
-							profile.primaryColor,
-							players
-						)}
-						<div class="font-mono-num flex items-center gap-1.5 text-xs font-bold" style="color: {popColor};">
-							<span>"{lastPlayedPopup.word}"</span>
-							{#if lastPlayedPopup.delta !== 0}
-								<span>({lastPlayedPopup.delta > 0 ? `+${lastPlayedPopup.delta}` : lastPlayedPopup.delta})</span>
-							{/if}
-						</div>
-					{/if}
-				</div>
 			{/if}
 
-			<!-- Main Grid + Word Composer + Played Words Layout -->
-			<div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_250px]">
-				<!-- Left Column: Letter Grid & Word Composer -->
-				<div class="flex flex-col items-center gap-3">
-					<!-- Letter Grid -->
-					<div
-						class="grid w-full max-w-[440px] gap-1.5 select-none sm:gap-2"
-						style="grid-template-columns: repeat({boardSize}, minmax(0, 1fr));"
-						role="grid"
-						aria-label="Silbenstreit Letter Grid"
-					>
-						{#each Array.from({ length: boardSize }, (_, r) => r) as r (r)}
-							{#each Array.from({ length: boardSize }, (_, c) => c) as c (c)}
-								{@const letter = letters[r]?.[c] ?? '?'}
-								{@const val = values[r]?.[c] ?? 1}
-								{@const ownerId = owners[r]?.[c] ?? null}
-								{@const isProtected = protectedGrid[r]?.[c] ?? false}
-								{@const stepIdx = selectionOrderMap.get(`${r},${c}`) ?? null}
-								{@const isSelected = stepIdx !== null}
-								{@const isLastMoveTile = lastMoveSet.has(`${r},${c}`)}
-								{@const ownerColor = ownerId
-									? resolvePlayerColor(ownerId, profile.playerId, profile.primaryColor, players)
-									: null}
-								<button
-									type="button"
-									disabled={!isMyTurn || isProtected || room.status !== 'playing'}
-									onclick={() => toggleTile(r, c)}
-									title={isProtected
-										? `Protected tile (${letter}, ${val} pts) — surrounded by ${getPlayerName(ownerId)}`
-										: `${letter} (${val} pts)`}
-									class="relative flex aspect-square flex-col items-center justify-center rounded-md border-[1.8px] transition select-none
-									{isProtected
-										? 'cursor-not-allowed'
-										: isMyTurn && room.status === 'playing'
-											? 'cursor-pointer hover:-translate-y-0.5 active:translate-y-0'
-											: 'cursor-default'}
-									{isSelected
-										? 'ring-2 ring-[#1a1917] -translate-y-0.5 shadow-[2.5px_2.5px_0px_#1a1917]'
-										: 'shadow-[1.5px_1.5px_0px_#1a1917]'}"
-									style="
-										border-color: {ownerColor ?? '#1a1917'};
-										background-color: {isProtected && ownerColor
-											? `color-mix(in oklab, ${ownerColor} 32%, #faf8f4)`
-											: ownerColor
-												? `color-mix(in oklab, ${ownerColor} 16%, #faf8f4)`
-												: isSelected
-													? '#f2eee6'
-													: '#faf8f4'};
-									"
-								>
-									<!-- Protected inner frame / shield indicator -->
-									{#if isProtected && ownerColor}
-										<span
-											class="pointer-events-none absolute inset-[3px] rounded border-[1.5px] border-dashed"
-											style="border-color: {ownerColor};"
-										></span>
-										<span
-											class="pointer-events-none absolute top-0.5 left-1 text-[9px] leading-none font-bold"
-											style="color: {ownerColor};"
-											aria-label="Protected"
-										>
-											★
-										</span>
-									{:else if isSelected}
-										<span
-											class="font-mono-num pointer-events-none absolute top-0.5 left-1 rounded bg-[#1a1917] px-1 text-[9px] leading-tight font-bold text-[#faf8f4]"
-										>
-											{stepIdx}
-										</span>
-									{:else if isLastMoveTile}
-										<span
-											class="pointer-events-none absolute top-1 left-1 h-1.5 w-1.5 rounded-full bg-[#1a1917]/40"
-										></span>
-									{/if}
-
-									<!-- Main Letter -->
-									<span
-										class="font-hand leading-none font-bold
-										{boardSize >= 7 ? 'text-base sm:text-xl' : 'text-xl sm:text-2xl'}"
-										style="color: {ownerColor ?? '#1a1917'};"
-									>
-										{letter}
-									</span>
-
-									<!-- Rarity Score (1-10) in bottom-right corner -->
-									<span
-										class="font-mono-num pointer-events-none absolute right-1 bottom-0.5 text-[9px] leading-none font-semibold sm:text-[10px]"
-										style="color: {ownerColor ?? '#6e6a63'};"
-									>
-										{val}
-									</span>
-								</button>
-							{/each}
-						{/each}
-					</div>
-
-					<!-- Word Composer Panel -->
-					{#if room.status === 'playing'}
-						<ScribblyBox
-							seed={71}
-							class="w-full max-w-[440px] bg-[#faf8f4] p-3 sm:p-4 {rejectShake ? 'animate-mistake-shake' : ''}"
-						>
-							<div class="flex items-center justify-between gap-2">
-								<span class="text-xs font-semibold uppercase text-[#6e6a63]">
-									Word Composer
-								</span>
-								{#if selectedTiles.length > 0}
-									<span class="font-mono-num text-xs font-semibold text-[#1a1917]">
-										{selectedTiles.length} letters • {composedPoints} tile pts
-									</span>
-								{/if}
-							</div>
-
-							<!-- Assembled Letter Chips -->
-							<div
-								class="mt-2 flex min-h-[44px] flex-wrap items-center gap-1.5 rounded border border-[#1a1917]/20 bg-[#f3efe6]/70 px-2.5 py-2"
+			<!-- Simple Flat Letter Grid -->
+			<div class="relative mx-auto aspect-square w-full select-none">
+				<div
+					class="grid h-full w-full border-[2px] border-[#1a1917] bg-[#faf8f4]"
+					style="
+						grid-template-columns: repeat({boardSize}, minmax(0, 1fr));
+						grid-template-rows: repeat({boardSize}, minmax(0, 1fr));
+					"
+					role="grid"
+					aria-label="Silbenstreit Letter Grid"
+				>
+					{#each Array.from({ length: boardSize }, (_, r) => r) as r (r)}
+						{#each Array.from({ length: boardSize }, (_, c) => c) as c (c)}
+							{@const letter = letters[r]?.[c] ?? ''}
+							{@const val = values[r]?.[c] ?? 1}
+							{@const ownerId = owners[r]?.[c] ?? null}
+							{@const isProtected = protectedGrid[r]?.[c] ?? false}
+							{@const isSelected = selectedKeySet.has(`${r},${c}`)}
+							{@const ownerColor = ownerId
+								? resolvePlayerColor(ownerId, profile.playerId, profile.primaryColor, players)
+								: null}
+							{@const borderRight =
+								c === boardSize - 1 ? '' : 'border-r border-r-[#1a1917]/30'}
+							{@const borderBottom =
+								r === boardSize - 1 ? '' : 'border-b border-b-[#1a1917]/30'}
+							<button
+								type="button"
+								disabled={!isMyTurn || isProtected || room.status !== 'playing'}
+								onclick={() => toggleTile(r, c)}
+								aria-label="Row {r + 1} Column {c + 1}: {letter} ({val} points)"
+								class="silben-cell relative flex items-center justify-center p-0 focus:outline-none {borderRight} {borderBottom}
+								{isProtected
+									? 'cursor-not-allowed'
+									: isMyTurn && room.status === 'playing'
+										? 'cursor-pointer'
+										: 'cursor-default'}"
+								style="background-color: {getCellBackground(ownerColor, isProtected)};"
 							>
-								{#if selectedTiles.length === 0}
-									<span class="text-xs text-[#6e6a63]">
-										{isMyTurn
-											? 'Tap tiles or type on keyboard to build a word…'
-											: 'Waiting for opponent…'}
-									</span>
-								{:else}
+								{#if isSelected}
+									<span
+										class="pointer-events-none absolute inset-[2px] border-2 border-[#1a1917]"
+									></span>
+								{/if}
+
+								<span class="silben-letter text-[#1a1917]">
+									{letter}
+								</span>
+
+								<span
+									class="silben-value font-mono-num pointer-events-none absolute right-1 bottom-0.5 leading-none text-[#1a1917]/65"
+								>
+									{val}
+								</span>
+							</button>
+						{/each}
+					{/each}
+				</div>
+			</div>
+
+			<!-- Word Composer Bar -->
+			{#if room.status === 'playing'}
+				<div
+					class="border-[1.8px] border-[#1a1917] bg-[#faf8f4] px-3 py-2.5 {rejectShake ? 'animate-mistake-shake' : ''}"
+				>
+					<div class="flex min-h-[34px] items-center justify-between gap-2">
+						{#if selectedTiles.length === 0}
+							<span class="text-xs text-[#6e6a63]">
+								{isMyTurn
+									? 'Select letters to form a word…'
+									: 'Waiting for opponent…'}
+							</span>
+						{:else}
+							<div class="flex flex-wrap items-baseline gap-2">
+								<span class="silben-word-preview text-xl font-semibold tracking-wider text-[#1a1917]">
 									{#each selectedTiles as pos, idx (`${pos.row},${pos.col}`)}
-										{@const ch = letters[pos.row]?.[pos.col] ?? '?'}
-										{@const pts = values[pos.row]?.[pos.col] ?? 1}
 										<button
 											type="button"
 											onclick={() => removeComposedAt(idx)}
 											title="Remove letter"
-											class="inline-flex cursor-pointer items-baseline gap-0.5 rounded border border-[#1a1917] bg-[#faf8f4] px-2 py-1 shadow-[1px_1px_0px_#1a1917] hover:bg-[#fef2f2]"
-										>
-											<span class="font-hand text-base font-bold">{ch}</span>
-											<span class="font-mono-num text-[9px] text-[#6e6a63]">{pts}</span>
-										</button>
+											class="cursor-pointer px-0.5 hover:line-through"
+										>{letters[pos.row]?.[pos.col] ?? ''}</button>
 									{/each}
-								{/if}
+								</span>
+								<span class="font-mono-num text-xs text-[#6e6a63]">
+									{composedPoints} pts
+								</span>
 							</div>
 
-							{#if composedAlreadyPlayed}
-								<p class="mt-1.5 text-xs font-medium text-[#dc2626]">
-									"{composedWord}" was already played in this game.
-								</p>
-							{/if}
-
-							{#if rejectReason}
-								<p class="mt-1.5 text-xs font-medium text-[#dc2626]">
-									{rejectReason}
-								</p>
-							{/if}
-
-							<!-- Actions -->
-							<div class="mt-3 flex flex-wrap items-center justify-between gap-2">
-								<div class="flex items-center gap-2">
-									<ScribblyButton
-										onclick={submitWord}
-										disabled={!isMyTurn || selectedTiles.length < 2 || composedAlreadyPlayed}
-										variant="primary"
-										accentColor={profile.primaryColor}
-									>
-										Submit Word
-									</ScribblyButton>
-									{#if selectedTiles.length > 0}
-										<ScribblyButton onclick={clearSelection}>
-											Clear
-										</ScribblyButton>
-									{/if}
-								</div>
-
-								<ScribblyButton
-									onclick={passTurn}
-									disabled={!isMyTurn}
-									title="Pass turn if no valid word can be formed"
-								>
-									Pass Turn
-								</ScribblyButton>
-							</div>
-						</ScribblyBox>
-					{/if}
-				</div>
-
-				<!-- Right Column: Played Words History & Rules Legend -->
-				<div class="space-y-3">
-					<ScribblyBox seed={83} class="bg-[#faf8f4] p-3.5 sm:p-4">
-						<div class="mb-2 flex items-center justify-between">
-							<h2 class="font-hand text-base font-bold">
-								Played Words ({playedWords.length})
-							</h2>
-						</div>
-
-						{#if playedWords.length === 0}
-							<p class="py-3 text-xs text-[#6e6a63]">
-								No words played yet. Each word can only be used once!
-							</p>
-						{:else}
-							<ul class="max-h-[280px] divide-y divide-[#1a1917]/10 overflow-y-auto pr-1">
-								{#each [...playedWords].reverse() as entry (entry.move_number)}
-									{@const entryColor = resolvePlayerColor(
-										entry.player_id,
-										profile.playerId,
-										profile.primaryColor,
-										players
-									)}
-									<li class="flex items-center justify-between gap-2 py-1.5 text-xs">
-										<div class="flex items-center gap-2">
-											<span
-												class="h-2 w-2 shrink-0 rounded-full border border-[#1a1917]"
-												style="background-color: {entryColor};"
-											></span>
-											<span class="font-mono-num font-bold tracking-wide" style="color: {entryColor};">
-												{entry.word}
-											</span>
-										</div>
-										<span class="font-mono-num text-[11px] text-[#6e6a63]">
-											{entry.points_delta >= 0 ? `+${entry.points_delta}` : entry.points_delta}
-										</span>
-									</li>
-								{/each}
-							</ul>
+							<button
+								type="button"
+								onclick={clearSelection}
+								class="cursor-pointer text-xs text-[#6e6a63] underline hover:text-[#1a1917]"
+							>
+								Clear
+							</button>
 						{/if}
-					</ScribblyBox>
+					</div>
 
-					<ScribblyBox seed={89} class="bg-[#faf8f4] p-3.5 text-xs text-[#6e6a63]">
-						<div class="font-hand mb-1 text-sm font-bold text-[#1a1917]">How Protection Works</div>
-						<p class="leading-relaxed">
-							Tiles you claim turn your color and add their <span class="font-mono-num font-semibold text-[#1a1917]">1–10</span> rarity value to your score.
-							When a tile is orthogonally surrounded by tiles of your color, it becomes
-							<strong class="text-[#1a1917]">protected (★)</strong> and cannot be selected anymore.
+					{#if composedAlreadyPlayed}
+						<p class="mt-1 text-xs font-medium text-[#dc2626]">
+							"{composedWord}" was already played.
 						</p>
-					</ScribblyBox>
+					{/if}
+
+					{#if rejectReason}
+						<p class="mt-1 text-xs font-medium text-[#dc2626]">
+							{rejectReason}
+						</p>
+					{/if}
+
+					<div class="mt-2 flex items-center justify-between gap-2 border-t border-[#1a1917]/15 pt-2">
+						<ScribblyButton
+							onclick={submitWord}
+							disabled={!isMyTurn || selectedTiles.length < 2 || composedAlreadyPlayed}
+							variant="primary"
+							accentColor={profile.primaryColor}
+						>
+							Submit Word
+						</ScribblyButton>
+
+						<ScribblyButton
+							onclick={passTurn}
+							disabled={!isMyTurn}
+							title="Pass turn if no valid word can be formed"
+						>
+							Pass Turn
+						</ScribblyButton>
+					</div>
 				</div>
-			</div>
+			{/if}
+
+			<!-- Played Words List -->
+			{#if playedWords.length > 0}
+				<div class="border-[1.6px] border-[#1a1917] bg-[#faf8f4] px-3 py-2.5">
+					<div class="mb-1.5 text-[11px] font-semibold tracking-wide text-[#6e6a63] uppercase">
+						Played Words ({playedWords.length})
+					</div>
+					<div class="flex max-h-[120px] flex-wrap gap-1.5 overflow-y-auto">
+						{#each [...playedWords].reverse() as entry (entry.move_number)}
+							{@const entryColor = resolvePlayerColor(
+								entry.player_id,
+								profile.playerId,
+								profile.primaryColor,
+								players
+							)}
+							<span
+								class="inline-flex items-center gap-1.5 border border-[#1a1917]/25 px-2 py-0.5 text-xs"
+								style="background-color: color-mix(in oklab, {entryColor} 20%, #faf8f4);"
+							>
+								<span class="font-semibold tracking-wide text-[#1a1917]">
+									{entry.word}
+								</span>
+								<span class="font-mono-num text-[10px] text-[#1a1917]/65">
+									{entry.points_delta >= 0 ? `+${entry.points_delta}` : entry.points_delta}
+								</span>
+							</span>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>
+
+<style>
+	.silben-cell {
+		container-type: size;
+		touch-action: manipulation;
+	}
+
+	.silben-letter {
+		font-family: Arial, Helvetica, system-ui, -apple-system, sans-serif;
+		font-weight: 500;
+		font-size: clamp(2rem, 74cqi, 5.25rem);
+		line-height: 1;
+	}
+
+	.silben-value {
+		font-size: clamp(0.6rem, 17cqi, 0.85rem);
+	}
+
+	.silben-word-preview {
+		font-family: Arial, Helvetica, system-ui, -apple-system, sans-serif;
+	}
+</style>
