@@ -2,7 +2,10 @@
 FROM node:22-alpine AS frontend
 RUN npm install -g pnpm@10.30.3
 WORKDIR /fe
-COPY frontend/package.json frontend/pnpm-lock.yaml ./
+# CI silences the pnpm "update available" banner; config files must exist before
+# install so the prepare script (`svelte-kit sync`) finds the adapter.
+ENV CI=true
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/svelte.config.js frontend/tsconfig.json ./
 RUN pnpm install --frozen-lockfile
 COPY frontend/ .
 RUN pnpm run build

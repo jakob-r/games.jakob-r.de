@@ -19,6 +19,8 @@ class ActionOutcome:
     is_correct_entry: bool = False
     is_mistake: bool = False
     is_finished: bool = False
+    # Additional score changes for other players (e.g. flag challenge transfers).
+    extra_score_deltas: dict[str, float] = field(default_factory=dict)
 
 
 class GameDefinition(Protocol):

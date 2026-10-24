@@ -428,6 +428,22 @@ class RoomManager:
                 last_correct_at=new_last_correct,
             )
 
+        if scoring_enabled and outcome.extra_score_deltas:
+            for other_id, delta in outcome.extra_score_deltas.items():
+                if other_id == player_id or delta == 0:
+                    continue
+                other = next((p for p in players if p["player_id"] == other_id), None)
+                if other is None:
+                    continue
+                other_score = round(float(other["score"]) + float(delta), 2)
+                await self.db.update_player_score(
+                    room_id,
+                    other_id,
+                    score=other_score,
+                    multiplier=float(other["multiplier"]),
+                    last_correct_at=other["last_correct_at"],
+                )
+
         new_status = "finished" if outcome.is_finished else room["status"]
         await self.db.update_room(room_id, status=new_status, state=outcome.state)
 

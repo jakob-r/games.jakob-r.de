@@ -55,6 +55,48 @@ export type ServerEvent =
 			next_player_id: string | null;
 	  }
 	| {
+			type: 'cell_revealed';
+			row: number;
+			col: number;
+			player_id: string;
+			revealed_count: number;
+			cells: { row: number; col: number; adjacent: number }[];
+			points_delta: number;
+	  }
+	| {
+			type: 'mine_hit';
+			row: number;
+			col: number;
+			player_id: string;
+			points_delta: number;
+	  }
+	| {
+			type: 'flag_placed';
+			row: number;
+			col: number;
+			player_id: string;
+			points_delta: number;
+	  }
+	| {
+			type: 'flag_removed';
+			row: number;
+			col: number;
+			player_id: string;
+			points_delta: number;
+	  }
+	| {
+			type: 'flag_challenged';
+			row: number;
+			col: number;
+			player_id: string;
+			owner_id: string;
+			was_correct: boolean;
+			challenger_delta: number;
+			owner_delta: number;
+			revealed_count?: number;
+			cells?: { row: number; col: number; adjacent: number }[];
+	  }
+	| {
 			type: 'cursor_update';
 			player_id: string;
 			row: number | null;

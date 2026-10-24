@@ -60,3 +60,25 @@ When the user enters games.jakob-r.de they can
 - The game ends when all squares are closed.
 - The player with the most points wins.
 
+### Co-op Minesweeper
+
+- The starting user creates a new game which will generate a unique game id url that they can share with others to invite them to join.
+- The starting user can set the difficulty (`easy` 9×9/10, `medium` 16×16/40, `hard` 30×16/99) and whether scoring is enabled.
+- All players join a shared lobby, then dig and flag the same board simultaneously (no turns).
+- The first dig is always safe (mines are placed afterward, avoiding that cell and its neighbors).
+- Zero-adjacent cells flood-fill when revealed.
+- Hitting a mine costs points, reveals the mine with a boom flash, and the game continues.
+- Flags are shown in the planting player's color. Players can only remove their own flags; opponent flags can be challenged.
+- The game finishes when all safe cells are revealed **or** every mine is secured (correctly flagged or already revealed).
+
+#### Scoring
+
+- Reveal a safe cell: `+1` per newly revealed cell (including flood-fill).
+- Hit a mine: `−10`.
+- Place a flag: `+2`.
+- Remove your own flag: `−3`.
+- Challenge an opponent's flag:
+  - Flag was correct (mine): challenger `−5`, owner `+5`; cell becomes a confirmed revealed mine.
+  - Flag was wrong (safe): challenger `+5`, owner `−5`; flag removed and cell revealed (flood-fill if zero).
+- Scoring can be turned off by the starting user.
+

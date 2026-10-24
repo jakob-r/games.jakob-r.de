@@ -23,5 +23,8 @@
 	},
 	"dependencies": {
 		"roughjs": "^4.6.6"
+	},
+	"pnpm": {
+		"onlyBuiltDependencies": ["esbuild"]
 	}
 }

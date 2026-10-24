@@ -49,6 +49,13 @@ To share components across games while allowing any game to be extracted and run
      - `standalone.py`: Standalone FastAPI entrypoint (`uv run uvicorn games_platform.games.kaesekaestchen.standalone:app`).
    - **Frontend (`frontend/src/lib/games/kaesekaestchen/`)**:
      - `KaesekaestchenGame.svelte`: Interactive lobby custom outline editor (with shape presets and click/drag edge drawing) and scribbly SVG Dots & Boxes game canvas with player-colored lines and hatched square claims.
+   - **Backend (`backend/games_platform/games/minesweeper/`)**:
+     - `game.py`: `MinesweeperGame` implementing `GameDefinition` (difficulty presets, deferred first-click-safe mine placement, flood-fill reveals, flag/challenge scoring with `extra_score_deltas`, win on all-safe-cleared or all-mines-secured).
+     - `standalone.py`: Standalone FastAPI entrypoint (`uv run uvicorn games_platform.games.minesweeper.standalone:app`).
+   - **Frontend (`frontend/src/lib/games/minesweeper/`)**:
+     - `MinesweeperGame.svelte`: Mobile-first dig/flag modes, long-press flagging, player-colored flags, boom FX on mine hits, and challenge confirm for opponent flags.
+
+`ActionOutcome.extra_score_deltas` lets a single action credit other players (minesweeper flag challenges); `RoomManager` applies those deltas after the actor's score update.
 
 ## Coding Conventions
 - Always keep the root `Makefile` up to date so the entire local stack (database, backend, frontend) can be started with `make dev`.
