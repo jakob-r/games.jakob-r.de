@@ -443,8 +443,8 @@
 			<div class="flex items-center justify-between gap-2">
 				<h2 class="font-hand text-2xl">Silbenstreit</h2>
 				<span
-					title="2 players"
-					aria-label="2 players"
+					title="2 to 4 players"
+					aria-label="2 to 4 players"
 					class="inline-flex items-center gap-1 text-xs font-medium text-[#6e6a63]"
 				>
 					<svg
@@ -462,7 +462,7 @@
 						<path d="M22 21v-2a4 4 0 0 0-3-3.87" />
 						<path d="M16 3.13a4 4 0 0 1 0 7.75" />
 					</svg>
-					<span class="font-mono-num">2</span>
+					<span class="font-mono-num">2–4</span>
 				</span>
 			</div>
 

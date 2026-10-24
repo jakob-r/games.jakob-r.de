@@ -75,7 +75,7 @@ When the user enters games.jakob-r.de they can
 
 - Configurable 4x4, to 8x8 grid of letters.
 - Letters drawn randomly but slightly proportional to language frequencies. Replacements are allowed. Still make sure to include rare letters.
-- 2 players, round based game.
+- 2 to 4 players, round based game.
 - At the start user can choose from english, german, french or spanish.
 - In a turn a player forms a valid word from the language dictionary.
 - Every letter in the word becomes "owned" by the player.

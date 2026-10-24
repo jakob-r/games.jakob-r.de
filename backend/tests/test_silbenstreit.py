@@ -233,6 +233,49 @@ def test_game_ends_when_no_unowned_letters_remain() -> None:
     assert outcome.is_finished is True
 
 
+def test_four_player_turn_rotation_and_multi_steal() -> None:
+    game = SilbenstreitGame()
+    config = game.validate_config({"size": 4, "language": "en", "scoring_enabled": True})
+    state = game.create_initial_state(config, player_ids=["p1", "p2", "p3", "p4"])
+
+    assert state["turn_order"] == ["p1", "p2", "p3", "p4"]
+    assert state["current_player_id"] == "p1"
+
+    state["letters"] = [
+        ["C", "A", "T", "S"],
+        ["D", "O", "G", "S"],
+        ["L", "I", "N", "E"],
+        ["B", "I", "R", "D"],
+    ]
+    state["values"] = [
+        [get_letter_score(ch, "en") for ch in row] for row in state["letters"]
+    ]
+    # Pre-assign (0,0) to p2 and (0,1) to p3 so p1 steals from both in one word
+    state["owners"][0][0] = "p2"
+    state["owners"][0][1] = "p3"
+
+    outcome = game.apply_action(
+        state=state,
+        config=config,
+        player_id="p1",
+        action={
+            "type": "submit_word",
+            "positions": [
+                {"row": 0, "col": 0},
+                {"row": 0, "col": 1},
+                {"row": 0, "col": 2},
+            ],
+        },
+        player_multiplier=1.0,
+    )
+    assert outcome.is_correct_entry is True
+    assert outcome.state["current_player_id"] == "p2"
+    assert outcome.extra_score_deltas == {
+        "p2": -float(state["values"][0][0]),
+        "p3": -float(state["values"][0][1]),
+    }
+
+
 def test_full_multiplayer_silbenstreit_websocket_lifecycle() -> None:
     test_db = Database()
     app = create_app(database=test_db)

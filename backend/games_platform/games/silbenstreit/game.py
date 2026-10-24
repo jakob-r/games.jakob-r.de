@@ -19,6 +19,7 @@ from games_platform.games.silbenstreit.dictionary import (
 MIN_SIZE = 4
 MAX_SIZE = 8
 DEFAULT_SIZE = 5
+MAX_PLAYERS = 4
 
 
 class TilePosition(BaseModel):
@@ -91,12 +92,12 @@ def count_unowned_tiles(size: int, owners: list[list[str | None]]) -> int:
 
 
 class SilbenstreitGame:
-    """Self-contained 2-player Silbenstreit implementation."""
+    """Self-contained 2-to-4-player Silbenstreit implementation."""
 
     slug: str = "silbenstreit"
     title: str = "Silbenstreit"
     description: str = (
-        "2-player word strategy on a 4×4 to 8×8 letter grid. Form valid words to claim "
+        "2–4 player word strategy on a 4×4 to 8×8 letter grid. Form valid words to claim "
         "letters in your color, score rarity points (1–10), and surround your tiles to "
         "protect them from being stolen!"
     )
@@ -144,7 +145,7 @@ class SilbenstreitGame:
             [False for _ in range(size)] for _ in range(size)
         ]
 
-        turn_order: list[str] = list(player_ids or [])[:2]
+        turn_order: list[str] = list(player_ids or [])[:MAX_PLAYERS]
         current_player_id: str | None = turn_order[0] if turn_order else None
 
         return {
@@ -208,7 +209,7 @@ class SilbenstreitGame:
         protected: list[list[bool]] = next_state["protected"]
         turn_order: list[str] = list(next_state.get("turn_order") or [])
 
-        if player_id not in turn_order and len(turn_order) < 2:
+        if player_id not in turn_order and len(turn_order) < MAX_PLAYERS:
             turn_order.append(player_id)
             next_state["turn_order"] = turn_order
 
