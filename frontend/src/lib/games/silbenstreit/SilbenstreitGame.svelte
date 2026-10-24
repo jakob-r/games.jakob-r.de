@@ -214,8 +214,7 @@
 	}
 
 	function passTurn() {
-		if (!isMyTurn) return;
-		clearSelection();
+		if (!isMyTurn || selectedTiles.length > 0) return;
 		client.sendAction({
 			type: 'pass_turn'
 		});
@@ -711,7 +710,7 @@
 
 						<ScribblyButton
 							onclick={passTurn}
-							disabled={!isMyTurn}
+							disabled={!isMyTurn || selectedTiles.length > 0}
 							title="Pass turn if no valid word can be formed"
 						>
 							Pass Turn
