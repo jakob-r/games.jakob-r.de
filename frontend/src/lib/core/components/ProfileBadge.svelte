@@ -12,15 +12,37 @@
 
 	let open = $state(false);
 	let draftName = $state(profile.name);
+	let nameFocused = $state(false);
 
 	$effect(() => {
-		draftName = profile.name;
+		// Don't clobber in-progress typing (including an empty field while deleting).
+		if (!nameFocused) {
+			draftName = profile.name;
+		}
 	});
 
-	function handleNameInput(e: Event) {
-		const target = e.currentTarget as HTMLInputElement;
-		draftName = target.value;
-		profile.setName(target.value);
+	function handleNameInput() {
+		draftName = draftName.slice(0, 28);
+		const trimmed = draftName.trim();
+		if (trimmed) {
+			profile.setName(trimmed);
+			onChange?.(profile.name, profile.primaryColor);
+		}
+	}
+
+	function handleNameFocus() {
+		nameFocused = true;
+	}
+
+	function handleNameBlur() {
+		nameFocused = false;
+		const trimmed = draftName.trim().slice(0, 28);
+		if (trimmed) {
+			profile.setName(trimmed);
+			draftName = profile.name;
+		} else {
+			draftName = profile.ensureName();
+		}
 		onChange?.(profile.name, profile.primaryColor);
 	}
 
@@ -51,8 +73,10 @@
 				<div class="mb-2 flex items-center gap-2">
 					<input
 						type="text"
-						value={draftName}
+						bind:value={draftName}
 						oninput={handleNameInput}
+						onfocus={handleNameFocus}
+						onblur={handleNameBlur}
 						maxlength="28"
 						placeholder="Your name"
 						aria-label="Your name"
@@ -106,8 +130,10 @@
 			<input
 				id="player-name-input"
 				type="text"
-				value={draftName}
+				bind:value={draftName}
 				oninput={handleNameInput}
+				onfocus={handleNameFocus}
+				onblur={handleNameBlur}
 				maxlength="28"
 				placeholder="Your name..."
 				aria-label="Your name"

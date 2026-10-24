@@ -54,10 +54,23 @@ class ProfileStore {
 
 	setName(newName: string): void {
 		const trimmed = newName.trim().slice(0, 32);
-		this.name = trimmed || 'Player';
+		// Keep the previous name if the caller passes blank (e.g. mid-edit clear).
+		// Callers that need a fallback should pass it explicitly or use ensureName().
+		if (!trimmed) return;
+		this.name = trimmed;
 		if (typeof window !== 'undefined') {
 			localStorage.setItem(STORAGE_KEY_NAME, this.name);
 		}
+	}
+
+	ensureName(): string {
+		const trimmed = this.name.trim();
+		if (trimmed) return trimmed;
+		this.name = 'Player';
+		if (typeof window !== 'undefined') {
+			localStorage.setItem(STORAGE_KEY_NAME, this.name);
+		}
+		return this.name;
 	}
 
 	setColor(newColor: string): void {
