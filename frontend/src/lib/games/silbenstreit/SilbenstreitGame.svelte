@@ -548,20 +548,20 @@
 
 				<div class="mt-2 flex items-center justify-between gap-2 border-t border-[#1a1917]/15 pt-2">
 					<ScribblyButton
+						onclick={passTurn}
+						disabled={!isMyTurn || selectedTiles.length > 0}
+						title="Pass turn if no valid word can be formed"
+					>
+						Pass Turn
+					</ScribblyButton>
+
+					<ScribblyButton
 						onclick={submitWord}
 						disabled={!isMyTurn || selectedTiles.length < 2 || composedAlreadyPlayed}
 						variant="primary"
 						accentColor={profile.primaryColor}
 					>
 						Submit Word
-					</ScribblyButton>
-
-					<ScribblyButton
-						onclick={passTurn}
-						disabled={!isMyTurn || selectedTiles.length > 0}
-						title="Pass turn if no valid word can be formed"
-					>
-						Pass Turn
 					</ScribblyButton>
 				</div>
 			</div>
