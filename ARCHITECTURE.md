@@ -8,6 +8,7 @@ General product concept lives in `idea.md`.
 - **Framework**: **Svelte 5** (using Runes: `$state`, `$derived`, `$effect`) with **SvelteKit** and **TypeScript**.
   - Fine-grained reactivity updates individual DOM nodes (ideal for high-frequency multiplayer board and corner-note updates) without Virtual DOM overhead.
   - Built-in `svelte/motion` (`Spring`, `Tween`) and `svelte/transition` primitives for nuanced micro-animations.
+- **SEO & game hubs**: Shared catalog in `frontend/src/lib/games/catalog.ts` plus scribbly `GameLogo.svelte` icons. Each game has a prerendered hub at `/{slug}` (`GameHub.svelte`: description, create room, open sessions for that game). Landing and hubs emit per-page title/description/canonical/OG/JSON-LD via `SeoHead.svelte`. `static/robots.txt` + `static/sitemap.xml` list those URLs. Room play stays at `/{slug}/{roomId}` via adapter-static `200.html` SPA fallback. FastAPI serves prerendered `{slug}.html` (or `{slug}/index.html`) for hubs and falls back to `200.html` for room routes.
 - **Styling & Scribbly Visuals**:
   - **Tailwind CSS v4** + native CSS custom properties.
   - **Rough.js** + inline **SVG** with `stroke-dasharray`/`stroke-dashoffset` animations and subtle SVG displacement filters (`#scribble-filter`) for a minimalistic, hand-drawn scribbly look.

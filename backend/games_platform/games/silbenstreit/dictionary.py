@@ -419,6 +419,9 @@ def get_syllable_pool(language: str) -> SyllablePool:
     return SyllablePool(by_length=by_length, rare_by_length=rare_by_length)
 
 
+MAX_LETTER_OCCURRENCES = 4
+
+
 def _allowed_syllable_lengths(remaining: int) -> list[int]:
     """
     Return syllable lengths (in {2, 3, 4}) that can be subtracted from `remaining`
@@ -431,6 +434,51 @@ def _allowed_syllable_lengths(remaining: int) -> list[int]:
     ]
 
 
+def _counts_fit(counts: dict[str, int], letters: str, *, max_count: int) -> bool:
+    """Return True if adding `letters` would keep every character at most `max_count`."""
+    extra: dict[str, int] = {}
+    for ch in letters:
+        next_count = counts.get(ch, 0) + extra.get(ch, 0) + 1
+        if next_count > max_count:
+            return False
+        extra[ch] = extra.get(ch, 0) + 1
+    return True
+
+
+def _pick_fitting_syllable(
+    rng: random.Random,
+    sylls: tuple[str, ...],
+    weights: tuple[float, ...],
+    counts: dict[str, int],
+    *,
+    max_count: int,
+    max_tries: int = 24,
+) -> str | None:
+    """Sample a syllable that respects per-letter occurrence limits."""
+    if not sylls:
+        return None
+    for _ in range(max_tries):
+        chosen = rng.choices(sylls, weights=weights, k=1)[0]
+        if _counts_fit(counts, chosen, max_count=max_count):
+            return chosen
+    # Exhaustive fallback when random sampling keeps missing fitting syllables
+    eligible = [
+        (syl, w)
+        for syl, w in zip(sylls, weights, strict=True)
+        if _counts_fit(counts, syl, max_count=max_count)
+    ]
+    if not eligible:
+        return None
+    eligible_sylls, eligible_weights = zip(*eligible, strict=True)
+    return rng.choices(tuple(eligible_sylls), weights=tuple(eligible_weights), k=1)[0]
+
+
+def _apply_syllable(candidate: list[str], counts: dict[str, int], syl: str) -> None:
+    candidate.extend(syl)
+    for ch in syl:
+        counts[ch] = counts.get(ch, 0) + 1
+
+
 def generate_board(
     size: int,
     language: str,
@@ -440,18 +488,20 @@ def generate_board(
     """
     Generate a `size x size` grid of uppercase letters and their 1-10 rarity values
     by sampling whole syllables (2..4 letters) according to dampened language frequencies,
-    keeping a balanced vowel share (~30%..42%).
+    keeping a balanced vowel share (~30%..42%) and at most 4 of any single letter.
     """
     rng = rng or random.Random()
     lang = normalize_language(language)
     pool = get_syllable_pool(lang)
     scores = LETTER_SCORES[lang]
+    alphabet = tuple(scores.keys())
 
     total_cells = size * size
     sampled_letters: list[str] = []
 
     for attempt in range(8):
         candidate: list[str] = []
+        counts: dict[str, int] = {}
 
         # 1. Guarantee at least one rare-letter syllable (score >= 6, e.g. QU, X, Y, Z, J, K, V)
         rare_lengths = [
@@ -463,8 +513,11 @@ def generate_board(
             len_weights = [4.0 if length == 3 else 1.5 for length in rare_lengths]
             chosen_len = rng.choices(rare_lengths, weights=len_weights, k=1)[0]
             rare_sylls, rare_weights = pool.rare_by_length[chosen_len]
-            first_syl = rng.choices(rare_sylls, weights=rare_weights, k=1)[0]
-            candidate.extend(first_syl)
+            first_syl = _pick_fitting_syllable(
+                rng, rare_sylls, rare_weights, counts, max_count=MAX_LETTER_OCCURRENCES
+            )
+            if first_syl is not None:
+                _apply_syllable(candidate, counts, first_syl)
 
         # 2. Fill remaining cells with whole syllables so no cluster (like QU) is ever truncated
         while len(candidate) < total_cells:
@@ -474,21 +527,39 @@ def generate_board(
                 for length in _allowed_syllable_lengths(remaining)
                 if pool.by_length.get(length, ((), ()))[0]
             ]
-            if not valid_lengths:
-                candidate.append(rng.choice(tuple(VOWELS)))
-                break
+            chosen_syl: str | None = None
+            if valid_lengths:
+                # Strongly favor 3-letter syllables for natural consonant balance
+                len_weights = [
+                    5.0 if length == 3 else (2.0 if length == 4 else 1.0)
+                    for length in valid_lengths
+                ]
+                for _ in range(6):
+                    chosen_len = rng.choices(valid_lengths, weights=len_weights, k=1)[0]
+                    sylls, weights = pool.by_length[chosen_len]
+                    chosen_syl = _pick_fitting_syllable(
+                        rng, sylls, weights, counts, max_count=MAX_LETTER_OCCURRENCES
+                    )
+                    if chosen_syl is not None:
+                        break
 
-            # Strongly favor 3-letter (1 vowel + 2 consonants) syllables for natural consonant balance
-            len_weights = [
-                5.0 if length == 3 else (2.0 if length == 4 else 1.0)
-                for length in valid_lengths
-            ]
-            chosen_len = rng.choices(valid_lengths, weights=len_weights, k=1)[0]
-            sylls, weights = pool.by_length[chosen_len]
-            chosen_syl = rng.choices(sylls, weights=weights, k=1)[0]
-            candidate.extend(chosen_syl)
+            if chosen_syl is not None:
+                _apply_syllable(candidate, counts, chosen_syl)
+                continue
 
-        sampled_letters = candidate
+            # Single-letter fill when no fitting syllable remains
+            under_cap = [ch for ch in alphabet if counts.get(ch, 0) < MAX_LETTER_OCCURRENCES]
+            if not under_cap:
+                under_cap = list(alphabet)
+            # Prefer vowels when vowel share is low, consonants when high
+            vowel_count = sum(1 for ch in candidate if ch in VOWELS)
+            target_vowel = len(candidate) > 0 and (vowel_count / len(candidate)) < 0.32
+            preferred = [ch for ch in under_cap if (ch in VOWELS) == target_vowel] or under_cap
+            ch = rng.choice(preferred)
+            candidate.append(ch)
+            counts[ch] = counts.get(ch, 0) + 1
+
+        sampled_letters = candidate[:total_cells]
         vowel_ratio = sum(1 for ch in sampled_letters if ch in VOWELS) / total_cells
         if 0.25 <= vowel_ratio <= 0.44 or attempt == 7:
             break

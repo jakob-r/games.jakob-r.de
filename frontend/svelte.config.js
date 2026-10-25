@@ -6,7 +6,8 @@ const config = {
 	preprocess: vitePreprocess(),
 	kit: {
 		adapter: adapter({
-			fallback: 'index.html',
+			// Keep prerendered index.html / {slug}.html; SPA rooms use 200.html
+			fallback: '200.html',
 			precompress: false
 		})
 	}

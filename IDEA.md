@@ -18,10 +18,17 @@ Source is public under PolyForm Noncommercial: forking and personal use are fine
 
 When the user enters games.jakob-r.de they can 
 - see and change their name and their primary color
-- see a list of games
+- see a list of games (each with a small SVG logo) linking to a per-game hub
 - see the most recently played games
 - if possible resume the game from where they left off
 - see some personal stats
+
+## Per-game hub (`/{slug}`)
+
+Each game is reachable at its own URL (e.g. `/sudoku`) for SEO and deep links. The hub shows:
+- a short description and logo
+- create a new room
+- the player’s open sessions for that game
 
 ## Common parts
 

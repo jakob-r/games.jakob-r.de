@@ -2,32 +2,20 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 		<meta name="theme-color" content="#faf8f4" />
-		<title>games.jakob-r.de – Minimalistic multiplayer games. No ads, hosted in Europe (Germany)</title>
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<!-- Defaults for SPA fallback (200.html); prerendered pages override via SeoHead -->
+		<title>games.jakob-r.de – Minimalistic multiplayer games</title>
 		<meta
 			name="description"
 			content="Minimalistic multiplayer games with a scribbly look. Create a room, share the link, play together. No ads, no tracking, hosted in Europe (Germany)."
 		/>
-		<link rel="canonical" href="https://games.jakob-r.de/" />
 		<link rel="author" href="https://github.com/jakob-r/games.jakob-r.de" />
-
-		<meta property="og:type" content="website" />
 		<meta property="og:site_name" content="games.jakob-r.de" />
-		<meta property="og:url" content="https://games.jakob-r.de/" />
-		<meta property="og:title" content="games.jakob-r.de – Minimalistic multiplayer games" />
-		<meta
-			property="og:description"
-			content="Create a room, share the link, play together. No ads, no tracking, hosted in Europe (Germany)."
-		/>
 		<meta property="og:locale" content="en_US" />
-
-		<meta name="twitter:card" content="summary" />
-		<meta name="twitter:title" content="games.jakob-r.de – Minimalistic multiplayer games" />
-		<meta
-			name="twitter:description"
-			content="Create a room, share the link, play together. No ads, no tracking, hosted in Europe (Germany)."
-		/>
 
 		<script type="application/ld+json">
 			{
@@ -51,6 +39,12 @@
 							"No ads, no tracking",
 							"Hosted in Europe (Germany)",
 							"Source available under PolyForm Noncommercial"
+						],
+						"hasPart": [
+							{ "@type": "WebApplication", "name": "Multiplayer Sudoku", "url": "https://games.jakob-r.de/sudoku" },
+							{ "@type": "WebApplication", "name": "Käsekästchen", "url": "https://games.jakob-r.de/kaesekaestchen" },
+							{ "@type": "WebApplication", "name": "Co-op Minesweeper", "url": "https://games.jakob-r.de/minesweeper" },
+							{ "@type": "WebApplication", "name": "Silbenstreit", "url": "https://games.jakob-r.de/silbenstreit" }
 						]
 					},
 					{
@@ -84,6 +78,12 @@
 					<a href="https://github.com/jakob-r/games.jakob-r.de">github.com/jakob-r/games.jakob-r.de</a>
 					(PolyForm Noncommercial).
 				</p>
+				<ul>
+					<li><a href="/sudoku">Multiplayer Sudoku</a> — solve a 9×9 board together in real time.</li>
+					<li><a href="/kaesekaestchen">Käsekästchen</a> — dots &amp; boxes; close squares to score.</li>
+					<li><a href="/minesweeper">Co-op Minesweeper</a> — clear a shared minefield together.</li>
+					<li><a href="/silbenstreit">Silbenstreit</a> — claim letter tiles with valid words.</li>
+				</ul>
 				<p>Please enable JavaScript to play.</p>
 			</main>
 		</noscript>

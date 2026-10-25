@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { profile } from '$lib/core/profile.svelte';
 	import type { PlayerInfo, RoomSocketClient } from '$lib/core/ws.svelte';
+	import DeleteRoomModal from './DeleteRoomModal.svelte';
 	import Lobby from './Lobby.svelte';
 	import NamePromptModal from './NamePromptModal.svelte';
 	import ProfileBadge from './ProfileBadge.svelte';
@@ -31,7 +32,9 @@
 	} = $props();
 
 	let deletingRoom = $state<boolean>(false);
+	let deleteConfirmOpen = $state(false);
 	let leavingRoom = $state<boolean>(false);
+	let copiedRoomLink = $state(false);
 
 	let room = $derived(client.room);
 	let players = $derived<PlayerInfo[]>(room?.players ?? []);
@@ -46,6 +49,7 @@
 				{ method: 'DELETE' }
 			);
 			if (res.ok) {
+				deleteConfirmOpen = false;
 				client.disconnect();
 				await goto('/');
 			}
@@ -70,9 +74,30 @@
 			leavingRoom = false;
 		}
 	}
+
+	async function copyRoomLink() {
+		if (typeof navigator === 'undefined' || typeof window === 'undefined') return;
+		try {
+			await navigator.clipboard.writeText(window.location.href);
+			copiedRoomLink = true;
+			setTimeout(() => (copiedRoomLink = false), 2000);
+		} catch {
+			// clipboard may be unavailable
+		}
+	}
 </script>
 
 <NamePromptModal onConfirm={(name, color) => client.syncProfile(profile.playerId, name, color)} />
+
+<DeleteRoomModal
+	open={deleteConfirmOpen}
+	{roomId}
+	deleting={deletingRoom}
+	onConfirm={deleteRoom}
+	onClose={() => {
+		if (!deletingRoom) deleteConfirmOpen = false;
+	}}
+/>
 
 <div class="mx-auto flex w-full {maxWidthClass} flex-1 flex-col px-3 py-3 sm:px-6 sm:py-5">
 	<!-- Top Header -->
@@ -87,7 +112,15 @@
 			<div>
 				<h1 class="font-hand text-lg leading-none sm:text-xl">{title}</h1>
 				<div class="font-mono-num flex flex-wrap items-center gap-2 text-[11px] text-[#6e6a63]">
-					<span>#{roomId}</span>
+					<button
+						type="button"
+						onclick={copyRoomLink}
+						title={copiedRoomLink ? 'Link copied!' : 'Copy room link'}
+						aria-label={copiedRoomLink ? 'Room link copied' : `Copy link for room #${roomId}`}
+						class="cursor-pointer rounded px-0.5 transition hover:bg-[#1a1917]/8 hover:text-[#1a1917] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#1a1917]"
+					>
+						{copiedRoomLink ? 'Link copied!' : `#${roomId}`}
+					</button>
 					{#each subtitleItems as item, idx (idx)}
 						<span>•</span>
 						<span>{item}</span>
@@ -106,7 +139,7 @@
 			{#if isHost}
 				<button
 					type="button"
-					onclick={deleteRoom}
+					onclick={() => (deleteConfirmOpen = true)}
 					disabled={deletingRoom}
 					title="Permanently delete this session"
 					aria-label="Permanently delete this session"

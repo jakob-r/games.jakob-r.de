@@ -62,22 +62,40 @@ def _mount_static(app: FastAPI) -> None:
         return
     root = Path(static_dir)
     index_html = root / "index.html"
-    if not index_html.is_file():
-        logger.warning("STATIC_DIR=%s has no index.html; skipping SPA mount", static_dir)
+    spa_fallback_html = root / "200.html"
+    if not spa_fallback_html.is_file():
+        spa_fallback_html = index_html
+    if not spa_fallback_html.is_file():
+        logger.warning("STATIC_DIR=%s has no 200.html/index.html; skipping SPA mount", static_dir)
         return
 
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str = "") -> FileResponse:
         if full_path.startswith(("api/", "ws/", ".well-known/")):
             raise HTTPException(status_code=404, detail="Not found")
+        root_resolved = root.resolve()
         candidate = (root / full_path).resolve()
         try:
-            candidate.relative_to(root.resolve())
+            candidate.relative_to(root_resolved)
         except ValueError as e:
             raise HTTPException(status_code=404, detail="Not found") from e
         if full_path and candidate.is_file():
             return FileResponse(candidate)
-        return FileResponse(index_html)
+        if full_path:
+            # adapter-static prerender: /sudoku → sudoku.html (or sudoku/index.html)
+            flat_html = (root / f"{full_path}.html").resolve()
+            try:
+                flat_html.relative_to(root_resolved)
+            except ValueError as e:
+                raise HTTPException(status_code=404, detail="Not found") from e
+            if flat_html.is_file():
+                return FileResponse(flat_html)
+            nested_index = candidate / "index.html"
+            if nested_index.is_file():
+                return FileResponse(nested_index)
+        if not full_path and index_html.is_file():
+            return FileResponse(index_html)
+        return FileResponse(spa_fallback_html)
 
 
 def create_app(

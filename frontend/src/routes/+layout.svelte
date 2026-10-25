@@ -21,6 +21,8 @@
 	</defs>
 </svg>
 
-<div class="min-h-dvh flex flex-col">
+<div
+	class="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]"
+>
 	{@render children()}
 </div>

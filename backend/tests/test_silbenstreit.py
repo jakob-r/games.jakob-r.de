@@ -7,7 +7,10 @@ import random
 from fastapi.testclient import TestClient
 
 from games_platform.core.db import Database
+from collections import Counter
+
 from games_platform.games.silbenstreit.dictionary import (
+    MAX_LETTER_OCCURRENCES,
     SUPPORTED_LANGUAGES,
     generate_board,
     get_letter_score,
@@ -41,6 +44,8 @@ def test_syllable_board_generation_and_q_accompaniment() -> None:
             assert any(v >= 6 for v in flat_values)
             vowel_ratio = sum(1 for ch in flat_letters if ch in vowels) / len(flat_letters)
             assert 0.20 <= vowel_ratio <= 0.48
+            letter_counts = Counter(flat_letters)
+            assert all(n <= MAX_LETTER_OCCURRENCES for n in letter_counts.values())
             if "Q" in flat_letters:
                 assert "U" in flat_letters
 
