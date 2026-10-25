@@ -31,7 +31,7 @@ To share components across games while allowing any game to be extracted and run
    - **Backend (`backend/games_platform/core/`)**:
      - `db.py`: Psycopg 3 `AsyncConnectionPool`, schema initialization (`rooms`, `room_players`, `player_stats`, `app_settings`, `push_subscriptions`), and expired room cleanup (2 days without moves, 1 year with moves).
      - `protocol.py`: `GameDefinition` protocol and Pydantic v2 discriminated unions for WebSocket/REST messages.
-     - `push.py`: `WebPushService` for auto-generated/persisted VAPID keys and asynchronous `pywebpush` turn-notification delivery.
+     - `push.py`: `WebPushService` for auto-generated/persisted VAPID keys and asynchronous `pywebpush` turn-notification delivery. Endpoints are limited to known push-service hosts (at most 5 per player). Pushes use a 5-minute TTL and a per-room Topic so a later turn replaces a queued alert. Set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` when more than one process serves the app.
      - `room_manager.py`: WebSocket room/lobby lifecycle, non-creator player leave handling (including automatic leave when a new player joins a running game and disconnects without acting) and host player removal (creators cannot leave a room, only delete it or remove other players), 10-second streak multiplier tracking (`1.1x` starting after first right entry), turn-change Web Push dispatch, and PostgreSQL state persistence.
    - **Frontend (`frontend/src/lib/core/`)**:
      - `profile.svelte.ts`: Player profile store (`localStorage` UUID, name configuration tracking, and primary color).

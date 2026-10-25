@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from fastapi.testclient import TestClient
+from pywebpush import WebPushException
 
 from games_platform.core.db import Database
 from games_platform.main import create_app
@@ -271,6 +274,8 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
     test_db = Database()
     app = create_app(database=test_db)
     dispatched: list[dict[str, object]] = []
+    fail_with_401 = {"on": False}
+    peer_endpoint = "https://fcm.googleapis.com/fcm/send/peer2"
 
     def fake_webpush(
         *,
@@ -278,8 +283,12 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
         data,
         vapid_private_key,
         vapid_claims,
-        ttl=86400,
+        ttl=300,
+        headers=None,
     ):
+        if fail_with_401["on"]:
+            response = type("Resp", (), {"status_code": 401, "text": "unauthorized"})()
+            raise WebPushException("unauthorized", response=response)
         dispatched.append(
             {
                 "subscription_info": subscription_info,
@@ -287,6 +296,7 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
                 "vapid_private_key": vapid_private_key,
                 "vapid_claims": vapid_claims,
                 "ttl": ttl,
+                "headers": headers,
             }
         )
 
@@ -313,26 +323,57 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
         assert room_res.status_code == 200
         room_id = room_res.json()["room_id"]
 
-        # 3. Subscribe peer_2 to Web Push notifications for this room
+        def subscribe(player_id: str, endpoint: str):
+            return client.post(
+                f"/api/rooms/{room_id}/notifications/subscribe",
+                json={
+                    "player_id": player_id,
+                    "endpoint": endpoint,
+                    "keys": {
+                        "p256dh": "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQ",
+                        "auth": "tBHItJI5svbpez7KI4CCXg",
+                    },
+                },
+            )
+
+        # 3. A player who has not joined cannot subscribe, even with a valid endpoint.
+        stranger = subscribe("peer_2", peer_endpoint)
+        assert stranger.status_code == 403
+
         status_before = client.get(
             f"/api/rooms/{room_id}/notifications/status?player_id=peer_2"
         )
         assert status_before.status_code == 200
         assert status_before.json()["subscribed"] is False
 
-        sub_res = client.post(
-            f"/api/rooms/{room_id}/notifications/subscribe",
-            json={
-                "player_id": "peer_2",
-                "endpoint": "https://push.example.test/sub/peer2",
-                "keys": {
-                    "p256dh": "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQ",
-                    "auth": "tBHItJI5svbpez7KI4CCXg",
-                },
-            },
-        )
-        assert sub_res.status_code == 200
-        assert sub_res.json()["status"] == "subscribed"
+        ws_url_1 = f"/ws/silbenstreit/{room_id}?player_id=host_1&name=Alice&color=%232563eb"
+        ws_url_2 = f"/ws/silbenstreit/{room_id}?player_id=peer_2&name=Bob&color=%23dc2626"
+
+        # Join both players, then subscribe once peer_2 is a member.
+        with client.websocket_connect(ws_url_1) as ws1, client.websocket_connect(ws_url_2) as ws2:
+            _ = ws1.receive_json()
+            _ = ws1.receive_json()
+            _ = ws2.receive_json()
+
+        assert subscribe("peer_2", "http://127.0.0.1/push").status_code == 400
+        assert subscribe("peer_2", "https://evil.example/push").status_code == 400
+
+        assert subscribe("peer_2", peer_endpoint).status_code == 200
+        for index in range(2, 6):
+            extra = subscribe("peer_2", f"https://fcm.googleapis.com/fcm/send/peer2-{index}")
+            assert extra.status_code == 200
+        sixth = subscribe("peer_2", "https://updates.push.services.mozilla.com/wpush/v2/extra")
+        assert sixth.status_code == 409
+        assert subscribe("peer_2", peer_endpoint).status_code == 200
+
+        for index in range(2, 6):
+            endpoint = quote(f"https://fcm.googleapis.com/fcm/send/peer2-{index}", safe="")
+            removed = client.delete(
+                f"/api/rooms/{room_id}/notifications/subscribe"
+                f"?player_id=peer_2&endpoint={endpoint}"
+            )
+            assert removed.status_code == 200
+            assert removed.json()["deleted"] == 1
 
         status_after = client.get(
             f"/api/rooms/{room_id}/notifications/status?player_id=peer_2"
@@ -345,10 +386,7 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
             "count": 1,
         }
 
-        # 4. Connect both players, start the game, and have host_1 pass turn -> peer_2 gets notified
-        ws_url_1 = f"/ws/silbenstreit/{room_id}?player_id=host_1&name=Alice&color=%232563eb"
-        ws_url_2 = f"/ws/silbenstreit/{room_id}?player_id=peer_2&name=Bob&color=%23dc2626"
-
+        # 4. Start the game and have host_1 pass -> peer_2 gets one notification.
         with client.websocket_connect(ws_url_1) as ws1, client.websocket_connect(ws_url_2) as ws2:
             _ = ws1.receive_json()
             _ = ws1.receive_json()
@@ -358,18 +396,22 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
             _ = ws1.receive_json()
             _ = ws2.receive_json()
 
-            # Host passes turn -> turn advances to peer_2
             ws1.send_json({"type": "game_action", "action": {"type": "pass_turn"}})
             _ = ws1.receive_json()  # turn_passed event
             _ = ws2.receive_json()
             _ = ws1.receive_json()  # room_state
             _ = ws2.receive_json()
 
+            assert client.portal is not None
+            client.portal.call(app.state.room_manager.flush_push_tasks)
+
         assert len(dispatched) == 1
         assert (
             dispatched[0]["subscription_info"]["endpoint"]  # type: ignore[index]
-            == "https://push.example.test/sub/peer2"
+            == peer_endpoint
         )
+        assert dispatched[0]["ttl"] == 300
+        assert dispatched[0]["headers"] == {"Topic": f"turn-{room_id}"}  # type: ignore[index]
         assert "Alice passed their turn" in str(dispatched[0]["data"])
         assert f"/{room_id}" in str(dispatched[0]["data"])
 
@@ -384,6 +426,35 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
             f"/api/rooms/{room_id}/notifications/status?player_id=peer_2"
         )
         assert status_final.json()["subscribed"] is False
+
+        # 6. A 401 from the push service drops that endpoint.
+        assert subscribe("peer_2", peer_endpoint).status_code == 200
+        fail_with_401["on"] = True
+        with client.websocket_connect(ws_url_1) as ws1, client.websocket_connect(ws_url_2) as ws2:
+            _ = ws1.receive_json()
+            _ = ws1.receive_json()
+            _ = ws2.receive_json()
+
+            # peer_2 still has the turn from the earlier pass, so hand it back, then return it.
+            ws2.send_json({"type": "game_action", "action": {"type": "pass_turn"}})
+            _ = ws1.receive_json()
+            _ = ws2.receive_json()
+            _ = ws1.receive_json()
+            _ = ws2.receive_json()
+
+            ws1.send_json({"type": "game_action", "action": {"type": "pass_turn"}})
+            _ = ws1.receive_json()
+            _ = ws2.receive_json()
+            _ = ws1.receive_json()
+            _ = ws2.receive_json()
+
+            client.portal.call(app.state.room_manager.flush_push_tasks)
+
+        status_pruned = client.get(
+            f"/api/rooms/{room_id}/notifications/status?player_id=peer_2"
+        )
+        assert status_pruned.json()["subscribed"] is False
+        assert len(dispatched) == 1
 
         client.delete(f"/api/rooms/{room_id}?player_id=host_1")
 

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import ipaddress
 import json
 import logging
 import os
 from typing import Any
+from urllib.parse import urlsplit
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -19,6 +21,53 @@ logger = logging.getLogger(__name__)
 
 VAPID_SETTINGS_KEY = "vapid_keys"
 DEFAULT_VAPID_CLAIMS_SUB = "mailto:games@jakob-r.de"
+PUSH_TTL_SECONDS = 300
+MAX_PUSH_SUBSCRIPTIONS_PER_PLAYER = 5
+ALLOWED_PUSH_HOSTS = frozenset(
+    {
+        "fcm.googleapis.com",
+        "updates.push.services.mozilla.com",
+        "web.push.apple.com",
+    }
+)
+ALLOWED_PUSH_HOST_SUFFIXES = (
+    ".push.apple.com",
+    ".notify.windows.com",
+)
+EXPIRED_PUSH_STATUS_CODES = frozenset({401, 403, 404, 410})
+
+
+class PushEndpointError(ValueError):
+    """Raised when a client-supplied push endpoint is not a known push service."""
+
+
+def validate_push_endpoint(endpoint: str) -> str:
+    """Return a stripped endpoint, or raise if it is not an allowlisted HTTPS push URL."""
+    cleaned = endpoint.strip()
+    parts = urlsplit(cleaned)
+    if parts.scheme != "https":
+        raise PushEndpointError("Push endpoint must use https")
+    if parts.username or parts.password:
+        raise PushEndpointError("Push endpoint must not include credentials")
+    host = parts.hostname
+    if not host:
+        raise PushEndpointError("Push endpoint must include a host")
+    if parts.port not in (None, 443):
+        raise PushEndpointError("Push endpoint must use port 443")
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        pass
+    else:
+        raise PushEndpointError("Push endpoint must not be an IP address")
+
+    normalized_host = host.lower().rstrip(".")
+    allowed = normalized_host in ALLOWED_PUSH_HOSTS or any(
+        normalized_host.endswith(suffix) for suffix in ALLOWED_PUSH_HOST_SUFFIXES
+    )
+    if not allowed:
+        raise PushEndpointError("Push endpoint host is not a known push service")
+    return cleaned
 
 
 def generate_vapid_keypair() -> tuple[str, str]:
@@ -158,12 +207,13 @@ class WebPushService:
                     data=data_str,
                     vapid_private_key=private_key,
                     vapid_claims={"sub": self._claims_sub},
-                    ttl=86400,
+                    ttl=PUSH_TTL_SECONDS,
+                    headers={"Topic": f"turn-{room_id}"},
                 )
                 sent_count += 1
             except WebPushException as e:
                 status_code = getattr(getattr(e, "response", None), "status_code", None)
-                if status_code in (404, 410):
+                if status_code in EXPIRED_PUSH_STATUS_CODES:
                     logger.info(
                         "Pruning expired push subscription for player %s in room %s: %s",
                         player_id,

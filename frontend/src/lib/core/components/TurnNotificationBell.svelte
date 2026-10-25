@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { TurnNotificationController } from '$lib/core/notifications.svelte';
+	import { roomDocumentTitle, TurnNotificationController } from '$lib/core/notifications.svelte';
 
 	let {
 		roomId,
@@ -35,8 +35,8 @@
 		}
 		if (notifier.enabled) {
 			return notifier.pushSubscribed
-				? "Turn notifications active (including background/closed tab) — click to mute"
-				: "Turn notifications active — click to mute";
+				? 'Turn notifications active (including when this tab is in the background) — click to mute'
+				: 'Turn notifications active — click to mute';
 		}
 		return "Notify me when it's my turn";
 	});
@@ -52,16 +52,14 @@
 		}
 	}
 
-	// Watch for turn transitions to fire notifications & update document title
+	// Watch for turn transitions to fire notifications and publish the tab title.
 	$effect(() => {
 		const activeTurn = isPlaying && isMyTurn;
 		const hint = turnHint;
 
-		if (typeof document !== 'undefined') {
-			document.title = activeTurn
-				? `🔔 Your turn! · ${gameTitle}`
-				: `${gameTitle} #${roomId} · games.jakob-r.de`;
-		}
+		roomDocumentTitle.text = activeTurn
+			? `🔔 Your turn! • ${gameTitle}`
+			: `${gameTitle} #${roomId} • games.jakob-r.de`;
 
 		if (!initializedTurnTracking) {
 			initializedTurnTracking = true;
@@ -76,7 +74,6 @@
 	});
 
 	onMount(() => {
-		const prevTitle = typeof document !== 'undefined' ? document.title : 'games.jakob-r.de';
 		void notifier.init({
 			roomId,
 			playerId,
@@ -86,9 +83,7 @@
 
 		return () => {
 			notifier.destroy();
-			if (typeof document !== 'undefined') {
-				document.title = prevTitle;
-			}
+			roomDocumentTitle.text = null;
 		};
 	});
 </script>

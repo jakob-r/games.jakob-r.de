@@ -1,5 +1,8 @@
 const STORAGE_KEY = 'games_turn_notifications_v1';
 
+/** Page title owned by the turn bell. Route heads fall back when this is null. */
+export const roomDocumentTitle = $state<{ text: string | null }>({ text: null });
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
 	const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
 	const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -9,6 +12,17 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 		outputArray[i] = rawData.charCodeAt(i);
 	}
 	return outputArray;
+}
+
+function applicationServerKeysMatch(existing: ArrayBuffer | null, publicKey: string): boolean {
+	if (!existing) return false;
+	const current = urlBase64ToUint8Array(publicKey);
+	const previous = new Uint8Array(existing);
+	if (previous.length !== current.length) return false;
+	for (let i = 0; i < previous.length; i++) {
+		if (previous[i] !== current[i]) return false;
+	}
+	return true;
 }
 
 function readStoredRooms(): Record<string, boolean> {
@@ -128,9 +142,11 @@ export class TurnNotificationController {
 			writeStoredRoom(this.roomId, true);
 			const pushOk = await this.syncWebPushSubscription();
 			if (pushOk) {
-				this.showToast("Turn notifications active (works in background & closed tab).");
+				this.showToast(
+					"Turn notifications on. You'll be notified when this tab is in the background."
+				);
 			} else {
-				this.showToast("Turn notifications active while this tab stays open.");
+				this.showToast('Turn notifications on while this tab stays open.');
 			}
 		} finally {
 			this.busy = false;
@@ -165,6 +181,10 @@ export class TurnNotificationController {
 			}
 
 			let sub = await registration.pushManager.getSubscription();
+			if (sub && !applicationServerKeysMatch(sub.options.applicationServerKey, publicKey)) {
+				await sub.unsubscribe();
+				sub = null;
+			}
 			if (!sub) {
 				const appServerKey = urlBase64ToUint8Array(publicKey);
 				sub = await registration.pushManager.subscribe({
@@ -234,6 +254,10 @@ export class TurnNotificationController {
 			return;
 		}
 		if (Notification.permission !== 'granted') {
+			return;
+		}
+		// The service worker shows the Web Push unless this room's tab is focused.
+		if (this.pushSubscribed) {
 			return;
 		}
 

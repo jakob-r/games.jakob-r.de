@@ -108,7 +108,21 @@ class RoomManager:
             )
         )
         self._push_tasks.add(task)
-        task.add_done_callback(self._push_tasks.discard)
+        task.add_done_callback(self._on_push_done)
+
+    def _on_push_done(self, task: asyncio.Task[Any]) -> None:
+        self._push_tasks.discard(task)
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            logger.warning("Turn push failed: %s", repr(exc))
+
+    async def flush_push_tasks(self) -> None:
+        """Wait for in-flight turn pushes. Used by tests to avoid racing create_task."""
+        pending = [task for task in self._push_tasks if not task.done()]
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
 
     def register_game(self, game: GameDefinition) -> None:
         self.games[game.slug] = game

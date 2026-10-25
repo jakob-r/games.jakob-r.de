@@ -23,6 +23,11 @@ from games_platform.core.protocol import (
     GameDefinition,
     PushSubscribeRequest,
 )
+from games_platform.core.push import (
+    MAX_PUSH_SUBSCRIPTIONS_PER_PLAYER,
+    PushEndpointError,
+    validate_push_endpoint,
+)
 from games_platform.core.room_manager import RoomManager
 from games_platform.games.kaesekaestchen.game import kaesekaestchen_game
 from games_platform.games.minesweeper.game import minesweeper_game
@@ -231,11 +236,26 @@ def create_app(
         room = await active_db.get_room(room_id)
         if room is None:
             raise HTTPException(status_code=404, detail="Room not found")
-        manager.mark_player_active(room_id, req.player_id)
+        players = await active_db.get_room_players(room_id)
+        if not any(p["player_id"] == req.player_id for p in players):
+            raise HTTPException(status_code=403, detail="Player is not in this room")
+        try:
+            endpoint = validate_push_endpoint(req.endpoint)
+        except PushEndpointError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        existing = await active_db.get_push_subscriptions(room_id, req.player_id)
+        already_stored = any(str(sub["endpoint"]) == endpoint for sub in existing)
+        if not already_stored and len(existing) >= MAX_PUSH_SUBSCRIPTIONS_PER_PLAYER:
+            raise HTTPException(
+                status_code=409,
+                detail="Too many push subscriptions for this player",
+            )
+        if req.player_id in manager._connected_player_ids(room_id):
+            manager.mark_player_active(room_id, req.player_id)
         await active_db.upsert_push_subscription(
             room_id=room_id,
             player_id=req.player_id,
-            endpoint=req.endpoint,
+            endpoint=endpoint,
             p256dh=req.keys.p256dh,
             auth=req.keys.auth,
         )

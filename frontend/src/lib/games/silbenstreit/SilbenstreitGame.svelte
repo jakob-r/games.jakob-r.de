@@ -25,6 +25,11 @@
 		move_number: number;
 	}
 
+	interface TurnPassedMove {
+		type: 'turn_passed';
+		player_id: string;
+	}
+
 	interface SilbenPublicState {
 		size?: number;
 		language?: string;
@@ -41,7 +46,7 @@
 		total_tiles?: number;
 		consecutive_passes?: number;
 		move_count?: number;
-		last_move?: PlayedWordEntry | null;
+		last_move?: PlayedWordEntry | TurnPassedMove | null;
 	}
 
 	const client = new RoomSocketClient();
@@ -82,9 +87,17 @@
 	let isMyTurn = $derived(room?.status === 'playing' && currentPlayerId === profile.playerId);
 	let turnNotificationHint = $derived.by(() => {
 		const last = gameState.last_move;
-		if (!last) return '';
+		if (!last) {
+			if (room?.status === 'playing') {
+				return `Game #${roomId} has started and you have the opening move!`;
+			}
+			return '';
+		}
 		const actor = players.find((p) => p.player_id === last.player_id)?.name ?? 'Opponent';
-		return `${actor} played "${last.word}" (${last.word_points} pts). Your move!`;
+		if ('word' in last) {
+			return `${actor} played "${last.word}" (${last.word_points} pts). Your move!`;
+		}
+		return `${actor} passed their turn. Your move!`;
 	});
 
 	// Word being composed
