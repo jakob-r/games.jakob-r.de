@@ -18,7 +18,16 @@ from fastapi.staticfiles import StaticFiles
 from psycopg import Error as PsycopgError
 
 from games_platform.core.db import Database, db
-from games_platform.core.protocol import CreateRoomRequest, GameDefinition
+from games_platform.core.protocol import (
+    CreateRoomRequest,
+    GameDefinition,
+    PushSubscribeRequest,
+)
+from games_platform.core.push import (
+    MAX_PUSH_SUBSCRIPTIONS_PER_PLAYER,
+    PushEndpointError,
+    validate_push_endpoint,
+)
 from games_platform.core.room_manager import RoomManager
 from games_platform.games.kaesekaestchen.game import kaesekaestchen_game
 from games_platform.games.minesweeper.game import minesweeper_game
@@ -197,6 +206,82 @@ def create_app(
             raise HTTPException(status_code=404, detail="Room or player not found")
         status_label = "removed" if actor_id and actor_id != player_id else "left"
         return {"status": status_label, "room_id": room_id, "player_id": player_id}
+
+    @app.get("/api/notifications/vapid-public-key")
+    async def get_vapid_public_key() -> dict[str, str]:
+        public_key = await manager.push.get_public_key()
+        return {"public_key": public_key}
+
+    @app.get("/api/rooms/{room_id}/notifications/status")
+    async def get_room_notification_status(
+        room_id: str,
+        player_id: str = Query(..., min_length=1),
+    ) -> dict[str, Any]:
+        room = await active_db.get_room(room_id)
+        if room is None:
+            raise HTTPException(status_code=404, detail="Room not found")
+        subs = await active_db.get_push_subscriptions(room_id, player_id)
+        return {
+            "room_id": room_id,
+            "player_id": player_id,
+            "subscribed": len(subs) > 0,
+            "count": len(subs),
+        }
+
+    @app.post("/api/rooms/{room_id}/notifications/subscribe")
+    async def subscribe_room_notifications(
+        room_id: str,
+        req: PushSubscribeRequest,
+    ) -> dict[str, Any]:
+        room = await active_db.get_room(room_id)
+        if room is None:
+            raise HTTPException(status_code=404, detail="Room not found")
+        players = await active_db.get_room_players(room_id)
+        if not any(p["player_id"] == req.player_id for p in players):
+            raise HTTPException(status_code=403, detail="Player is not in this room")
+        try:
+            endpoint = validate_push_endpoint(req.endpoint)
+        except PushEndpointError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        existing = await active_db.get_push_subscriptions(room_id, req.player_id)
+        already_stored = any(str(sub["endpoint"]) == endpoint for sub in existing)
+        if not already_stored and len(existing) >= MAX_PUSH_SUBSCRIPTIONS_PER_PLAYER:
+            raise HTTPException(
+                status_code=409,
+                detail="Too many push subscriptions for this player",
+            )
+        if req.player_id in manager._connected_player_ids(room_id):
+            manager.mark_player_active(room_id, req.player_id)
+        await active_db.upsert_push_subscription(
+            room_id=room_id,
+            player_id=req.player_id,
+            endpoint=endpoint,
+            p256dh=req.keys.p256dh,
+            auth=req.keys.auth,
+        )
+        return {
+            "status": "subscribed",
+            "room_id": room_id,
+            "player_id": req.player_id,
+        }
+
+    @app.delete("/api/rooms/{room_id}/notifications/subscribe")
+    async def unsubscribe_room_notifications(
+        room_id: str,
+        player_id: str = Query(..., min_length=1),
+        endpoint: str | None = Query(default=None),
+    ) -> dict[str, Any]:
+        deleted = await active_db.delete_push_subscriptions(
+            room_id=room_id,
+            player_id=player_id,
+            endpoint=endpoint,
+        )
+        return {
+            "status": "unsubscribed",
+            "room_id": room_id,
+            "player_id": player_id,
+            "deleted": deleted,
+        }
 
     @app.get("/api/players/{player_id}/recent")
     async def get_player_recent_rooms(

@@ -5,6 +5,7 @@
 	import RoomShell from '$lib/core/components/RoomShell.svelte';
 	import ScribblyBox from '$lib/core/components/ScribblyBox.svelte';
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
+	import TurnNotificationBell from '$lib/core/components/TurnNotificationBell.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 	import { RoomSocketClient, type PlayerInfo, type ServerEvent } from '$lib/core/ws.svelte';
 
@@ -24,6 +25,11 @@
 		move_number: number;
 	}
 
+	interface TurnPassedMove {
+		type: 'turn_passed';
+		player_id: string;
+	}
+
 	interface SilbenPublicState {
 		size?: number;
 		language?: string;
@@ -40,7 +46,7 @@
 		total_tiles?: number;
 		consecutive_passes?: number;
 		move_count?: number;
-		last_move?: PlayedWordEntry | null;
+		last_move?: PlayedWordEntry | TurnPassedMove | null;
 	}
 
 	const client = new RoomSocketClient();
@@ -79,6 +85,20 @@
 	let playedWords = $derived<PlayedWordEntry[]>(gameState.played_words ?? []);
 	let currentPlayerId = $derived(gameState.current_player_id ?? null);
 	let isMyTurn = $derived(room?.status === 'playing' && currentPlayerId === profile.playerId);
+	let turnNotificationHint = $derived.by(() => {
+		const last = gameState.last_move;
+		if (!last) {
+			if (room?.status === 'playing') {
+				return `Game #${roomId} has started and you have the opening move!`;
+			}
+			return '';
+		}
+		const actor = players.find((p) => p.player_id === last.player_id)?.name ?? 'Opponent';
+		if ('word' in last) {
+			return `${actor} played "${last.word}" (${last.word_points} pts). Your move!`;
+		}
+		return `${actor} passed their turn. Your move!`;
+	});
 
 	// Word being composed
 	let composedWord = $derived(
@@ -316,6 +336,18 @@
 	title="Silbenstreit"
 	subtitleItems={[`${boardSize}×${boardSize}`, boardLang.toUpperCase()]}
 >
+	{#snippet headerActions()}
+		<TurnNotificationBell
+			{roomId}
+			playerId={profile.playerId}
+			gameSlug="silbenstreit"
+			gameTitle="Silbenstreit"
+			{isMyTurn}
+			isPlaying={room?.status === 'playing'}
+			turnHint={turnNotificationHint}
+		/>
+	{/snippet}
+
 	{#snippet configSlot()}
 		<div class="space-y-4">
 			{#if !isHost}

@@ -130,6 +130,17 @@ class CreateRoomRequest(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)
 
 
+class PushSubscriptionKeys(BaseModel):
+    p256dh: str = Field(min_length=1)
+    auth: str = Field(min_length=1)
+
+
+class PushSubscribeRequest(BaseModel):
+    player_id: str = Field(min_length=1)
+    endpoint: str = Field(min_length=1)
+    keys: PushSubscriptionKeys
+
+
 class PlayerPublicInfo(BaseModel):
     player_id: str
     name: str

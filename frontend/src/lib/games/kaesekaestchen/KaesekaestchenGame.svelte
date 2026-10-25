@@ -5,6 +5,7 @@
 	import RoomShell from '$lib/core/components/RoomShell.svelte';
 	import ScribblyBox from '$lib/core/components/ScribblyBox.svelte';
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
+	import TurnNotificationBell from '$lib/core/components/TurnNotificationBell.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 	import { RoomSocketClient, type PlayerInfo, type ServerEvent } from '$lib/core/ws.svelte';
 
@@ -90,6 +91,12 @@
 	let currentTurnColor = $derived(
 		resolvePlayerColor(currentPlayerId, profile.playerId, profile.primaryColor, players)
 	);
+	let turnNotificationHint = $derived.by(() => {
+		const last = gameState.last_move;
+		if (!last) return '';
+		const actor = players.find((p) => p.player_id === last.player_id)?.name ?? 'Opponent';
+		return `${actor} drew a line in #${roomId}. Your turn!`;
+	});
 
 	// Winners calculation when finished
 	let winners = $derived.by(() => {
@@ -436,6 +443,18 @@
 	title="Käsekästchen"
 	subtitleItems={[`${boardWidth}×${boardHeight}`]}
 >
+	{#snippet headerActions()}
+		<TurnNotificationBell
+			{roomId}
+			playerId={profile.playerId}
+			gameSlug="kaesekaestchen"
+			gameTitle="Käsekästchen"
+			{isMyTurn}
+			isPlaying={room?.status === 'playing'}
+			turnHint={turnNotificationHint}
+		/>
+	{/snippet}
+
 	{#snippet configSlot()}
 		<div class="space-y-4">
 			{#if !isHost}

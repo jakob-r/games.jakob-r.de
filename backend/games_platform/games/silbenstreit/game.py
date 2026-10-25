@@ -237,6 +237,10 @@ class SilbenstreitGame:
                 next_state["move_count"] = int(next_state.get("move_count", 0)) + 1
                 passes = int(next_state.get("consecutive_passes", 0)) + 1
                 next_state["consecutive_passes"] = passes
+                next_state["last_move"] = {
+                    "type": "turn_passed",
+                    "player_id": player_id,
+                }
                 self._advance_turn(next_state, player_id)
                 pass_limit = max(2, len(turn_order) * 2)
                 is_finished = passes >= pass_limit
