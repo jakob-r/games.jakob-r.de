@@ -3,7 +3,68 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-		<title>games.jakob-r.de</title>
+		<meta name="theme-color" content="#faf8f4" />
+		<title>games.jakob-r.de – Minimalistic multiplayer games. No ads, hosted in Europe (Germany)</title>
+		<meta
+			name="description"
+			content="Minimalistic multiplayer games with a scribbly look. Create a room, share the link, play together. No ads, no tracking, hosted in Europe (Germany)."
+		/>
+		<link rel="canonical" href="https://games.jakob-r.de/" />
+		<link rel="author" href="https://github.com/jakob-r/games.jakob-r.de" />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="games.jakob-r.de" />
+		<meta property="og:url" content="https://games.jakob-r.de/" />
+		<meta property="og:title" content="games.jakob-r.de – Minimalistic multiplayer games" />
+		<meta
+			property="og:description"
+			content="Create a room, share the link, play together. No ads, no tracking, hosted in Europe (Germany)."
+		/>
+		<meta property="og:locale" content="en_US" />
+
+		<meta name="twitter:card" content="summary" />
+		<meta name="twitter:title" content="games.jakob-r.de – Minimalistic multiplayer games" />
+		<meta
+			name="twitter:description"
+			content="Create a room, share the link, play together. No ads, no tracking, hosted in Europe (Germany)."
+		/>
+
+		<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@graph": [
+					{
+						"@type": "WebApplication",
+						"@id": "https://games.jakob-r.de/#app",
+						"name": "games.jakob-r.de",
+						"url": "https://games.jakob-r.de/",
+						"description": "Minimalistic multiplayer games with a scribbly look. No ads, no tracking, hosted in Europe (Germany).",
+						"applicationCategory": "GameApplication",
+						"operatingSystem": "Any (web browser)",
+						"browserRequirements": "Requires JavaScript",
+						"isAccessibleForFree": true,
+						"offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+						"license": "https://github.com/jakob-r/games.jakob-r.de/blob/main/LICENSE",
+						"sameAs": ["https://github.com/jakob-r/games.jakob-r.de"],
+						"featureList": [
+							"Real-time multiplayer rooms",
+							"No ads, no tracking",
+							"Hosted in Europe (Germany)",
+							"Source available under PolyForm Noncommercial"
+						]
+					},
+					{
+						"@type": "SoftwareSourceCode",
+						"name": "games.jakob-r.de",
+						"codeRepository": "https://github.com/jakob-r/games.jakob-r.de",
+						"programmingLanguage": ["TypeScript", "Python"],
+						"license": "https://github.com/jakob-r/games.jakob-r.de/blob/main/LICENSE",
+						"targetProduct": { "@id": "https://games.jakob-r.de/#app" }
+					}
+				]
+			}
+		</script>
+
 		<link rel="preconnect" href="https://fonts.googleapis.com" />
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 		<link
@@ -14,5 +75,17 @@
 	</head>
 	<body data-sveltekit-preload-data="hover" class="bg-[#faf8f4] text-[#1a1917] antialiased selection:bg-[#1a1917] selection:text-[#faf8f4]">
 		<div style="display: contents">%sveltekit.body%</div>
+		<noscript>
+			<main style="max-width: 36rem; margin: 2rem auto; padding: 0 1rem; font-family: system-ui, sans-serif">
+				<h1>games.jakob-r.de – minimalistic multiplayer games</h1>
+				<p>
+					Create a room, share the link, play together. No ads, no tracking. Hosted in Europe
+					(Germany). Source code:
+					<a href="https://github.com/jakob-r/games.jakob-r.de">github.com/jakob-r/games.jakob-r.de</a>
+					(PolyForm Noncommercial).
+				</p>
+				<p>Please enable JavaScript to play.</p>
+			</main>
+		</noscript>
 	</body>
 </html>
