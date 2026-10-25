@@ -7,6 +7,8 @@ The style of the games should be minimalistic, scribbly with nuanced animations.
 We don't want to annoy the user with ads or tracking.
 Only use color where it is necessary and helpful.
 
+Source is public under PolyForm Noncommercial: forking and personal use are fine; commercial reuse (ads, paywalls, selling a rebranded copy) is not. The live site is hosted in Europe (Germany).
+
 ## Not now
 - For now we don't need authentication, but we want to be able to add it later.
 - For now we don't add a chat function but might be added later.

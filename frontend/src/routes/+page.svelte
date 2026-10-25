@@ -269,7 +269,7 @@
 </script>
 
 <svelte:head>
-	<title>games.jakob-r.de • Minimalistic Multiplayer Games</title>
+	<title>games.jakob-r.de • Minimalistic multiplayer games</title>
 </svelte:head>
 
 <main class="mx-auto w-full max-w-2xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
@@ -277,6 +277,9 @@
 	<header class="mb-7 flex flex-wrap items-baseline justify-between gap-3 border-b-2 border-[#1a1917] pb-3">
 		<div>
 			<h1 class="font-hand text-3xl tracking-tight sm:text-4xl">games.jakob-r.de</h1>
+			<p class="mt-1 text-sm text-[#6e6a63]">
+				Minimalistic multiplayer games · no ads · hosted in Europe (Germany)
+			</p>
 		</div>
 
 		<form onsubmit={handleJoinByCode} class="flex items-center gap-2">
@@ -608,4 +611,35 @@
 			</div>
 		</ScribblyBox>
 	</div>
+
+	<footer class="mt-10 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-[#1a1917]/15 pt-6 text-sm text-[#6e6a63]">
+		<span>Source available under PolyForm Noncommercial · hosted in Europe (Germany)</span>
+		<span aria-hidden="true">·</span>
+		<a
+			href="https://github.com/jakob-r/games.jakob-r.de"
+			class="inline-flex items-center gap-1 font-medium text-[#1a1917] underline decoration-[#1a1917]/30 underline-offset-4 transition hover:decoration-[#1a1917]"
+		>
+			<svg
+				class="h-3.5 w-3.5"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+				aria-hidden="true"
+			>
+				<path d="M16 18l6-6-6-6" />
+				<path d="M8 6l-6 6 6 6" />
+			</svg>
+			Source on GitHub
+		</a>
+		<span aria-hidden="true">·</span>
+		<a
+			href="https://github.com/jakob-r/games.jakob-r.de/blob/main/LICENSE"
+			class="font-medium text-[#1a1917] underline decoration-[#1a1917]/30 underline-offset-4 transition hover:decoration-[#1a1917]"
+		>
+			License
+		</a>
+	</footer>
 </main>
