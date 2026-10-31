@@ -82,6 +82,17 @@ Each game is reachable at its own URL (e.g. `/sudoku`) for SEO and deep links. T
 - Flags are shown in the planting player's color. Players can only remove their own flags; opponent flags can be challenged.
 - The game finishes when all safe cells are revealed **or** every mine is secured (correctly flagged or already revealed).
 
+#### Scoring
+
+- Reveal a safe cell: `+1` per newly revealed cell (including flood-fill).
+- Hit a mine: `−10`.
+- Place a flag: `+2`.
+- Remove your own flag: `−3`.
+- Challenge an opponent's flag:
+  - Flag was correct (mine): challenger `−5`, owner `+5`; cell becomes a confirmed revealed mine.
+  - Flag was wrong (safe): challenger `+5`, owner `−5`; flag removed and cell revealed (flood-fill if zero).
+- Scoring can be turned off by the starting user.
+
 ### Silbenstreit
 
 - Configurable 4x4, to 8x8 grid of letters.
@@ -99,14 +110,36 @@ Each game is reachable at its own URL (e.g. `/sudoku`) for SEO and deep links. T
 - A played word cannot be reused.
 - Players can see the list of all played words.
 
-#### Scoring
+### Emoji Concept
 
-- Reveal a safe cell: `+1` per newly revealed cell (including flood-fill).
-- Hit a mine: `−10`.
-- Place a flag: `+2`.
-- Remove your own flag: `−3`.
-- Challenge an opponent's flag:
-  - Flag was correct (mine): challenger `−5`, owner `+5`; cell becomes a confirmed revealed mine.
-  - Flag was wrong (safe): challenger `+5`, owner `−5`; flag removed and cell revealed (flood-fill if zero).
-- Scoring can be turned off by the starting user.
+A multiplayer game that can be played in person but also remotely.
+In each round a player is given a word or phrase (Object, Food, Animal, Brand, Famous Person, Movie Title, TV Show or Quote). 
+This main player ("explainer") has to select emojis to describe the word.
+The other players ("guessers") see only the emojis and have to guess the word.
+If the word is guessed correctly the guesser gets a point.
+If the round is timed also the explainer gets a point.
+
+1. The host can select if the game is played in person or remotely and if the game is timed or not.
+2. From the joined players a explainer is chosen randomly.
+3. The explainer is given a set of three words which they can choose from.
+4. The explainer can create multiple "sentences" just out of emojis. The first sentence is the main concept.
+6. The guessers see the selected emojis and have to guess the word.
+  * In person: The guessers just shout the word out loud and the explainer selects the player who guessed the word correctly.
+  * Remotely: The guessers can write the word and the game detects if the word is correct (allowing for typos and slight variations).
+7. The guesser who guessed the word correctly gets a point. If the round is timed also the explainer gets a point.
+8. The next round starts with a new explainer and a new word.
+
+- Explainers are chosen circularly.
+- The explainer can select which sentence they are currently editing.
+- The explainer can add, remove, rearrange emojis from the sentence.
+- Emojis are sorted by category
+  * Categories: Countries, Colors, Shapes, Foods, Animals, Concepts, Actions
+  * Concepts and actions are antonym pairs
+  * Not all available emojis have to be used.
+  * For the dev it should be easy to fine tune the selection.
+- Timer is 2 minutes but can be adjusted by the host.
+- The explainer can give up.
+- People can join the game at any time.
+- The host can end the game at any time and the final scores are shown.
+
 
