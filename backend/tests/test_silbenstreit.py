@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import random
+from collections import Counter
 
 from fastapi.testclient import TestClient
 
 from games_platform.core.db import Database
-from collections import Counter
-
 from games_platform.games.silbenstreit.dictionary import (
     MAX_LETTER_OCCURRENCES,
     SUPPORTED_LANGUAGES,

@@ -62,6 +62,17 @@ class GameDefinition(Protocol):
         ...
 
 
+# Optional GameDefinition hooks, looked up with getattr by the RoomManager:
+#
+# def get_player_view(self, state, config, viewer_id: str | None) -> dict[str, Any]
+#     Per-viewer state (e.g. hide a secret word from guessers). When present, every
+#     connection gets its own room_state snapshot instead of get_public_view.
+#
+# def on_player_removed(self, state, config, player_id: str) -> dict[str, Any]
+#     Adjust game state after a player left or was removed mid-game (after the
+#     shared turn_order fix-up).
+
+
 # --- Client -> Server WebSocket Messages ---
 
 
@@ -90,6 +101,10 @@ class ReturnToLobbyMessage(BaseModel):
     type: Literal["return_to_lobby"] = "return_to_lobby"
 
 
+class EndGameMessage(BaseModel):
+    type: Literal["end_game"] = "end_game"
+
+
 class RemovePlayerMessage(BaseModel):
     type: Literal["remove_player"] = "remove_player"
     player_id: str = Field(min_length=1)
@@ -112,6 +127,7 @@ type ClientMessage = Annotated[
     | UpdateConfigMessage
     | StartGameMessage
     | ReturnToLobbyMessage
+    | EndGameMessage
     | RemovePlayerMessage
     | GameActionMessage
     | CursorMoveMessage,

@@ -15,6 +15,7 @@ from games_platform.core.db import Database
 from games_platform.core.protocol import (
     ClientMessage,
     CursorMoveMessage,
+    EndGameMessage,
     GameActionMessage,
     GameDefinition,
     PlayerSyncMessage,
@@ -277,6 +278,11 @@ class RoomManager:
                     state["current_turn_index"] = new_order.index(
                         state["current_player_id"]
                     )
+                if room["status"] == "playing":
+                    game = self.get_game(room["game_slug"])
+                    on_player_removed = getattr(game, "on_player_removed", None)
+                    if on_player_removed is not None:
+                        state = on_player_removed(state, room["config"], player_id)
                 next_turn_player_id = state.get("current_player_id")
                 new_state = state
 
@@ -342,7 +348,36 @@ class RoomManager:
     def _connected_player_ids(self, room_id: str) -> set[str]:
         return {c.player_id for c in self.connections.get(room_id, [])}
 
-    async def build_room_snapshot(self, room_id: str) -> dict[str, Any] | None:
+    @staticmethod
+    def _view_state(
+        game: GameDefinition,
+        room: dict[str, Any],
+        viewer_id: str | None,
+    ) -> dict[str, Any]:
+        if room["status"] not in ("playing", "finished") or not room["state"]:
+            return {}
+        get_player_view = getattr(game, "get_player_view", None)
+        if get_player_view is not None:
+            return get_player_view(room["state"], room["config"], viewer_id)
+        return game.get_public_view(room["state"], room["config"])
+
+    async def build_room_snapshot(
+        self,
+        room_id: str,
+        viewer_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        loaded = await self._load_room_snapshot(room_id)
+        if loaded is None:
+            return None
+        snapshot, room, game = loaded
+        snapshot["state"] = self._view_state(game, room, viewer_id)
+        return snapshot
+
+    async def _load_room_snapshot(
+        self,
+        room_id: str,
+    ) -> tuple[dict[str, Any], dict[str, Any], GameDefinition] | None:
+        """Build the viewer-independent part of a room_state snapshot (without "state")."""
         room = await self.db.get_room(room_id)
         if room is None:
             return None
@@ -378,23 +413,18 @@ class RoomManager:
                 }
             )
 
-        public_state = (
-            game.get_public_view(room["state"], room["config"])
-            if room["status"] in ("playing", "finished") and room["state"]
-            else {}
-        )
-
-        return {
+        snapshot = {
             "type": "room_state",
             "room_id": room["id"],
             "game_slug": room["game_slug"],
             "status": room["status"],
             "host_player_id": room["host_player_id"],
             "config": room["config"],
-            "state": public_state,
+            "state": {},
             "players": players_payload,
             "server_time": now.isoformat(),
         }
+        return snapshot, room, game
 
     async def broadcast(self, room_id: str, message: dict[str, Any]) -> None:
         conns = list(self.connections.get(room_id, []))
@@ -410,9 +440,25 @@ class RoomManager:
                 self._remove_connection(room_id, s)
 
     async def broadcast_room_state(self, room_id: str) -> None:
-        snapshot = await self.build_room_snapshot(room_id)
-        if snapshot is not None:
+        loaded = await self._load_room_snapshot(room_id)
+        if loaded is None:
+            return
+        snapshot, room, game = loaded
+        if getattr(game, "get_player_view", None) is None:
+            snapshot["state"] = self._view_state(game, room, None)
             await self.broadcast(room_id, snapshot)
+            return
+
+        stale: list[RoomConnection] = []
+        for conn in list(self.connections.get(room_id, [])):
+            message = {**snapshot, "state": self._view_state(game, room, conn.player_id)}
+            try:
+                await conn.websocket.send_json(message)
+            except (RuntimeError, OSError) as e:
+                logger.debug("WebSocket send failed for %s: %s", conn.player_id, repr(e))
+                stale.append(conn)
+        for s in stale:
+            self._remove_connection(room_id, s)
 
     def _remove_connection(self, room_id: str, conn: RoomConnection) -> None:
         conns = self.connections.get(room_id, [])
@@ -597,6 +643,18 @@ class RoomManager:
                         return
                     self.midgame_inactive_players.pop(room_id, None)
                     await self.db.update_room(room_id, status="lobby", state={})
+                    await self.broadcast_room_state(room_id)
+
+                case EndGameMessage():
+                    if room["host_player_id"] != conn.player_id:
+                        await conn.websocket.send_json(
+                            {"type": "error", "message": "Only the host can end the game."}
+                        )
+                        return
+                    if room["status"] != "playing":
+                        return
+                    await self.db.update_room(room_id, status="finished")
+                    await self.db.record_game_finished(room_id, room["game_slug"])
                     await self.broadcast_room_state(room_id)
 
                 case RemovePlayerMessage():

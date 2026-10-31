@@ -152,6 +152,38 @@
 			filter="url(#scribble-filter)"
 		/>
 	</svg>
+{:else if slug === 'emoji-charades'}
+	<svg
+		class={className}
+		viewBox="0 0 48 48"
+		fill="none"
+		role="img"
+		aria-hidden={titleAttr ? undefined : true}
+		aria-label={titleAttr}
+	>
+		{#if titleAttr}<title>{titleAttr}</title>{/if}
+		<!-- Speech bubble with a scribbled smiley and a guessing mark -->
+		<path
+			d="M8 9.5h26.5a3 3 0 0 1 3 3V30a3 3 0 0 1-3 3H19l-7.5 6.5V33H8a3 3 0 0 1-3-3V12.5a3 3 0 0 1 3-3z"
+			stroke="#1a1917"
+			stroke-width="1.7"
+			stroke-linejoin="round"
+			fill="#faf8f4"
+			filter="url(#scribble-filter)"
+		/>
+		<circle cx="21" cy="21" r="7.5" stroke="#1a1917" stroke-width="1.5" filter="url(#scribble-filter)" />
+		<circle cx="18.4" cy="19.2" r="1.1" fill="#1a1917" />
+		<circle cx="23.6" cy="19.2" r="1.1" fill="#1a1917" />
+		<path d="M17.6 23.2c1.9 2.2 4.9 2.2 6.8 0" stroke="#1a1917" stroke-width="1.4" stroke-linecap="round" />
+		<text
+			x="36.5"
+			y="44"
+			font-family="Architects Daughter, cursive"
+			font-size="13"
+			fill="#1a1917"
+			opacity="0.75"
+		>?</text>
+	</svg>
 {:else}
 	<svg
 		class={className}

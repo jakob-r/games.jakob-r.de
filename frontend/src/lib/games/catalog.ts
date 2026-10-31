@@ -1,6 +1,11 @@
 /** Shared frontend game catalog for hubs, SEO, and the landing page. */
 
-export type GameSlug = 'sudoku' | 'kaesekaestchen' | 'minesweeper' | 'silbenstreit';
+export type GameSlug =
+	| 'sudoku'
+	| 'kaesekaestchen'
+	| 'minesweeper'
+	| 'silbenstreit'
+	| 'emoji-charades';
 
 export interface GameInfo {
 	slug: GameSlug;
@@ -68,6 +73,24 @@ export const GAMES: GameInfo[] = [
 		boxSeed: 39,
 		defaultConfig: { size: 5, language: 'de', scoring_enabled: true },
 		createLabel: 'New Silbenstreit →'
+	},
+	{
+		slug: 'emoji-charades',
+		title: 'Emoji Charades',
+		tagline: 'Explain words, movies, and quotes using only emojis.',
+		description:
+			'A party game for the couch or a video call. One player explains a secret word, movie title, or quote with emoji sentences while everyone else guesses — shout it out in person or type it remotely with typo-tolerant matching. Optional timer, German or English words.',
+		playersLabel: '2+',
+		playersAria: '2 or more players',
+		boxSeed: 45,
+		defaultConfig: {
+			mode: 'in_person',
+			timed: false,
+			round_seconds: 120,
+			language: 'de',
+			scoring_enabled: true
+		},
+		createLabel: 'New Emoji Charades →'
 	}
 ];
 

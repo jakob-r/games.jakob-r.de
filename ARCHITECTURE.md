@@ -33,7 +33,8 @@ To share components across games while allowing any game to be extracted and run
      - `db.py`: Psycopg 3 `AsyncConnectionPool`, schema initialization (`rooms`, `room_players`, `player_stats`, `app_settings`, `push_subscriptions`), and expired room cleanup (2 days without moves, 1 year with moves).
      - `protocol.py`: `GameDefinition` protocol and Pydantic v2 discriminated unions for WebSocket/REST messages.
      - `push.py`: `WebPushService` for auto-generated/persisted VAPID keys and asynchronous `pywebpush` turn-notification delivery. Endpoints are limited to known push-service hosts (at most 5 per player). Pushes use a 5-minute TTL and a per-room Topic so a later turn replaces a queued alert. Set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` when more than one process serves the app.
-     - `room_manager.py`: WebSocket room/lobby lifecycle, non-creator player leave handling (including automatic leave when a new player joins a running game and disconnects without acting) and host player removal (creators cannot leave a room, only delete it or remove other players), 10-second streak multiplier tracking (`1.1x` starting after first right entry), turn-change Web Push dispatch, and PostgreSQL state persistence.
+     - `protocol.py` optional game hooks (looked up with `getattr`): `get_player_view(state, config, viewer_id)` makes `RoomManager` send each connection its own `room_state` (hidden information such as a secret word; REST snapshots use `viewer_id=None`), and `on_player_removed(state, config, player_id)` runs after the shared `turn_order` fix-up when someone leaves mid-game.
+     - `room_manager.py`: WebSocket room/lobby lifecycle, host-only `end_game` message (playing → finished with final scores, usable by any game), non-creator player leave handling (including automatic leave when a new player joins a running game and disconnects without acting) and host player removal (creators cannot leave a room, only delete it or remove other players), 10-second streak multiplier tracking (`1.1x` starting after first right entry), turn-change Web Push dispatch, and PostgreSQL state persistence.
    - **Frontend (`frontend/src/lib/core/`)**:
      - `profile.svelte.ts`: Player profile store (`localStorage` UUID, name configuration tracking, and primary color).
      - `color.ts`: Perceptual OKLCH similarity check and preset-palette `opponent_color(my_color, their_color)` resolver.
@@ -63,6 +64,15 @@ To share components across games while allowing any game to be extracted and run
      - `standalone.py`: Standalone FastAPI entrypoint (`uv run uvicorn games_platform.games.silbenstreit.standalone:app`).
    - **Frontend (`frontend/src/lib/games/silbenstreit/`)**:
      - `SilbenstreitGame.svelte`: Mobile-first `4×4`–`8×8` scribbly letter grid with rarity badges, protected tile indicators, keyboard & tap word composer, and played words history.
+
+   - **Backend (`backend/games_platform/games/emoji_charades/`)** (slug `emoji-charades`):
+     - `words.py`: Curated German/English word lists (`"Text|alias|alias"` per line) across object, food, animal, brand, person, movie, TV show, and quote categories.
+     - `matching.py`: Typo-tolerant guess matching (accent/umlaut/ß folding, leading-article stripping, length-scaled Levenshtein threshold) plus a looser `is_close` hint.
+     - `game.py`: `EmojiCharadesGame` (`in_person`/`remote` modes, optional timer, choosing → explaining → reveal phases, circular explainers via `turn_order` with `current_player_id` = explainer or next explainer so turn pushes fire, `+1` guesser and `+1` explainer when timed). Uses `get_player_view` to hide the word and choices from guessers and `on_player_removed` to end a round whose explainer left. Timed rounds have no server timer task: clients send `time_up` at the deadline and the server only accepts it once the deadline has passed.
+     - `standalone.py`: Standalone FastAPI entrypoint (`uv run uvicorn games_platform.games.emoji_charades.standalone:app`).
+   - **Frontend (`frontend/src/lib/games/emoji-charades/`)**:
+     - `emojis.ts`: The tunable emoji palette (Concepts and Actions as antonym pairs; Shapes, Colors, Foods, Animals, Countries as lists).
+     - `EmojiCharadesGame.svelte`: Word picker, multi-sentence emoji editor (tap to select, move, delete; add/remove sentences), guess input with close hints, in-person award chips, reveal card, and host end-game.
 
 `ActionOutcome.extra_score_deltas` lets a single action credit other players (minesweeper flag challenges); `RoomManager` applies those deltas after the actor's score update.
 

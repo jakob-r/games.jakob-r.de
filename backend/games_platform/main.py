@@ -29,6 +29,7 @@ from games_platform.core.push import (
     validate_push_endpoint,
 )
 from games_platform.core.room_manager import RoomManager
+from games_platform.games.emoji_charades.game import emoji_charades_game
 from games_platform.games.kaesekaestchen.game import kaesekaestchen_game
 from games_platform.games.minesweeper.game import minesweeper_game
 from games_platform.games.silbenstreit.game import silbenstreit_game
@@ -41,6 +42,7 @@ ALL_GAMES: dict[str, GameDefinition] = {
     kaesekaestchen_game.slug: kaesekaestchen_game,
     minesweeper_game.slug: minesweeper_game,
     silbenstreit_game.slug: silbenstreit_game,
+    emoji_charades_game.slug: emoji_charades_game,
 }
 
 

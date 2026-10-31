@@ -24,6 +24,7 @@
 - **Käsekästchen** — turn-based dots-and-boxes on a customisable grid
 - **Co-op Minesweeper** — dig and flag the same minefield together
 - **Silbenstreit** — claim letter tiles with words, steal, and surround
+- **Emoji Charades** — explain words, movies, and quotes with emojis; play in person or remotely
 
 ## Use it
 

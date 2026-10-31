@@ -118,6 +118,32 @@ export type ServerEvent =
 			consecutive_passes: number;
 	  }
 	| {
+			type: 'round_ended';
+			round_number: number;
+			reason: 'guessed' | 'gave_up' | 'time_up' | 'explainer_left';
+			word: string | null;
+			category: string | null;
+			explainer_id: string | null;
+			winner_id: string | null;
+			points: Record<string, number>;
+			next_player_id: string | null;
+	  }
+	| {
+			type: 'guess_wrong';
+			player_id: string;
+			text: string;
+			close: boolean;
+	  }
+	| {
+			type: 'word_chosen' | 'round_started';
+			explainer_id: string;
+	  }
+	| {
+			type: 'action_rejected';
+			player_id: string;
+			reason: string;
+	  }
+	| {
 			type: 'cursor_update';
 			player_id: string;
 			row: number | null;
@@ -284,6 +310,10 @@ export class RoomSocketClient {
 
 	returnToLobby(): void {
 		this.send({ type: 'return_to_lobby' });
+	}
+
+	endGame(): void {
+		this.send({ type: 'end_game' });
 	}
 
 	async removePlayer(targetPlayerId: string): Promise<boolean> {

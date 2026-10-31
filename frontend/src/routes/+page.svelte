@@ -30,6 +30,7 @@
 			height?: number;
 			size?: number;
 			language?: string;
+			mode?: string;
 		};
 		score: number;
 		player_count: number;
@@ -184,6 +185,10 @@
 			const sz = item.config?.size ?? 5;
 			const lang = (item.config?.language ?? 'de').toUpperCase();
 			return `${sz}×${sz} • ${lang}`;
+		}
+		if (item.game_slug === 'emoji-charades') {
+			const mode = item.config?.mode === 'remote' ? 'Remote' : 'In person';
+			return `${mode} • ${(item.config?.language ?? 'de').toUpperCase()}`;
 		}
 		return item.config?.difficulty ?? 'medium';
 	}

@@ -112,6 +112,9 @@ def format_turn_notification(
             body = f"{actor} passed their turn. Your move!"
         elif ev_type == "line_drawn":
             body = f"{actor} drew a line in #{room_id}. Your turn!"
+        elif ev_type == "round_ended":
+            word = first.get("word", "")
+            body = f'The word was "{word}". You explain next!'
 
     return {
         "title": title,
