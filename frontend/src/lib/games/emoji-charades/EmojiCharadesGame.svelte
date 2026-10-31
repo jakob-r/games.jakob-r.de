@@ -55,6 +55,7 @@
 
 	const MAX_SENTENCES = 5;
 	const MAX_EMOJIS_PER_SENTENCE = 16;
+	const MIN_PALETTE_HEIGHT = 220;
 	const ROUND_SECONDS = [60, 90, 120, 180, 240];
 	const LANGUAGES = [
 		{ code: 'de', label: 'Deutsch' },
@@ -221,6 +222,49 @@
 		pushDraft(draft.filter((_, i) => i !== index));
 		activeSentence = Math.max(0, Math.min(activeSentence, draft.length - 1));
 		selectedEmoji = null;
+	}
+
+	/**
+	 * Grow a scroll area into the free vertical space of the viewport (never below
+	 * MIN_PALETTE_HEIGHT). Content above it and the siblings below it keep their size;
+	 * the page only scrolls once the palette is at its minimum.
+	 */
+	function fillViewport(node: HTMLElement) {
+		const box = node.parentElement!;
+		const update = () => {
+			const container = box.parentElement;
+			if (!container) return;
+			const gap = parseFloat(getComputedStyle(container).rowGap) || 0;
+			let below = 0;
+			for (let sib = box.nextElementSibling; sib; sib = sib.nextElementSibling) {
+				below += (sib as HTMLElement).offsetHeight + gap;
+			}
+			for (let el = container.parentElement; el && el !== document.body; el = el.parentElement) {
+				below += parseFloat(getComputedStyle(el).paddingBottom) || 0;
+			}
+			const top = node.getBoundingClientRect().top + window.scrollY;
+			const frame = box.getBoundingClientRect().bottom - node.getBoundingClientRect().bottom;
+			const free = window.innerHeight - top - frame - below;
+			node.style.maxHeight = `${Math.max(MIN_PALETTE_HEIGHT, Math.floor(free))}px`;
+		};
+		// Re-fit when the sentences above or the controls below change size, or when
+		// siblings appear. The result never depends on the palette's own height.
+		const observer = new ResizeObserver(update);
+		const container = box.parentElement;
+		if (container) {
+			observer.observe(container);
+			for (const el of container.children) {
+				if (el !== box) observer.observe(el);
+			}
+		}
+		window.addEventListener('resize', update);
+		update();
+		return {
+			destroy() {
+				observer.disconnect();
+				window.removeEventListener('resize', update);
+			}
+		};
 	}
 
 	function submitGuess(e: SubmitEvent) {
@@ -657,7 +701,7 @@
 							</button>
 						{/each}
 					</div>
-					<div class="max-h-[220px] overflow-y-auto p-2">
+					<div class="overflow-y-auto p-2" use:fillViewport>
 						{#if 'pairs' in category}
 							<div class="grid grid-cols-3 gap-1.5 sm:grid-cols-4">
 								{#each category.pairs as [left, right] (`${left}${right}`)}
