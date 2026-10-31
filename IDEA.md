@@ -133,7 +133,7 @@ If the round is timed also the explainer gets a point.
 - The explainer can select which sentence they are currently editing.
 - The explainer can add, remove, rearrange emojis from the sentence.
 - Emojis are sorted by category
-  * Categories: Countries, Colors, Shapes, Foods, Animals, Concepts, Actions
+  * Categories: Countries, Colors, Shapes, Foods, Animals, People, Things, Concepts, Actions
   * Concepts and actions are antonym pairs
   * Not all available emojis have to be used.
   * For the dev it should be easy to fine tune the selection.

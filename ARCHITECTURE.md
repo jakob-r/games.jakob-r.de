@@ -71,7 +71,7 @@ To share components across games while allowing any game to be extracted and run
      - `game.py`: `EmojiCharadesGame` (`in_person`/`remote` modes, optional timer, choosing → explaining → reveal phases, circular explainers via `turn_order` with `current_player_id` = explainer or next explainer so turn pushes fire, `+1` guesser and `+1` explainer when timed). Uses `get_player_view` to hide the word and choices from guessers and `on_player_removed` to end a round whose explainer left. Timed rounds have no server timer task: clients send `time_up` at the deadline and the server only accepts it once the deadline has passed.
      - `standalone.py`: Standalone FastAPI entrypoint (`uv run uvicorn games_platform.games.emoji_charades.standalone:app`).
    - **Frontend (`frontend/src/lib/games/emoji-charades/`)**:
-     - `emojis.ts`: The tunable emoji palette (Concepts and Actions as antonym pairs; Shapes, Colors, Foods, Animals, Countries as lists).
+     - `emojis.ts`: The tunable emoji palette (Concepts and Actions as antonym pairs; People, Things, Shapes, Colors, Foods, Animals, Countries as lists).
      - `EmojiCharadesGame.svelte`: Word picker, multi-sentence emoji editor (tap to select, move, delete; add/remove sentences), guess input with close hints, in-person award chips, reveal card, and host end-game.
 
 `ActionOutcome.extra_score_deltas` lets a single action credit other players (minesweeper flag challenges); `RoomManager` applies those deltas after the actor's score update.
