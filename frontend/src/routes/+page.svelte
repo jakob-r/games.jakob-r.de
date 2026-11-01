@@ -228,13 +228,6 @@
 	<header class="mb-7 flex flex-wrap items-baseline justify-between gap-3 border-b-2 border-[#1a1917] pb-3">
 		<h1 class="font-hand text-3xl tracking-tight sm:text-4xl">games.jakob-r.de</h1>
 
-		{#if auth.loaded}
-			<a
-				href={auth.user ? '/account' : '/login'}
-				class="text-sm font-medium text-[#6e6a63] underline decoration-[#1a1917]/30 underline-offset-4 transition hover:text-[#1a1917] hover:decoration-[#1a1917]"
-			>{auth.user ? 'Account' : 'Sign in'}</a>
-		{/if}
-
 		<form onsubmit={handleJoinByCode} class="flex items-center gap-2">
 			<input
 				type="text"
@@ -244,6 +237,17 @@
 				class="font-mono-num w-28 rounded-md border-[1.6px] border-[#1a1917] bg-white px-2.5 py-1.5 text-xs focus:outline-none"
 			/>
 			<ScribblyButton type="submit">Join Room</ScribblyButton>
+			<ScribblyButton
+				onclick={() => goto(auth.user ? '/account' : '/login')}
+				title={auth.user ? 'Account settings' : 'Sign in or create account'}
+				class="!px-2.5"
+			>
+				<span class="sr-only">{auth.user ? 'Account settings' : 'Sign in'}</span>
+				<svg width="18" height="18" viewBox="0 0 24 24" fill={auth.user ? profile.primaryColor : 'none'} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<circle cx="12" cy="8" r="4" />
+					<path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7" />
+				</svg>
+			</ScribblyButton>
 		</form>
 	</header>
 
