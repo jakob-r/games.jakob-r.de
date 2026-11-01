@@ -31,7 +31,7 @@ To share components across games while allowing any game to be extracted and run
 
 1. **Core Layer (`core`)**:
    - **Backend (`backend/games_platform/core/`)**:
-     - `db.py`: Psycopg 3 `AsyncConnectionPool`, schema initialization (`rooms`, `room_players`, `player_stats`, `app_settings`, `push_subscriptions`), and expired room cleanup (2 days without moves, 1 year with moves) plus `player_stats` untouched for 1 year. The app container runs uvicorn with `--no-access-log` (no IPs logged by the app; data retention is documented in `docs/privacy-games.md`).
+     - `db.py`: Psycopg 3 `AsyncConnectionPool`, schema initialization (`rooms`, `room_players`, `player_stats`, `app_settings`, `push_subscriptions`), and expired room cleanup (2 days without moves, 1 year with moves) plus `player_stats` untouched for 1 year. The app container runs uvicorn with `--no-access-log` (no IPs logged by the app; data retention is described in the privacy page `frontend/src/routes/privacy/+page.svelte`).
      - `protocol.py`: `GameDefinition` protocol and Pydantic v2 discriminated unions for WebSocket/REST messages.
      - `push.py`: `WebPushService` for auto-generated/persisted VAPID keys and asynchronous `pywebpush` turn-notification delivery. Endpoints are limited to known push-service hosts (at most 5 per player). Pushes use a 5-minute TTL and a per-room Topic so a later turn replaces a queued alert. Set `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` when more than one process serves the app.
      - `protocol.py` optional game hooks (looked up with `getattr`): `get_player_view(state, config, viewer_id)` makes `RoomManager` send each connection its own `room_state` (hidden information such as a secret word; REST snapshots use `viewer_id=None`), and `on_player_removed(state, config, player_id)` runs after the shared `turn_order` fix-up when someone leaves mid-game.
@@ -82,7 +82,7 @@ To share components across games while allowing any game to be extracted and run
 - Use Python 3.12+ syntax (`type` aliases, generics `def foo[T]()`, built-in `dict`, `list`, `tuple`, `X | Y` unions — do not import legacy `typing` equivalents).
 - Use `repr(e)` when logging or printing exceptions.
 - Use **Psycopg 3** async pools/cursors directly rather than heavy ORMs.
-- Landing pages end with a small footer: "by jakob-r" (→ https://www.jakob-r.de/coding/), source code, license (if the repo has one), and the legal notice and privacy pages on jakob-r.de. Game sessions (`/{slug}/{roomId}`) have no footer.
+- Landing pages end with a small footer: "by jakob-r" (→ https://www.jakob-r.de/coding/), source code, license (if the repo has one), the legal notice on jakob-r.de and the own privacy page `/privacy` (games.jakob-r.de processes data differently from the static jakob-r.de, so it has its own policy; keep it in sync with data handling and the proxy log setup on the VPS: nginx-proxy `LOG_FORMAT` without `$remote_addr`, size-capped json-file logs). Game sessions (`/{slug}/{roomId}`) have no footer.
 
 ## Production
 
