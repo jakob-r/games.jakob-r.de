@@ -10,12 +10,14 @@
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import type { Snippet } from 'svelte';
+	import { auth } from '$lib/core/auth.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 
 	let { children }: { children: Snippet } = $props();
 
 	onMount(() => {
 		profile.init();
+		void auth.load();
 	});
 </script>
 

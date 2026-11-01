@@ -17,6 +17,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg import Error as PsycopgError
 
+from games_platform.core.auth import AuthService, public_base_url
+from games_platform.core.auth_api import create_auth_router
 from games_platform.core.db import Database, db
 from games_platform.core.protocol import (
     CreateRoomRequest,
@@ -107,6 +109,7 @@ def create_app(
 ) -> FastAPI:
     active_db = database or db
     manager = RoomManager(active_db)
+    auth_service = AuthService(active_db)
 
     slugs = enabled_games or list(ALL_GAMES.keys())
     for slug in slugs:
@@ -126,6 +129,7 @@ def create_app(
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         await active_db.connect()
+        await auth_service.load_secret()
         cleanup_task = asyncio.create_task(_periodic_cleanup())
         try:
             yield
@@ -143,13 +147,15 @@ def create_app(
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=sorted({public_base_url(), "http://localhost:5173"}),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
+    app.include_router(create_auth_router(auth_service))
     app.state.db = active_db
+    app.state.auth = auth_service
     app.state.room_manager = manager
 
     @app.get("/api/health")

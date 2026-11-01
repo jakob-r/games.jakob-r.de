@@ -55,6 +55,20 @@ class ProfileStore {
 		this.hydrated = true;
 	}
 
+	/** Use the account's stable player id (so stats and rooms follow it across devices). */
+	setPlayerId(id: string): void {
+		if (!id || id === this.playerId) return;
+		this.playerId = id;
+		if (typeof window !== 'undefined') {
+			localStorage.setItem(STORAGE_KEY_ID, id);
+		}
+	}
+
+	/** After sign-out, don't leave the account's player id on a possibly shared device. */
+	resetAnonymous(): void {
+		this.setPlayerId(generateRandomId());
+	}
+
 	setName(newName: string): void {
 		const trimmed = newName.trim().slice(0, 32);
 		// Keep the previous name if the caller passes blank (e.g. mid-edit clear).

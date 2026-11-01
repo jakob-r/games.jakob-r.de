@@ -6,6 +6,7 @@
 	import SeoHead from '$lib/core/components/SeoHead.svelte';
 	import ScribblyBox from '$lib/core/components/ScribblyBox.svelte';
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
+	import { auth } from '$lib/core/auth.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 	import {
 		GAMES,
@@ -226,6 +227,13 @@
 	<!-- Header -->
 	<header class="mb-7 flex flex-wrap items-baseline justify-between gap-3 border-b-2 border-[#1a1917] pb-3">
 		<h1 class="font-hand text-3xl tracking-tight sm:text-4xl">games.jakob-r.de</h1>
+
+		{#if auth.loaded}
+			<a
+				href={auth.user ? '/account' : '/login'}
+				class="text-sm font-medium text-[#6e6a63] underline decoration-[#1a1917]/30 underline-offset-4 transition hover:text-[#1a1917] hover:decoration-[#1a1917]"
+			>{auth.user ? 'Account' : 'Sign in'}</a>
+		{/if}
 
 		<form onsubmit={handleJoinByCode} class="flex items-center gap-2">
 			<input

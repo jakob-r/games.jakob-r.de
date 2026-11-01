@@ -4,7 +4,7 @@
 
 <SeoHead
 	title="Privacy policy"
-	description="How games.jakob-r.de handles your data: no cookies, no tracking, nicknames instead of accounts, automatic deletion."
+	description="How games.jakob-r.de handles your data: no tracking, nicknames, optional accounts, automatic deletion."
 	path="/privacy"
 />
 
@@ -26,8 +26,9 @@
 
 		<h2>2. Principles</h2>
 		<p>
-			games.jakob-r.de is a small, non-commercial collection of multiplayer browser games. There is no
-			registration, no cookies, no analytics or tracking and no advertising. All fonts, scripts and images are
+			games.jakob-r.de is a small, non-commercial collection of multiplayer browser games. You can play without
+			registering; an account is optional. The only cookie is a session cookie that is set if you sign in
+			(see section 5). There is no analytics or tracking and no advertising. All fonts, scripts and images are
 			served from games.jakob-r.de itself; no content is loaded from third-party servers.
 		</p>
 
@@ -72,7 +73,35 @@
 			at any time. Per-game statistics are deleted automatically after 1 year without a new game.
 		</p>
 
-		<h2>5. Storage in your browser</h2>
+		<h2>5. Optional user account</h2>
+		<p>
+			You can create an account to keep your statistics and recent rooms across devices. You can sign up with
+			an email address and password or with Google. The following data is stored on my server:
+		</p>
+		<ul>
+			<li>your email address and an optional display name,</li>
+			<li>for email sign-up, a salted hash of your password (never the password itself),</li>
+			<li>for Google sign-in, Google's account identifier; I receive your email address and name from Google,</li>
+			<li>the player ID linked to your account, and hashes of your login sessions and one-time email links.</li>
+		</ul>
+		<p>
+			If you are signed in, a session cookie (<code>games_session</code>) keeps you logged in for up to 30
+			days. It is strictly necessary for the login you requested (§ 25(2) no. 2 TDDDG). While a Google
+			sign-in is in progress, another short-lived cookie (up to 10 minutes) protects the process against
+			forgery. Confirmation and password-reset emails are sent through an email provider's SMTP server.
+		</p>
+		<p>
+			If you choose Google sign-in, your browser is redirected to Google, which processes data under its own
+			privacy policy and may do so in the USA (Google is certified under the EU-U.S. Data Privacy Framework).
+			Nothing is sent to Google unless you click that button.
+		</p>
+		<p>
+			The legal basis is Art. 6(1)(b) GDPR. You can delete your account at any time on the account page; this
+			erases your account data, statistics and the rooms you host. Accounts whose email address was never
+			confirmed and that have no active session are deleted automatically after 30 days.
+		</p>
+
+		<h2>6. Storage in your browser</h2>
 		<p>
 			The site stores your player ID, display name, colour and notification settings in your browser's local
 			storage so that you are recognised when you come back. The player ID is sent to the server to show your
@@ -81,7 +110,7 @@
 			TDDDG).
 		</p>
 
-		<h2>6. Push notifications (optional)</h2>
+		<h2>7. Push notifications (optional)</h2>
 		<p>
 			If you explicitly enable it, the site can notify you when it is your turn. Your browser then creates a
 			push subscription, which is stored on my server together with the game room and your player ID. To
@@ -98,13 +127,13 @@
 			deleted.
 		</p>
 
-		<h2>7. External links</h2>
+		<h2>8. External links</h2>
 		<p>
 			The site links to other websites, e.g. GitHub and jakob-r.de. No data is transferred to them until you
 			click a link. After that, the privacy policy of the respective provider applies.
 		</p>
 
-		<h2>8. Your rights</h2>
+		<h2>9. Your rights</h2>
 		<p>You have the right to</p>
 		<ul>
 			<li>access the data stored about you (Art. 15 GDPR),</li>
@@ -117,8 +146,9 @@
 		</ul>
 		<p>
 			To exercise these rights, contact me by email at the address in the
-			<a href="https://www.jakob-r.de/legal-notice/">legal notice</a>. As there are no accounts, please include
-			your player ID so I can find your data; you can see it in your browser's local storage for this site.
+			<a href="https://www.jakob-r.de/legal-notice/">legal notice</a>. Please include your account email or, if you
+			play without an account, your player ID so I can find your data; you can see the latter in your
+			browser's local storage for this site.
 		</p>
 		<p>
 			You also have the right to lodge a complaint with a data protection supervisory authority, for example
@@ -126,7 +156,7 @@
 			Datenschutz und Informationsfreiheit), Alt-Moabit 59–61, 10555 Berlin, Germany.
 		</p>
 
-		<h2>9. Automated decision-making</h2>
+		<h2>10. Automated decision-making</h2>
 		<p>No automated decision-making within the meaning of Art. 22 GDPR takes place.</p>
 	</article>
 </main>

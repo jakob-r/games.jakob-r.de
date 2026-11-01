@@ -77,6 +77,44 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 
 CREATE INDEX IF NOT EXISTS idx_push_subscriptions_room_player
     ON push_subscriptions(room_id, player_id);
+
+CREATE TABLE IF NOT EXISTS users (
+    id BIGSERIAL PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT,
+    display_name TEXT NOT NULL DEFAULT '',
+    player_id TEXT NOT NULL UNIQUE,
+    email_verified_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id);
+
+CREATE TABLE IF NOT EXISTS auth_email_tokens (
+    token_hash TEXT PRIMARY KEY,
+    purpose TEXT NOT NULL,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS oauth_accounts (
+    provider TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (provider, subject)
+);
+
+CREATE INDEX IF NOT EXISTS idx_oauth_accounts_user ON oauth_accounts(user_id);
 """
 
 
@@ -113,6 +151,10 @@ class Database:
                 logger.error("Error closing PostgreSQL pool: %s", repr(e))
             finally:
                 self.pool = None
+
+    def connection(self):
+        """Async context manager yielding a pooled autocommit connection (dict rows)."""
+        return self._require_pool().connection()
 
     def _require_pool(self) -> AsyncConnectionPool:
         if self.pool is None:
@@ -311,6 +353,19 @@ class Database:
             rows = await cur.fetchall()
             await cur.execute(
                 "DELETE FROM player_stats WHERE updated_at < NOW() - INTERVAL '1 year'"
+            )
+            await cur.execute("DELETE FROM auth_sessions WHERE expires_at < NOW()")
+            await cur.execute(
+                "DELETE FROM auth_email_tokens WHERE expires_at < NOW() - INTERVAL '1 day'"
+            )
+            # Sign-ups that never confirmed their email within 30 days.
+            await cur.execute(
+                """
+                DELETE FROM users
+                WHERE email_verified_at IS NULL
+                  AND created_at < NOW() - INTERVAL '30 days'
+                  AND NOT EXISTS (SELECT 1 FROM auth_sessions s WHERE s.user_id = users.id)
+                """
             )
             return [str(r["id"]) for r in rows]
 
