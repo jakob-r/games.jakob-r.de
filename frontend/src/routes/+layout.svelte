@@ -1,4 +1,12 @@
 <script lang="ts">
+	// Fonts are self-hosted (bundled by Vite) so no request goes to Google Fonts.
+	import '@fontsource/architects-daughter/400.css';
+	import '@fontsource/plus-jakarta-sans/400.css';
+	import '@fontsource/plus-jakarta-sans/500.css';
+	import '@fontsource/plus-jakarta-sans/600.css';
+	import '@fontsource/plus-jakarta-sans/700.css';
+	import '@fontsource/jetbrains-mono/400.css';
+	import '@fontsource/jetbrains-mono/600.css';
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import type { Snippet } from 'svelte';

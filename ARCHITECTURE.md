@@ -11,6 +11,7 @@ General product concept lives in `idea.md`.
 - **SEO & game hubs**: Shared catalog in `frontend/src/lib/games/catalog.ts` plus scribbly `GameLogo.svelte` icons. Each game has a prerendered hub at `/{slug}` (`GameHub.svelte`: description, create room, open sessions for that game). Landing and hubs emit per-page title/description/canonical/OG/JSON-LD via `SeoHead.svelte`. `static/robots.txt` + `static/sitemap.xml` list those URLs. Room play stays at `/{slug}/{roomId}` via adapter-static `200.html` SPA fallback. FastAPI serves prerendered `{slug}.html` (or `{slug}/index.html`) for hubs and falls back to `200.html` for room routes.
 - **Styling & Scribbly Visuals**:
   - **Tailwind CSS v4** + native CSS custom properties.
+  - **Fonts are self-hosted** via `@fontsource/*` packages imported in `+layout.svelte` (bundled by Vite). No third-party requests (no Google Fonts, CDNs, analytics); keep it that way.
   - **Rough.js** + inline **SVG** with `stroke-dasharray`/`stroke-dashoffset` animations and subtle SVG displacement filters (`#scribble-filter`) for a minimalistic, hand-drawn scribbly look.
 - **Color System (`opponent_color`)**:
   - **OKLCH perceptual color space** in `frontend/src/lib/core/color.ts` for `opponent_color(my_color, their_color)`.
