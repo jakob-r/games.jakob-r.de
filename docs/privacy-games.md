@@ -1,7 +1,7 @@
 # Draft: privacy section for games.jakob-r.de
 
 Meant to be added to https://www.jakob-r.de/privacy/ (e.g. as a new section after "3. Hosting by GitHub Pages").
-Before publishing: conclude the AVV with netcup (customer control panel). The proxy (nginx-proxy in ~/docker_compose on the VPS) must keep `LOG_FORMAT` without `$remote_addr` and its json-file log rotation, otherwise section 4.1 is wrong. Section 2 ("Principles") currently says the page is fully static; it should
+The AVV with netcup is concluded (1 Nov 2026). The proxy (nginx-proxy in ~/docker_compose on the VPS) must keep `LOG_FORMAT` without `$remote_addr` and its json-file log rotation, otherwise section 4.1 is wrong. Section 2 ("Principles") currently says the page is fully static; it should
 be scoped to www.jakob-r.de, e.g. "This applies to www.jakob-r.de. For games.jakob-r.de see section 4."
 
 ---
