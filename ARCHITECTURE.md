@@ -81,6 +81,7 @@ To share components across games while allowing any game to be extracted and run
 - Use Python 3.12+ syntax (`type` aliases, generics `def foo[T]()`, built-in `dict`, `list`, `tuple`, `X | Y` unions — do not import legacy `typing` equivalents).
 - Use `repr(e)` when logging or printing exceptions.
 - Use **Psycopg 3** async pools/cursors directly rather than heavy ORMs.
+- Landing pages end with a small footer linking "by jakob-r" to https://www.jakob-r.de/coding/ (which carries the legal notice). Game sessions (`/{slug}/{roomId}`) have no footer.
 
 ## Production
 

@@ -358,10 +358,15 @@
 		</ScribblyBox>
 	</div>
 
-	<footer class="mt-10 border-t border-[#1a1917]/15 pt-6 text-center text-sm text-[#6e6a63]">
+	<footer class="mt-10 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-[#1a1917]/15 pt-6 text-sm text-[#6e6a63]">
 		<a
 			href="/"
 			class="font-medium text-[#1a1917] underline decoration-[#1a1917]/30 underline-offset-4 transition hover:decoration-[#1a1917]"
 		>← All games</a>
+		<span aria-hidden="true">·</span>
+		<a
+			href="https://www.jakob-r.de/coding/"
+			class="font-medium text-[#1a1917] underline decoration-[#1a1917]/30 underline-offset-4 transition hover:decoration-[#1a1917]"
+		>by jakob-r</a>
 	</footer>
 </main>

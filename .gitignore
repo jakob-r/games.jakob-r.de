@@ -21,3 +21,6 @@ frontend/node_modules/
 .env.*
 !.env.example
 .DS_Store
+
+# Claude Code local settings
+.claude/

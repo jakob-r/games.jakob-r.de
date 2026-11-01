@@ -488,5 +488,10 @@
 		>
 			License
 		</a>
+		<span aria-hidden="true">·</span>
+		<a
+			href="https://www.jakob-r.de/coding/"
+			class="font-medium text-[#1a1917] underline decoration-[#1a1917]/30 underline-offset-4 transition hover:decoration-[#1a1917]"
+		>by jakob-r</a>
 	</footer>
 </main>
