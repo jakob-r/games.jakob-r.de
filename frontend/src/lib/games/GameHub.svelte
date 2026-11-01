@@ -368,5 +368,25 @@
 			href="https://www.jakob-r.de/coding/"
 			class="font-medium text-[#1a1917] underline decoration-[#1a1917]/30 underline-offset-4 transition hover:decoration-[#1a1917]"
 		>by jakob-r</a>
+		<span aria-hidden="true">·</span>
+		<a
+			href="https://github.com/jakob-r/games.jakob-r.de"
+			class="font-medium text-[#1a1917] underline decoration-[#1a1917]/30 underline-offset-4 transition hover:decoration-[#1a1917]"
+		>Source</a>
+		<span aria-hidden="true">·</span>
+		<a
+			href="https://github.com/jakob-r/games.jakob-r.de/blob/main/LICENSE"
+			class="font-medium text-[#1a1917] underline decoration-[#1a1917]/30 underline-offset-4 transition hover:decoration-[#1a1917]"
+		>License</a>
+		<span aria-hidden="true">·</span>
+		<a
+			href="https://www.jakob-r.de/legal-notice/"
+			class="font-medium text-[#1a1917] underline decoration-[#1a1917]/30 underline-offset-4 transition hover:decoration-[#1a1917]"
+		>Legal notice</a>
+		<span aria-hidden="true">·</span>
+		<a
+			href="https://www.jakob-r.de/privacy/"
+			class="font-medium text-[#1a1917] underline decoration-[#1a1917]/30 underline-offset-4 transition hover:decoration-[#1a1917]"
+		>Privacy</a>
 	</footer>
 </main>
