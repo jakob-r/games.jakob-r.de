@@ -1,7 +1,7 @@
 # Draft: privacy section for games.jakob-r.de
 
 Meant to be added to https://www.jakob-r.de/privacy/ (e.g. as a new section after "3. Hosting by GitHub Pages").
-Placeholders are marked `[…]`. Before publishing: conclude the AVV with netcup (customer control panel) and fill in the log retention. Section 2 ("Principles") currently says the page is fully static; it should
+Before publishing: conclude the AVV with netcup (customer control panel). The proxy (nginx-proxy in ~/docker_compose on the VPS) must keep `LOG_FORMAT` without `$remote_addr` and its json-file log rotation, otherwise section 4.1 is wrong. Section 2 ("Principles") currently says the page is fully static; it should
 be scoped to www.jakob-r.de, e.g. "This applies to www.jakob-r.de. For games.jakob-r.de see section 4."
 
 ---
@@ -18,10 +18,13 @@ games.jakob-r.de runs on a server operated by me that I rent from netcup GmbH, E
 76131 Karlsruhe, Germany. The server is located in Germany. I have concluded a data processing agreement
 with netcup (Art. 28 GDPR).
 
-When you visit the site, the web server processes technically necessary data, in particular your IP
-address, date and time of the request, the requested URL and the browser identifier (user agent). This
-data is written to server log files to ensure secure operation and to analyse errors, and is deleted
-after [N] days.
+When you visit the site, your browser transmits technically necessary data, in particular your IP
+address, date and time of the request, the requested URL and the browser identifier (user agent). Your IP
+address is only used to deliver the requested content and is not stored. To ensure secure operation and to
+analyse errors, the web server keeps a log containing the date and time of the request, the requested URL
+(which may include a game room ID or the random player ID described below), the HTTP status, the amount of
+data transferred and the browser identifier. The log contains no IP addresses. Its size is limited; older
+entries are overwritten automatically.
 
 The legal basis is Art. 6(1)(f) GDPR. My legitimate interest is the secure and reliable operation of the
 website.
