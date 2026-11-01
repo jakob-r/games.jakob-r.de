@@ -256,6 +256,15 @@ def test_room_expiration_cleanup() -> None:
                     "UPDATE rooms SET status = 'playing', state = '{\"history_count\": 5}'::jsonb, updated_at = NOW() - INTERVAL '370 days' WHERE id = %s",
                     (r3,),
                 )
+                await cur.execute(
+                    """
+                    INSERT INTO player_stats (player_id, game_slug, games_played, updated_at)
+                    VALUES ('stats_old', 'sudoku', 1, NOW() - INTERVAL '370 days'),
+                           ('stats_recent', 'sudoku', 1, NOW() - INTERVAL '10 days')
+                    ON CONFLICT (player_id, game_slug)
+                    DO UPDATE SET games_played = 1, updated_at = EXCLUDED.updated_at
+                    """
+                )
             return await app.state.room_manager.cleanup_expired_rooms()
 
         assert client.portal is not None
@@ -267,7 +276,16 @@ def test_room_expiration_cleanup() -> None:
         assert client.get(f"/api/rooms/{r1}").status_code == 404
         assert client.get(f"/api/rooms/{r2}").status_code == 200
         assert client.get(f"/api/rooms/{r3}").status_code == 404
+        assert client.get("/api/players/stats_old/stats").json()["summary"]["games_completed"] == 0
+        assert client.get("/api/players/stats_recent/stats").json()["summary"]["games_completed"] == 1
         client.delete(f"/api/rooms/{r2}?player_id=u1")
+
+        async def _drop_stats() -> None:
+            pool = test_db._require_pool()
+            async with pool.connection() as conn, conn.cursor() as cur:
+                await cur.execute("DELETE FROM player_stats WHERE player_id = 'stats_recent'")
+
+        client.portal.call(_drop_stats)
 
 
 def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:

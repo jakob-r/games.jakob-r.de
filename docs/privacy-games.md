@@ -1,7 +1,7 @@
 # Draft: privacy section for games.jakob-r.de
 
 Meant to be added to https://www.jakob-r.de/privacy/ (e.g. as a new section after "3. Hosting by GitHub Pages").
-Placeholders are marked `[…]`. Section 2 ("Principles") currently says the page is fully static; it should
+Placeholders are marked `[…]`. Before publishing: conclude the AVV with netcup (customer control panel) and fill in the log retention. Section 2 ("Principles") currently says the page is fully static; it should
 be scoped to www.jakob-r.de, e.g. "This applies to www.jakob-r.de. For games.jakob-r.de see section 4."
 
 ---
@@ -14,12 +14,14 @@ games.jakob-r.de itself; no content is loaded from third-party servers.
 
 ### 4.1 Hosting and server logs
 
-games.jakob-r.de runs on a server operated by me at [hosting provider, address], located in Germany.
+games.jakob-r.de runs on a server operated by me that I rent from netcup GmbH, Emmy-Noether-Straße 10,
+76131 Karlsruhe, Germany. The server is located in Germany. I have concluded a data processing agreement
+with netcup (Art. 28 GDPR).
+
 When you visit the site, the web server processes technically necessary data, in particular your IP
 address, date and time of the request, the requested URL and the browser identifier (user agent). This
 data is written to server log files to ensure secure operation and to analyse errors, and is deleted
-after [N days]. [If applicable: I have concluded a data processing agreement with the hosting provider
-(Art. 28 GDPR).]
+after [N] days.
 
 The legal basis is Art. 6(1)(f) GDPR. My legitimate interest is the secure and reliable operation of the
 website.
@@ -39,7 +41,7 @@ The data is processed in order to provide the game you requested; the legal basi
 
 Game rooms, including the players' names and moves, are deleted automatically: rooms without any moves
 after 2 days of inactivity, all other rooms after 1 year of inactivity. The host of a room can delete it
-at any time. [Per-game statistics are deleted after … / are kept until you ask for deletion.]
+at any time. Per-game statistics are deleted automatically after 1 year without a new game.
 
 ### 4.3 Storage in your browser
 

@@ -280,6 +280,8 @@ class Database:
         Delete rooms that:
         - Have no moves and haven't been updated for > 2 days.
         - Have moves and haven't been updated for > 1 year.
+
+        Also drops per-player stats that haven't been updated for > 1 year.
         """
         pool = self._require_pool()
         has_moves_expr = """(
@@ -307,6 +309,9 @@ class Database:
         async with pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(query)
             rows = await cur.fetchall()
+            await cur.execute(
+                "DELETE FROM player_stats WHERE updated_at < NOW() - INTERVAL '1 year'"
+            )
             return [str(r["id"]) for r in rows]
 
     async def set_player_ready(self, room_id: str, player_id: str, is_ready: bool) -> None:
