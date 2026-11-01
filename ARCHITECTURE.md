@@ -83,6 +83,7 @@ To share components across games while allowing any game to be extracted and run
 - Use `repr(e)` when logging or printing exceptions.
 - Use **Psycopg 3** async pools/cursors directly rather than heavy ORMs.
 - Landing pages end with a small footer: "by jakob-r" (→ https://www.jakob-r.de/coding/), source code, license (if the repo has one), the legal notice on jakob-r.de and the own privacy page `/privacy` (games.jakob-r.de processes data differently from the static jakob-r.de, so it has its own policy; keep it in sync with data handling and the proxy log setup on the VPS: nginx-proxy `LOG_FORMAT` without `$remote_addr`, size-capped json-file logs). Game sessions (`/{slug}/{roomId}`) have no footer.
+- Share image: `og/og.html` is rendered by `make og` (headless Chrome) to `frontend/static/og.png` (1200×630) and set as `og:image`. jakob-r.de/coding uses a copy of it. Re-render when the site changes noticeably.
 
 ## Production
 

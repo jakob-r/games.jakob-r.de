@@ -1,5 +1,5 @@
 .PHONY: dev db db-down wait-db backend frontend install test check build \
-	docker-up docker-down
+	docker-up docker-down og
 
 DOCKER_COMPOSE ?= docker-compose
 
@@ -54,6 +54,14 @@ check:
 
 build:
 	cd frontend && pnpm run build
+
+CHROME ?= /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+
+# Render the share image (og:image) from og/og.html; fonts come from frontend/node_modules
+og:
+	"$(CHROME)" --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+		--window-size=1200,630 --allow-file-access-from-files \
+		--screenshot="$(CURDIR)/frontend/static/og.png" "file://$(CURDIR)/og/og.html"
 
 docker-up:
 	test -f .env || cp .env.example .env
