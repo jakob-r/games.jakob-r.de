@@ -32,7 +32,7 @@ Playing stays anonymous by default (random `player_id` in `localStorage`). Accou
 - Backend (`core/auth.py`, `auth_api.py`, `oauth.py`, `mail.py`, routes under `/api/auth`): email + password (argon2), Google OpenID Connect (authorization code + PKCE, hand-written with `httpx`; a signed `games_oauth` cookie binds the flow to the browser), email verification and password reset via single-use hashed tokens. Sessions are opaque random tokens stored hashed in `auth_sessions` (HttpOnly, SameSite=Lax cookie `games_session`, 30 days sliding, `Secure` when `PUBLIC_BASE_URL` is https) — no JWTs. Password change/reset revokes all sessions. Rate limits are in memory and keyed by email, never by IP. If Google signs in to an address that was registered but never verified, the unverified password is dropped (prevents pre-registration takeover). Deleting an account removes its stats, push subscriptions and hosted rooms.
 - CORS is limited to `PUBLIC_BASE_URL` and `http://localhost:5173` because cookies carry login state.
 - Frontend routes: `/login` (sign in / sign up / forgot), `/account`, `/verify-email`, `/reset-password` (SPA fallback, `noindex`).
-- Config via env, see `.env.example` (`PUBLIC_BASE_URL`, `AUTH_MAIL_BACKEND`, `SMTP_*`, `GOOGLE_CLIENT_*`). Not implemented: change email, Apple sign-in.
+- Mail goes out via the SMTP server of Linevast (domain registrar and email provider; named in the privacy page). Config via env, see `.env.example` (`PUBLIC_BASE_URL`, `AUTH_MAIL_BACKEND`, `SMTP_*`, `GOOGLE_CLIENT_*`). Not implemented: change email, Apple sign-in.
 
 ## Modular Structure & Standalone Extractability
 

@@ -88,7 +88,8 @@
 			If you are signed in, a session cookie (<code>games_session</code>) keeps you logged in for up to 30
 			days. It is strictly necessary for the login you requested (§ 25(2) no. 2 TDDDG). While a Google
 			sign-in is in progress, another short-lived cookie (up to 10 minutes) protects the process against
-			forgery. Confirmation and password-reset emails are sent through an email provider's SMTP server.
+			forgery. Confirmation and password-reset emails are sent through the mail server of my email provider Linevast, which also
+			registered the domain. Linevast processes the recipient address and the email content for delivery.
 		</p>
 		<p>
 			If you choose Google sign-in, your browser is redirected to Google, which processes data under its own
