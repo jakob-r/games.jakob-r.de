@@ -614,9 +614,10 @@
 											e.stopPropagation();
 											tapEmoji(si, ei);
 										}}
-										class="emoji-chip cursor-pointer rounded px-0.5 leading-none
+										aria-pressed={isActive && selectedEmoji === ei}
+										class="emoji-chip editable cursor-pointer leading-none
 										{si === 0 ? 'text-[2rem]' : 'text-[1.6rem]'}
-										{isActive && selectedEmoji === ei ? 'ring-2 ring-[#1a1917]' : ''}"
+										{isActive && selectedEmoji === ei ? 'is-selected' : ''}"
 									>
 										{emoji}
 									</button>
@@ -839,6 +840,51 @@
 	.palette-btn {
 		font-family:
 			'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', system-ui, sans-serif;
+	}
+
+	/* Same padding selected or not, so selecting never shifts the sentence. */
+	.emoji-chip.editable {
+		position: relative;
+		border-radius: 8px;
+		padding: 3px 3px 5px;
+		transition:
+			background-color 140ms ease,
+			transform 160ms cubic-bezier(0.2, 1.4, 0.4, 1);
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	.emoji-chip.editable:focus {
+		outline: none;
+	}
+
+	.emoji-chip.editable:focus-visible {
+		outline: 1.5px dashed #1a1917;
+		outline-offset: 1px;
+	}
+
+	.emoji-chip.is-selected {
+		background-color: #e6dfd0;
+		transform: translateY(-2px) scale(1.06);
+	}
+
+	/* Hand-drawn ink underline under the selected emoji. */
+	.emoji-chip.is-selected::after {
+		content: '';
+		position: absolute;
+		left: 20%;
+		right: 14%;
+		bottom: 1px;
+		height: 2.5px;
+		border-radius: 2px;
+		background: #1a1917;
+		transform: rotate(-2.5deg);
+		animation: chip-underline 180ms ease-out;
+	}
+
+	@keyframes chip-underline {
+		from {
+			transform: rotate(-2.5deg) scaleX(0);
+		}
 	}
 
 	.palette-btn {
