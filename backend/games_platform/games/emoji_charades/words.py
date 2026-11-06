@@ -444,11 +444,10 @@ _RAW_WORDS: dict[Language, dict[Category, list[str]]] = {
             "Black Mirror",
             "Grey's Anatomy|Greys Anatomy",
             "The Big Bang Theory|Big Bang Theory",
-            "Survivor",
-            "Bluey",
-            "Wednesday",
+            "Rick and Morty",
             "Family Guy",
-            "Downton Abbey",
+            "The Office",
+            "The Fresh Prince of Bel-Air"
         ],
         "quote": [
             "May the Force be with you",
