@@ -366,6 +366,10 @@ def test_ai_prompt_only_contains_visible_hints() -> None:
     assert "Tiger King" in prompt
     assert "German" in prompt
 
+    quote_view = {**view, "word": {"category": "quote"}}
+    quote_prompt = "\n".join(m["content"] for m in build_messages(quote_view))
+    assert "NOT a single word" in quote_prompt
+
     hidden = _config(mode="remote", show_category=False)
     view = GAME.get_player_view(state, hidden, AI_PLAYER_ID)
     prompt = "\n".join(m["content"] for m in build_messages(view))

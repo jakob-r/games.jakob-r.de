@@ -26,12 +26,25 @@ CATEGORY_NAMES = {
     "tv_show": "TV show",
     "quote": "famous quote or saying",
 }
+# What a complete answer looks like per category (the explained term is often not one word).
+CATEGORY_ANSWER_HINTS = {
+    "quote": (
+        "This is NOT a single word: it is a whole well-known phrase, such as a proverb, "
+        "idiom, saying or famous movie line. Each emoji sentence may stand for part of it. "
+        "Answer with the complete phrase as people commonly say it."
+    ),
+    "movie": "Answer with the full movie title as commonly known in that language.",
+    "tv_show": "Answer with the full TV show title as commonly known in that language.",
+    "person": "Answer with the person's full name.",
+    "brand": "Answer with the brand name.",
+}
 LANGUAGE_NAMES = {"de": "German", "en": "English"}
 
 SYSTEM_PROMPT = (
     "You are a player in Emoji Charades. Another player explains a secret term using only "
     "emoji sentences. The first sentence is the main concept; later sentences add details. "
     "Emojis may stand for their meaning, a sound-alike word or a syllable. "
+    "The term can be a single word, a name, a title or a whole phrase. "
     "Reply with exactly one guess: just the term itself, no explanation, no quotes, no emoji."
 )
 
@@ -56,6 +69,8 @@ def build_messages(view: dict[str, Any]) -> list[dict[str, str]]:
     lines = [f"The secret term is in {language}; answer in {language}."]
     if category:
         lines.append(f"It is a {CATEGORY_NAMES.get(category, category)}.")
+        if hint := CATEGORY_ANSWER_HINTS.get(category):
+            lines.append(hint)
     lines.append("Emoji sentences:")
     for i, sentence in enumerate(view.get("sentences") or [], start=1):
         if sentence:
