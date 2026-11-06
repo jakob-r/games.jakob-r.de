@@ -24,6 +24,7 @@ from games_platform.core.protocol import (
     CreateRoomRequest,
     GameDefinition,
     PushSubscribeRequest,
+    is_bot_id,
 )
 from games_platform.core.push import (
     MAX_PUSH_SUBSCRIPTIONS_PER_PLAYER,
@@ -375,6 +376,9 @@ def create_app(
         room = await active_db.get_room(room_id)
         if room is None or room["game_slug"] != game_slug:
             await websocket.close(code=4004, reason="Room not found")
+            return
+        if is_bot_id(player_id):
+            await websocket.close(code=4003, reason="Reserved player id")
             return
 
         conn = await manager.connect(

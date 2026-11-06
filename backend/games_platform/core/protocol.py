@@ -71,6 +71,22 @@ class GameDefinition(Protocol):
 # def on_player_removed(self, state, config, player_id: str) -> dict[str, Any]
 #     Adjust game state after a player left or was removed mid-game (after the
 #     shared turn_order fix-up).
+#
+# def get_bot_players(self, config) -> list[dict[str, str]]
+#     Server-side bot players ({player_id, name, color}; ids start with BOT_ID_PREFIX)
+#     the room should have for this config. They get a room_players row (score, player
+#     bar) but are never added to turn_order and cannot be removed by the host.
+#
+# async def bot_turn(self, room_id, state, config, bot_id: str) -> dict[str, Any] | None
+#     Called BOT_DEBOUNCE_SECONDS after the last state change by a human. Returns a
+#     game action for the bot (applied like a player action) or None. Must only look
+#     at what the bot is allowed to see (e.g. get_player_view with viewer_id=bot_id).
+
+BOT_ID_PREFIX = "ai:"
+
+
+def is_bot_id(player_id: str) -> bool:
+    return player_id.startswith(BOT_ID_PREFIX)
 
 
 # --- Client -> Server WebSocket Messages ---

@@ -24,6 +24,7 @@ from games_platform.core.protocol import (
     SetReadyMessage,
     StartGameMessage,
     UpdateConfigMessage,
+    is_bot_id,
 )
 from games_platform.core.push import WebPushService, format_turn_notification
 
@@ -32,6 +33,8 @@ logger = logging.getLogger(__name__)
 CLIENT_MESSAGE_ADAPTER: TypeAdapter[ClientMessage] = TypeAdapter(ClientMessage)
 MULTIPLIER_WINDOW_SECONDS = 10.0
 MULTIPLIER_FACTOR = 1.1
+# Bots act once the game state has been quiet (no human action) for this long.
+BOT_DEBOUNCE_SECONDS = 1.0
 
 
 def generate_room_id(length: int = 6) -> str:
@@ -74,6 +77,12 @@ class RoomManager:
         self.midgame_inactive_players: dict[str, set[str]] = {}
         self.locks: dict[str, asyncio.Lock] = {}
         self._push_tasks: set[asyncio.Task[Any]] = set()
+        # Bot players: pending debounce timer per room, rooms with a bot run in progress,
+        # rooms that changed during that run, and strong refs to all bot tasks.
+        self._bot_timers: dict[str, asyncio.Task[Any]] = {}
+        self._bot_running: set[str] = set()
+        self._bot_dirty: set[str] = set()
+        self._bot_tasks: set[asyncio.Task[Any]] = set()
 
     def mark_player_active(self, room_id: str, player_id: str) -> None:
         """Mark a player as active in a room so closing their tab won't auto-remove them."""
@@ -125,6 +134,95 @@ class RoomManager:
         if pending:
             await asyncio.gather(*pending, return_exceptions=True)
 
+    async def flush_bot_tasks(self) -> None:
+        """Wait for pending bot timers and runs. Used by tests."""
+        while pending := [task for task in self._bot_tasks if not task.done()]:
+            await asyncio.gather(*pending, return_exceptions=True)
+
+    async def _sync_bot_players(
+        self,
+        room_id: str,
+        game: GameDefinition,
+        config: dict[str, Any],
+    ) -> None:
+        """Make the room's bot rows match game.get_bot_players(config)."""
+        get_bot_players = getattr(game, "get_bot_players", None)
+        wanted = list(get_bot_players(config)) if get_bot_players is not None else []
+        wanted_ids = {bot["player_id"] for bot in wanted}
+        for row in await self.db.get_room_players(room_id):
+            if is_bot_id(row["player_id"]) and row["player_id"] not in wanted_ids:
+                await self.db.remove_room_player(room_id, row["player_id"])
+        for bot in wanted:
+            await self.db.upsert_room_player(
+                room_id=room_id,
+                player_id=bot["player_id"],
+                name=bot["name"],
+                color=bot["color"],
+            )
+            await self.db.set_player_ready(room_id, bot["player_id"], True)
+
+    def _schedule_bots(self, room_id: str, game: GameDefinition, config: dict[str, Any]) -> None:
+        """(Re)start the room's debounce timer; bots act once it runs out."""
+        get_bot_players = getattr(game, "get_bot_players", None)
+        if getattr(game, "bot_turn", None) is None or get_bot_players is None:
+            return
+        if not get_bot_players(config):
+            return
+        timer = self._bot_timers.pop(room_id, None)
+        if timer is not None:
+            timer.cancel()
+        task = asyncio.create_task(self._bot_debounce(room_id, game))
+        self._bot_timers[room_id] = task
+        self._track_bot_task(task)
+
+    def _track_bot_task(self, task: asyncio.Task[Any]) -> None:
+        self._bot_tasks.add(task)
+        task.add_done_callback(self._bot_tasks.discard)
+
+    async def _bot_debounce(self, room_id: str, game: GameDefinition) -> None:
+        await asyncio.sleep(BOT_DEBOUNCE_SECONDS)
+        # From here on a new state change must not cancel the (possibly slow) bot run.
+        if self._bot_timers.get(room_id) is asyncio.current_task():
+            del self._bot_timers[room_id]
+        if room_id in self._bot_running:
+            self._bot_dirty.add(room_id)
+            return
+        self._bot_running.add(room_id)
+        try:
+            while True:
+                self._bot_dirty.discard(room_id)
+                await self._run_bots_once(room_id, game)
+                if room_id not in self._bot_dirty:
+                    break
+        finally:
+            self._bot_running.discard(room_id)
+            self._bot_dirty.discard(room_id)
+
+    async def _run_bots_once(self, room_id: str, game: GameDefinition) -> None:
+        room = await self.db.get_room(room_id)
+        if room is None or room["status"] != "playing":
+            return
+        for bot in game.get_bot_players(room["config"]):  # type: ignore[attr-defined]
+            bot_id = bot["player_id"]
+            try:
+                # Without the room lock: the bot may take seconds (LLM call).
+                action = await game.bot_turn(  # type: ignore[attr-defined]
+                    room_id, room["state"], room["config"], bot_id
+                )
+            except Exception as e:  # noqa: BLE001 - a broken bot must not kill the room
+                logger.warning("Bot %s failed in room %s: %s", bot_id, room_id, repr(e))
+                continue
+            if action is None:
+                continue
+            async with self._get_lock(room_id):
+                fresh = await self.db.get_room(room_id)
+                if fresh is None or fresh["status"] != "playing":
+                    return
+                try:
+                    await self._handle_game_action(fresh, game, bot_id, action)
+                except ValidationError as e:
+                    logger.warning("Invalid bot action in room %s: %s", room_id, repr(e))
+
     def register_game(self, game: GameDefinition) -> None:
         self.games[game.slug] = game
 
@@ -169,6 +267,7 @@ class RoomManager:
             name=host_name,
             color=host_color,
         )
+        await self._sync_bot_players(room_id, game, config)
         return room
 
     async def delete_room(self, room_id: str, player_id: str) -> bool:
@@ -205,6 +304,8 @@ class RoomManager:
         """Remove a player while holding the room lock. Returns (removed, empty_room)."""
         room_id = room["id"]
         effective_actor = actor_id or player_id
+        if is_bot_id(player_id):
+            raise PermissionError("Turn the AI player off in the game settings instead.")
 
         if effective_actor == player_id:
             if room["host_player_id"] == player_id:
@@ -404,7 +505,8 @@ class RoomManager:
                     "name": p["name"],
                     "color": p["color"],
                     "is_ready": bool(p["is_ready"]),
-                    "is_connected": p["player_id"] in connected_ids,
+                    "is_connected": p["player_id"] in connected_ids or is_bot_id(p["player_id"]),
+                    "is_bot": is_bot_id(p["player_id"]),
                     "score": round(float(p["score"]), 2),
                     "multiplier": round(eff_mult, 4),
                     "multiplier_remaining_ms": remaining_ms,
@@ -555,6 +657,11 @@ class RoomManager:
 
             match msg:
                 case PlayerSyncMessage():
+                    if is_bot_id(msg.player_id):
+                        await conn.websocket.send_json(
+                            {"type": "error", "message": "Reserved player id."}
+                        )
+                        return
                     old_player_id = conn.player_id
                     existing_players = await self.db.get_room_players(room_id)
                     was_existing = any(
@@ -607,6 +714,7 @@ class RoomManager:
                     merged = {**room["config"], **msg.config}
                     validated = game.validate_config(merged)
                     await self.db.update_room(room_id, config=validated)
+                    await self._sync_bot_players(room_id, game, validated)
                     await self.broadcast_room_state(room_id)
 
                 case StartGameMessage():
@@ -616,8 +724,17 @@ class RoomManager:
                         )
                         return
                     self.midgame_inactive_players.pop(room_id, None)
+                    # Re-validate so a bot whose backend support went away is dropped.
+                    config = game.validate_config(room["config"])
+                    if config != room["config"]:
+                        await self.db.update_room(room_id, config=config)
+                        room = {**room, "config": config}
+                    await self._sync_bot_players(room_id, game, config)
                     players_rows = await self.db.get_room_players(room_id)
-                    player_ids = [p["player_id"] for p in players_rows]
+                    # Bots never explain or take turns.
+                    player_ids = [
+                        p["player_id"] for p in players_rows if not is_bot_id(p["player_id"])
+                    ]
                     initial_state = game.create_initial_state(
                         room["config"],
                         player_ids=player_ids,
@@ -788,6 +905,9 @@ class RoomManager:
             await self.broadcast(room_id, event)
 
         await self.broadcast_room_state(room_id)
+
+        if not is_bot_id(player_id) and new_status == "playing":
+            self._schedule_bots(room_id, game, room["config"])
 
         next_turn_player_id = (
             outcome.state.get("current_player_id")

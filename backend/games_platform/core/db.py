@@ -12,6 +12,8 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
+from games_platform.core.protocol import is_bot_id
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_DATABASE_URL = "postgresql://games:games@localhost:5434/games"
@@ -430,6 +432,8 @@ class Database:
         pool = self._require_pool()
         async with pool.connection() as conn, conn.cursor() as cur:
             for p in players:
+                if is_bot_id(p["player_id"]):
+                    continue
                 score = float(p["score"])
                 won = 1 if score >= max_score else 0
                 await cur.execute(

@@ -68,6 +68,13 @@
 			room. The data is processed to provide the game you requested; the legal basis is Art. 6(1)(b) GDPR.
 		</p>
 		<p>
+			In Emoji Charades the host can add an AI player. If they do, my server sends the emoji hints of the
+			current round, the word category (if shown) and the guesses typed so far to OpenRouter (OpenRouter,
+			Inc., USA), which forwards them to an AI model provider. Names, player IDs and other personal data are
+			not sent. Requests are only routed to providers that do not store or train on them. Nothing is sent
+			unless the AI player is turned on.
+		</p>
+		<p>
 			Game rooms, including the players' names and moves, are deleted automatically: rooms without any moves
 			after 2 days of inactivity, all other rooms after 1 year of inactivity. The host of a room can delete it
 			at any time. Per-game statistics are deleted automatically after 1 year without a new game.

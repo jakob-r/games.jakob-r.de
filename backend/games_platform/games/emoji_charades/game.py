@@ -9,7 +9,16 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field, TypeAdapter
 
+from games_platform.core.llm import llm_configured
 from games_platform.core.protocol import ActionOutcome
+from games_platform.games.emoji_charades.ai_player import (
+    AI_PLAYER_COLOR,
+    AI_PLAYER_ID,
+    AI_PLAYER_NAME,
+    ask_guess,
+    has_hints,
+    hint_signature,
+)
 from games_platform.games.emoji_charades.matching import is_close, is_match
 from games_platform.games.emoji_charades.words import (
     DEFAULT_LANGUAGE,
@@ -126,6 +135,10 @@ class EmojiCharadesGame:
         "typed guesses."
     )
 
+    def __init__(self) -> None:
+        # Per room: the hints the AI last guessed on, so it only asks again when they change.
+        self._ai_asked: dict[str, str] = {}
+
     def default_config(self) -> dict[str, Any]:
         return {
             "mode": DEFAULT_MODE,
@@ -134,6 +147,8 @@ class EmojiCharadesGame:
             "language": DEFAULT_LANGUAGE,
             "show_category": True,
             "scoring_enabled": True,
+            "ai_player": False,
+            "ai_available": llm_configured(),
         }
 
     def validate_config(self, raw_config: dict[str, Any]) -> dict[str, Any]:
@@ -152,7 +167,37 @@ class EmojiCharadesGame:
             "language": normalize_language(str(raw_config.get("language") or DEFAULT_LANGUAGE)),
             "show_category": bool(raw_config.get("show_category", True)),
             "scoring_enabled": bool(raw_config.get("scoring_enabled", True)),
+            "ai_player": bool(raw_config.get("ai_player", False)) and llm_configured(),
+            # Derived, tells the lobby whether to offer the AI toggle.
+            "ai_available": llm_configured(),
         }
+
+    def get_bot_players(self, config: dict[str, Any]) -> list[dict[str, str]]:
+        if not config.get("ai_player"):
+            return []
+        return [{"player_id": AI_PLAYER_ID, "name": AI_PLAYER_NAME, "color": AI_PLAYER_COLOR}]
+
+    async def bot_turn(
+        self,
+        room_id: str,
+        state: dict[str, Any],
+        config: dict[str, Any],
+        bot_id: str,
+    ) -> dict[str, Any] | None:
+        """Return the AI's guess action, or None when there is nothing new to guess on."""
+        view = self.get_player_view(state, config, bot_id)
+        if view.get("phase") != "explaining" or view.get("explainer_id") == bot_id:
+            return None
+        if not has_hints(view):
+            return None
+        signature = hint_signature(view)
+        if self._ai_asked.get(room_id) == signature:
+            return None
+        self._ai_asked[room_id] = signature
+        guess = await ask_guess(view)
+        if guess is None:
+            return None
+        return {"type": "guess", "text": guess}
 
     def create_initial_state(
         self,
@@ -312,7 +357,10 @@ class EmojiCharadesGame:
                 return ActionOutcome(state=next_state)
 
             case GuessAction():
-                if phase != "explaining" or is_explainer or mode != "remote":
+                # The AI player types its guesses in in-person games too.
+                if phase != "explaining" or is_explainer or (
+                    mode != "remote" and player_id != AI_PLAYER_ID
+                ):
                     return rejected("not_allowed")
                 word = next_state.get("word") or {}
                 answers = [word.get("text", ""), *word.get("aliases", [])]

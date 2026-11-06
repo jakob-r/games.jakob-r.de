@@ -9,7 +9,14 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from games_platform.core import room_manager as room_manager_module
 from games_platform.core.db import Database
+from games_platform.games.emoji_charades import game as game_module
+from games_platform.games.emoji_charades.ai_player import (
+    AI_PLAYER_ID,
+    build_messages,
+    clean_guess,
+)
 from games_platform.games.emoji_charades.game import (
     CHOICE_COUNT,
     MAX_EMOJIS_PER_SENTENCE,
@@ -327,3 +334,146 @@ def test_websocket_per_viewer_state_and_host_end_game() -> None:
             ws1.send_json({"type": "end_game"})
             assert _recv_state(ws1)["status"] == "finished"
             assert _recv_state(ws2)["status"] == "finished"
+
+
+# --- AI player ---------------------------------------------------------------------------
+
+
+def test_ai_player_needs_openrouter_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    cfg = GAME.validate_config({"ai_player": True})
+    assert cfg["ai_player"] is False
+    assert cfg["ai_available"] is False
+    assert GAME.get_bot_players(cfg) == []
+
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    cfg = GAME.validate_config({"ai_player": True})
+    assert cfg["ai_player"] is True
+    assert cfg["ai_available"] is True
+    assert [b["player_id"] for b in GAME.get_bot_players(cfg)] == [AI_PLAYER_ID]
+
+
+def test_ai_prompt_only_contains_visible_hints() -> None:
+    config = _config(mode="remote")
+    state = _explaining(config)
+    state["sentences"] = [["🦁", "👑"], [], ["🎬"]]
+    state["guesses"] = [{"player_id": "b", "text": "Tiger King", "close": False}]
+    view = GAME.get_player_view(state, config, AI_PLAYER_ID)
+    prompt = "\n".join(m["content"] for m in build_messages(view))
+    assert state["word"]["text"] not in prompt
+    assert "🦁 👑" in prompt
+    assert "3. 🎬" in prompt
+    assert "Tiger King" in prompt
+    assert "German" in prompt
+
+    hidden = _config(mode="remote", show_category=False)
+    view = GAME.get_player_view(state, hidden, AI_PLAYER_ID)
+    prompt = "\n".join(m["content"] for m in build_messages(view))
+    assert "It is a" not in prompt
+
+
+def test_clean_guess() -> None:
+    assert clean_guess('"Der König der Löwen".\nBecause lions.') == "Der König der Löwen"
+    assert clean_guess("\n  Guess: Titanic!") == "Titanic"
+    assert clean_guess("") == ""
+
+
+async def test_bot_turn_only_asks_when_hints_change(monkeypatch: pytest.MonkeyPatch) -> None:
+    game = EmojiCharadesGame()
+    asked: list[dict[str, Any]] = []
+
+    async def fake_ask(view: dict[str, Any]) -> str:
+        asked.append(view)
+        return "Titanic"
+
+    monkeypatch.setattr(game_module, "ask_guess", fake_ask)
+    config = _config(mode="remote")
+    state = _explaining(config)
+
+    assert await game.bot_turn("r1", state, config, AI_PLAYER_ID) is None  # no emojis yet
+    state["sentences"] = [["🚢", "🧊"]]
+    action = await game.bot_turn("r1", state, config, AI_PLAYER_ID)
+    assert action == {"type": "guess", "text": "Titanic"}
+    assert set(asked[0]["word"]) == {"category"}
+    assert await game.bot_turn("r1", state, config, AI_PLAYER_ID) is None  # same hints
+    state["sentences"] = [["🚢", "🧊", "💔"]]
+    assert await game.bot_turn("r1", state, config, AI_PLAYER_ID) is not None
+    assert len(asked) == 2
+
+
+def test_ai_can_guess_in_person_and_scores() -> None:
+    config = _config(mode="in_person")
+    state = _explaining(config)
+    word = state["word"]["text"]
+    human = GAME.apply_action(state, config, "b", {"type": "guess", "text": word}, 1.0)
+    assert human.state is state  # humans shout in person
+    outcome = GAME.apply_action(state, config, AI_PLAYER_ID, {"type": "guess", "text": word}, 1.0)
+    assert outcome.state["phase"] == "reveal"
+    assert outcome.state["last_result"]["winner_id"] == AI_PLAYER_ID
+    assert outcome.is_correct_entry
+
+
+def test_websocket_ai_player_guesses_after_quiet_second(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(room_manager_module, "BOT_DEBOUNCE_SECONDS", 0.05)
+    secret: dict[str, str] = {}
+    seen_views: list[dict[str, Any]] = []
+
+    async def fake_ask(view: dict[str, Any]) -> str:
+        seen_views.append(view)
+        return secret["word"]
+
+    monkeypatch.setattr(game_module, "ask_guess", fake_ask)
+    app = create_app(database=Database())
+
+    with TestClient(app) as client:
+        room = client.post(
+            "/api/rooms",
+            json={
+                "game_slug": "emoji-charades",
+                "host_player_id": "host_ai1",
+                "host_name": "Anna",
+                "config": {"mode": "remote", "ai_player": True},
+            },
+        ).json()
+        room_id = room["room_id"]
+        ai_row = next(p for p in room["players"] if p["player_id"] == AI_PLAYER_ID)
+        assert ai_row["is_bot"] and ai_row["is_ready"] and ai_row["is_connected"]
+        assert client.delete(
+            f"/api/rooms/{room_id}/players/{AI_PLAYER_ID}", params={"actor_id": "host_ai1"}
+        ).status_code == 403
+
+        url = f"/ws/emoji-charades/{room_id}?player_id=host_ai1&name=Anna&color=%232563eb"
+        with client.websocket_connect(url) as ws:
+            _recv_state(ws)
+            ws.send_json({"type": "start_game"})
+            started = _recv_state(ws)
+            assert started["state"]["turn_order"] == ["host_ai1"]
+            assert started["state"]["explainer_id"] == "host_ai1"
+
+            ws.send_json({"type": "game_action", "action": {"type": "choose_word", "index": 0}})
+            secret["word"] = _recv_state(ws)["state"]["word"]["text"]
+            ws.send_json(
+                {"type": "game_action", "action": {"type": "set_sentences", "sentences": [["⭐"]]}}
+            )
+            _recv_state(ws)
+
+            ended = ws.receive_json()
+            while ended["type"] != "round_ended":
+                ended = ws.receive_json()
+            assert ended["winner_id"] == AI_PLAYER_ID
+            final = _recv_state(ws)
+            scores = {p["player_id"]: p["score"] for p in final["players"]}
+            assert scores[AI_PLAYER_ID] == 1
+            assert len(seen_views) == 1
+            assert seen_views[0]["word"].get("text") is None
+
+        # Turning the AI off in the lobby removes its row.
+        url = f"/ws/emoji-charades/{room_id}?player_id=host_ai1&name=Anna&color=%232563eb"
+        with client.websocket_connect(url) as ws:
+            _recv_state(ws)
+            ws.send_json({"type": "return_to_lobby"})
+            _recv_state(ws)
+            ws.send_json({"type": "update_config", "config": {"ai_player": False}})
+            lobby = _recv_state(ws)
+            assert all(p["player_id"] != AI_PLAYER_ID for p in lobby["players"])

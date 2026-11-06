@@ -63,7 +63,8 @@
 		{#each players as p (p.player_id)}
 			{@const pColor = resolvePlayerColor(p.player_id, myPlayerId, myColor, players)}
 			{@const isTurn = showTurnBadge && p.player_id === currentPlayerId}
-			{@const canRemove = isHost && p.player_id !== myPlayerId && Boolean(onRemovePlayer)}
+			{@const canRemove =
+				isHost && p.player_id !== myPlayerId && !p.is_bot && Boolean(onRemovePlayer)}
 			{@const multRatio = showMultiplier ? getMultiplierRemainingRatio(p) : 0}
 			{@const liveMult = showMultiplier ? getLiveMultiplier(p) : 1}
 

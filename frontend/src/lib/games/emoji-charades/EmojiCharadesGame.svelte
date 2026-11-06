@@ -74,6 +74,8 @@
 	let cfgLanguage = $derived(String(room?.config?.language ?? 'de'));
 	let cfgShowCategory = $derived(Boolean(room?.config?.show_category ?? true));
 	let cfgScoring = $derived(Boolean(room?.config?.scoring_enabled ?? true));
+	let cfgAiPlayer = $derived(Boolean(room?.config?.ai_player ?? false));
+	let cfgAiAvailable = $derived(Boolean(room?.config?.ai_available ?? false));
 
 	let phase = $derived(gameState.phase ?? 'choosing');
 	let explainerId = $derived(gameState.explainer_id ?? null);
@@ -109,6 +111,8 @@
 		return Math.max(0, Date.parse(gameState.deadline) - (nowMs + clockOffsetMs));
 	});
 	let otherPlayers = $derived(players.filter((p) => p.player_id !== profile.playerId));
+	// The AI types its guesses, so the in-person award chips only list humans.
+	let awardablePlayers = $derived(otherPlayers.filter((p) => !p.is_bot));
 	let sortedPlayers = $derived([...players].sort((a, b) => b.score - a.score));
 
 	let nextExplainer = $derived(players.find((p) => p.player_id === currentPlayerId) ?? null);
@@ -447,6 +451,26 @@
 				</button>
 			</div>
 
+			{#if cfgAiAvailable}
+				<div class="flex items-center justify-between border-t border-[#1a1917]/15 pt-3">
+					<div>
+						<div class="text-xs font-semibold uppercase">AI player</div>
+						<div class="text-xs text-[#6e6a63]">
+							Guesses along from the same emojis everyone sees. Never explains.
+						</div>
+					</div>
+					<button
+						type="button"
+						disabled={!isHost}
+						onclick={() => updateConfig({ ai_player: !cfgAiPlayer })}
+						class="cursor-pointer rounded border border-[#1a1917] px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed
+						{cfgAiPlayer ? 'bg-[#1a1917] text-[#faf8f4]' : 'bg-[#faf8f4] text-[#6e6a63]'}"
+					>
+						{cfgAiPlayer ? 'On' : 'Off'}
+					</button>
+				</div>
+			{/if}
+
 			<div class="flex items-center justify-between border-t border-[#1a1917]/15 pt-3">
 				<div>
 					<div class="text-xs font-semibold uppercase">Scoring</div>
@@ -773,7 +797,7 @@
 							Who guessed it?
 						</div>
 						<div class="flex flex-wrap gap-1.5">
-							{#each otherPlayers as p (p.player_id)}
+							{#each awardablePlayers as p (p.player_id)}
 								<button
 									type="button"
 									onclick={() => client.sendAction({ type: 'award', player_id: p.player_id })}
@@ -824,7 +848,7 @@
 				</p>
 			{/if}
 
-			{#if cfgMode === 'remote' && guesses.length > 0}
+			{#if guesses.length > 0}
 				<div class="border-[1.6px] border-[#1a1917] bg-[#faf8f4] px-3 py-2.5">
 					<div class="mb-1.5 text-[11px] font-semibold tracking-wide text-[#6e6a63] uppercase">
 						Guesses

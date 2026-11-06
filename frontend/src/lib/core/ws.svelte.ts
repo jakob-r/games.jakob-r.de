@@ -4,6 +4,8 @@ export interface PlayerInfo {
 	color: string;
 	is_ready: boolean;
 	is_connected: boolean;
+	/** Server-side bot player (e.g. the Emoji Charades AI); cannot be removed. */
+	is_bot?: boolean;
 	score: number;
 	multiplier: number;
 	multiplier_remaining_ms: number;

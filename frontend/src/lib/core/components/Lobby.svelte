@@ -100,7 +100,8 @@
 		<ul class="divide-y divide-[#1a1917]/10">
 			{#each players as player (player.player_id)}
 				{@const displayColor = resolvePlayerColor(player.player_id, myPlayerId, myColor, players)}
-				{@const canRemove = isHost && player.player_id !== myPlayerId && Boolean(onRemovePlayer)}
+				{@const canRemove =
+					isHost && player.player_id !== myPlayerId && !player.is_bot && Boolean(onRemovePlayer)}
 				<li class="flex items-center justify-between py-2.5">
 					<div class="flex items-center gap-2.5">
 						<span
