@@ -102,6 +102,20 @@ def test_player_view_hides_word_and_choices_from_guessers() -> None:
     assert GAME.get_player_view(outcome.state, config, "b")["word"]["text"] == word["text"]
 
 
+def test_category_can_be_hidden_from_guessers() -> None:
+    config = _config(show_category=False)
+    assert config["show_category"] is False
+    assert GAME.validate_config({})["show_category"] is True
+
+    state = _explaining(config)
+    category = state["word"]["category"]
+    assert GAME.get_player_view(state, config, "b")["word"] == {"category": None}
+    assert GAME.get_player_view(state, config, "a")["word"]["category"] == category
+
+    revealed = GAME.apply_action(state, config, "a", {"type": "give_up"}, 1.0).state
+    assert GAME.get_player_view(revealed, config, "b")["last_result"]["category"] == category
+
+
 def test_remote_round_wrong_close_and_correct_guess() -> None:
     config = _config(mode="remote")
     state = _explaining(config)

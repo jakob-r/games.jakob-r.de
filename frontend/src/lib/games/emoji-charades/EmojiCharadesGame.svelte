@@ -72,6 +72,7 @@
 	let cfgTimed = $derived(Boolean(room?.config?.timed ?? false));
 	let cfgSeconds = $derived(Number(room?.config?.round_seconds ?? 120));
 	let cfgLanguage = $derived(String(room?.config?.language ?? 'de'));
+	let cfgShowCategory = $derived(Boolean(room?.config?.show_category ?? true));
 	let cfgScoring = $derived(Boolean(room?.config?.scoring_enabled ?? true));
 
 	let phase = $derived(gameState.phase ?? 'choosing');
@@ -155,6 +156,10 @@
 
 	function categoryLabel(id: string | null | undefined): string {
 		return id ? (WORD_CATEGORY_LABELS[id] ?? id) : '';
+	}
+
+	function indefiniteArticle(word: string): string {
+		return /^[aeiou]/i.test(word) ? 'an' : 'a';
 	}
 
 	function formatClock(ms: number): string {
@@ -428,6 +433,22 @@
 
 			<div class="flex items-center justify-between border-t border-[#1a1917]/15 pt-3">
 				<div>
+					<div class="text-xs font-semibold uppercase">Category hint</div>
+					<div class="text-xs text-[#6e6a63]">Guessers see "Movie Title", "Animal", …</div>
+				</div>
+				<button
+					type="button"
+					disabled={!isHost}
+					onclick={() => updateConfig({ show_category: !cfgShowCategory })}
+					class="cursor-pointer rounded border border-[#1a1917] px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed
+					{cfgShowCategory ? 'bg-[#1a1917] text-[#faf8f4]' : 'bg-[#faf8f4] text-[#6e6a63]'}"
+				>
+					{cfgShowCategory ? 'Shown' : 'Hidden'}
+				</button>
+			</div>
+
+			<div class="flex items-center justify-between border-t border-[#1a1917]/15 pt-3">
+				<div>
 					<div class="text-xs font-semibold uppercase">Scoring</div>
 					<div class="text-xs text-[#6e6a63]">+1 for the correct guess.</div>
 				</div>
@@ -555,9 +576,15 @@
 					{#if amExplainer}
 						Explain:
 						<strong class="text-[#1a1917]">{gameState.word?.text}</strong>
+						{#if gameState.word?.category}
+							({categoryLabel(gameState.word.category)})
+						{/if}
+					{:else if gameState.word?.category}
+						{@const label = categoryLabel(gameState.word.category)}
+						{playerName(explainerId)} explains {indefiniteArticle(label)}
+						<strong class="text-[#1a1917]">{label}</strong>
 					{:else}
-						{playerName(explainerId)} explains a
-						<strong class="text-[#1a1917]">{categoryLabel(gameState.word?.category)}</strong>
+						{playerName(explainerId)} is explaining…
 					{/if}
 				</span>
 				{#if remainingMs !== null}

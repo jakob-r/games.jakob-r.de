@@ -132,6 +132,7 @@ class EmojiCharadesGame:
             "timed": False,
             "round_seconds": DEFAULT_ROUND_SECONDS,
             "language": DEFAULT_LANGUAGE,
+            "show_category": True,
             "scoring_enabled": True,
         }
 
@@ -149,6 +150,7 @@ class EmojiCharadesGame:
             "timed": bool(raw_config.get("timed", False)),
             "round_seconds": round_seconds,
             "language": normalize_language(str(raw_config.get("language") or DEFAULT_LANGUAGE)),
+            "show_category": bool(raw_config.get("show_category", True)),
             "scoring_enabled": bool(raw_config.get("scoring_enabled", True)),
         }
 
@@ -186,7 +188,6 @@ class EmojiCharadesGame:
         config: dict[str, Any],
         viewer_id: str | None,
     ) -> dict[str, Any]:
-        _ = config
         view = dict(state)
         view.pop("used_words", None)
         is_explainer = viewer_id is not None and viewer_id == state.get("explainer_id")
@@ -194,8 +195,9 @@ class EmojiCharadesGame:
             view["choices"] = []
             word = state.get("word")
             if word is not None and state.get("phase") != "reveal":
-                # Guessers get the category as a hint, never the answer.
-                view["word"] = {"category": word.get("category")}
+                # Guessers never get the answer; the category is an optional hint.
+                show_category = bool(config.get("show_category", True))
+                view["word"] = {"category": word.get("category") if show_category else None}
         return view
 
     def get_public_view(self, state: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:

@@ -88,6 +88,7 @@ export const GAMES: GameInfo[] = [
 			timed: false,
 			round_seconds: 120,
 			language: 'de',
+			show_category: true,
 			scoring_enabled: true
 		},
 		createLabel: 'New Emoji Charades →'
