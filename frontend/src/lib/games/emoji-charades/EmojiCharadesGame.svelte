@@ -685,22 +685,32 @@
 			{#if amExplainer}
 				<!-- Emoji palette -->
 				<div class="border-[1.6px] border-[#1a1917] bg-[#faf8f4]">
-					<div class="flex overflow-x-auto border-b border-[#1a1917]/20" role="tablist">
+					<!-- One even row of tabs; labels only where they fit (sm+), otherwise a caption. -->
+					<div
+						class="grid border-b border-[#1a1917]/20"
+						style="grid-template-columns: repeat({EMOJI_CATEGORIES.length}, minmax(0, 1fr));"
+						role="tablist"
+					>
 						{#each EMOJI_CATEGORIES as cat (cat.id)}
 							<button
 								type="button"
 								role="tab"
 								aria-selected={activeCategory === cat.id}
+								aria-label={cat.label}
+								title={cat.label}
 								onclick={() => (activeCategory = cat.id)}
-								class="flex shrink-0 cursor-pointer flex-col items-center px-2.5 py-1.5 text-[10px]
+								class="flex min-w-0 cursor-pointer flex-col items-center py-1.5 text-[10px]
 								{activeCategory === cat.id
 									? 'bg-[#1a1917] text-[#faf8f4]'
 									: 'text-[#6e6a63] hover:bg-[#f2eee6]'}"
 							>
 								<span class="text-lg leading-none">{cat.icon}</span>
-								{cat.label}
+								<span class="hidden max-w-full truncate sm:block">{cat.label}</span>
 							</button>
 						{/each}
+					</div>
+					<div class="px-2 pt-1.5 text-[10px] tracking-wide text-[#6e6a63] uppercase sm:hidden">
+						{category.label}
 					</div>
 					<div class="overflow-y-auto p-2" use:fillViewport>
 						{#if 'pairs' in category}
