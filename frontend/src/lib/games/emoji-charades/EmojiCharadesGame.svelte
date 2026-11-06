@@ -177,7 +177,8 @@
 		const at = selectedEmoji === null ? line.length : selectedEmoji + 1;
 		const nextLine = [...line.slice(0, at), emoji, ...line.slice(at)];
 		pushDraft(draft.map((s, i) => (i === activeSentence ? nextLine : s)));
-		if (selectedEmoji !== null) selectedEmoji = at;
+		// Select the new emoji so ⌫ removes it and the next one goes right after it.
+		selectedEmoji = at;
 	}
 
 	function removeSelected() {
