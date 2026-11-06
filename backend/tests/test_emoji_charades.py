@@ -374,6 +374,11 @@ def test_ai_prompt_only_contains_visible_hints() -> None:
     view = GAME.get_player_view(state, hidden, AI_PLAYER_ID)
     prompt = "\n".join(m["content"] for m in build_messages(view))
     assert "It is a" not in prompt
+    # Category hint off: the AI must not learn that the term is a quote either.
+    state["word"] = {**state["word"], "category": "quote"}
+    view = GAME.get_player_view(state, hidden, AI_PLAYER_ID)
+    prompt = "\n".join(m["content"] for m in build_messages(view))
+    assert "NOT a single word" not in prompt
 
 
 def test_clean_guess() -> None:
