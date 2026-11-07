@@ -142,4 +142,32 @@ If the round is timed also the explainer gets a point.
 - People can join the game at any time.
 - The host can end the game at any time and the final scores are shown.
 
+### Spellsprawl
+
+A multiplayer word spelling game with an infinite grid and endless allowed words and letters.
+Inspired by scrabble but you only get points for reusing letters.
+
+- The game is played in rounds.
+- The grid where the letters are placed is infinite.
+- 1 to 8 players.
+- Main player can select end condition:
+  * 50 Words played
+  * First player to reach 500 points wins.
+  * As soon as the grid takes more then 500 square units the game ends. (Counting max height * max width = number of square units of grid)
+- Dictionary uses a shared component with silbenstreit.
+- Letter scoring is shared with silbenstreit.
+- Scoring:
+  * A new word itself does not score points.
+  * Only the letters that are already on the grid score points.
+
+UX:
+- Letters are entered using system keyboard.
+- You can select the first cell and select if your typing will go right or down.
+- After putting two letters your direction is locked to horizontal or vertical.
+- Diagonal words are not allowed.
+- It should be easy to edit your current word.
+- Option to cancel the current word or submit it.
+
+
+
 
