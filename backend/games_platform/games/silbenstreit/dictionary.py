@@ -1,167 +1,37 @@
-"""Language dictionaries, letter rarity scores (1-10), and syllable-based board generation."""
+"""Syllable-based board generation for Silbenstreit (dictionary lives in core.dictionary)."""
 
 from __future__ import annotations
 
 import functools
 import random
-import unicodedata
 from dataclasses import dataclass
 
 from wordfreq import top_n_list, zipf_frequency
 
-SUPPORTED_LANGUAGES: tuple[str, ...] = ("de", "en", "fr", "es")
-DEFAULT_LANGUAGE = "de"
+from games_platform.core.dictionary import (
+    DEFAULT_LANGUAGE,
+    LETTER_SCORES,
+    SUPPORTED_LANGUAGES,
+    get_letter_score,
+    get_wordlist,
+    is_valid_word,
+    normalize_language,
+    normalize_word_forms,
+)
+
+__all__ = [
+    "DEFAULT_LANGUAGE",
+    "LETTER_SCORES",
+    "SUPPORTED_LANGUAGES",
+    "generate_board",
+    "get_letter_score",
+    "get_wordlist",
+    "is_valid_word",
+    "normalize_language",
+    "normalize_word_forms",
+]
 
 VOWELS = frozenset("AEIOU")
-
-# Integer rarity scores between 1 and 10 per language (higher = rarer letter).
-LETTER_SCORES: dict[str, dict[str, int]] = {
-    "en": {
-        "E": 1,
-        "A": 1,
-        "I": 1,
-        "O": 1,
-        "N": 1,
-        "R": 1,
-        "T": 1,
-        "L": 2,
-        "S": 2,
-        "U": 2,
-        "D": 2,
-        "G": 3,
-        "B": 3,
-        "C": 3,
-        "M": 3,
-        "P": 3,
-        "F": 4,
-        "H": 4,
-        "V": 5,
-        "W": 5,
-        "Y": 5,
-        "K": 6,
-        "J": 8,
-        "X": 8,
-        "Q": 10,
-        "Z": 10,
-    },
-    "de": {
-        "E": 1,
-        "N": 1,
-        "S": 1,
-        "I": 1,
-        "R": 1,
-        "T": 1,
-        "U": 1,
-        "A": 1,
-        "D": 2,
-        "H": 2,
-        "G": 2,
-        "L": 2,
-        "O": 2,
-        "M": 3,
-        "B": 3,
-        "W": 3,
-        "Z": 3,
-        "C": 4,
-        "F": 4,
-        "K": 4,
-        "P": 4,
-        "V": 6,
-        "J": 6,
-        "X": 8,
-        "Y": 10,
-        "Q": 10,
-    },
-    "fr": {
-        "E": 1,
-        "A": 1,
-        "I": 1,
-        "S": 1,
-        "N": 1,
-        "R": 1,
-        "T": 1,
-        "O": 1,
-        "L": 2,
-        "U": 2,
-        "D": 2,
-        "C": 3,
-        "M": 3,
-        "P": 3,
-        "G": 4,
-        "B": 4,
-        "V": 4,
-        "H": 5,
-        "F": 5,
-        "Q": 7,
-        "Y": 8,
-        "X": 8,
-        "J": 8,
-        "K": 10,
-        "W": 10,
-        "Z": 10,
-    },
-    "es": {
-        "E": 1,
-        "A": 1,
-        "O": 1,
-        "S": 1,
-        "R": 1,
-        "N": 1,
-        "I": 1,
-        "D": 2,
-        "L": 2,
-        "C": 2,
-        "T": 2,
-        "U": 2,
-        "M": 3,
-        "P": 3,
-        "B": 3,
-        "G": 4,
-        "V": 4,
-        "Y": 5,
-        "Q": 6,
-        "H": 6,
-        "F": 6,
-        "Z": 7,
-        "J": 8,
-        "X": 8,
-        "K": 10,
-        "W": 10,
-    },
-}
-
-# Standard valid 2-letter words per language to ensure classic Scrabble-style short plays work reliably.
-EXTRA_VALID_WORDS: dict[str, tuple[str, ...]] = {
-    "en": (
-        "AA", "AB", "AD", "AE", "AG", "AH", "AI", "AL", "AM", "AN", "AR", "AS", "AT", "AW", "AX", "AY",
-        "BA", "BE", "BI", "BO", "BY", "DA", "DE", "DO", "ED", "EF", "EH", "EL", "EM", "EN", "ER", "ES",
-        "ET", "EW", "EX", "FA", "FE", "GI", "GO", "HA", "HE", "HI", "HM", "HO", "ID", "IF", "IN", "IS",
-        "IT", "JO", "KA", "KI", "LA", "LI", "LO", "MA", "ME", "MI", "MM", "MO", "MU", "MY", "NA", "NE",
-        "NO", "NU", "OD", "OE", "OF", "OH", "OI", "OK", "OM", "ON", "OP", "OR", "OS", "OW", "OX", "OY",
-        "PA", "PE", "PI", "PO", "QI", "RE", "SH", "SI", "SO", "TA", "TE", "TI", "TO", "UH", "UM", "UN",
-        "UP", "US", "UT", "WE", "WO", "XI", "XU", "YA", "YE", "YO", "ZA",
-    ),
-    "de": (
-        "AB", "AI", "AM", "AN", "AS", "AU", "BI", "DA", "DU", "EI", "ER", "ES", "ET", "EX", "FA", "GO",
-        "HA", "HE", "HI", "HM", "HO", "HU", "IM", "IN", "JA", "JE", "JO", "LA", "MI", "MY", "NA", "NE",
-        "NO", "NU", "OB", "OD", "OH", "OK", "ON", "OP", "OS", "PI", "PO", "QI", "RE", "SO", "TU", "UI",
-        "UL", "UM", "UN", "UR", "UZ", "WO", "XI", "YL", "ZU",
-    ),
-    "fr": (
-        "AA", "AH", "AI", "AN", "AS", "AU", "AY", "BI", "BU", "CA", "CE", "CI", "DA", "DE", "DO", "DU",
-        "EH", "EN", "ES", "ET", "EU", "EX", "FA", "FI", "GO", "HA", "HE", "HI", "HO", "IF", "IL", "IN",
-        "JE", "KA", "LA", "LE", "LI", "LU", "MA", "ME", "MI", "MU", "NA", "NE", "NI", "NO", "NU", "OC",
-        "OH", "OM", "ON", "OR", "OS", "OU", "PI", "PU", "QI", "RA", "RE", "RI", "RU", "SA", "SE", "SI",
-        "SU", "TA", "TE", "TI", "TU", "UN", "US", "UT", "VA", "VE", "VS", "VU", "WU", "XI",
-    ),
-    "es": (
-        "AH", "AL", "AR", "AS", "AY", "CA", "CE", "DA", "DE", "DI", "DO", "EA", "EH", "EL", "EN", "ES",
-        "ET", "EX", "FA", "FE", "FU", "GE", "HA", "HE", "HI", "ID", "IR", "JA", "JE", "JI", "JO", "JU",
-        "KA", "LA", "LE", "LO", "ME", "MI", "MU", "NA", "NI", "NO", "OA", "OC", "OH", "OI", "OS", "OX",
-        "PA", "PE", "PI", "PO", "PU", "RO", "SE", "SI", "SO", "SU", "TA", "TE", "TI", "TU", "UF", "UH",
-        "UN", "VA", "VE", "VI", "YA", "YO",
-    ),
-}
 
 # Fallback syllables per length and language to ensure rich pools for every length 2..4.
 FALLBACK_SYLLABLES: dict[str, tuple[str, ...]] = {
@@ -196,61 +66,6 @@ FALLBACK_SYLLABLES: dict[str, tuple[str, ...]] = {
 class SyllablePool:
     by_length: dict[int, tuple[tuple[str, ...], tuple[float, ...]]]
     rare_by_length: dict[int, tuple[tuple[str, ...], tuple[float, ...]]]
-
-
-def normalize_language(lang: str | None) -> str:
-    if not lang:
-        return DEFAULT_LANGUAGE
-    cleaned = lang.strip().lower()
-    if cleaned in SUPPORTED_LANGUAGES:
-        return cleaned
-    return DEFAULT_LANGUAGE
-
-
-def get_letter_score(letter: str, language: str) -> int:
-    lang = normalize_language(language)
-    scores = LETTER_SCORES.get(lang, LETTER_SCORES[DEFAULT_LANGUAGE])
-    return scores.get(letter.upper(), 1)
-
-
-def _strip_accents(raw: str) -> str:
-    decomposed = unicodedata.normalize("NFKD", raw)
-    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
-
-
-def normalize_word_forms(raw_word: str, language: str) -> list[str]:
-    """
-    Convert a dictionary token into valid uppercase A-Z forms.
-    For German, both stripped-umlaut (BÄR -> BAR) and digraph-expanded (BÄR -> BAER, ß -> SS)
-    forms are accepted if purely alphabetical A-Z.
-    """
-    lowered = raw_word.strip().lower()
-    if not lowered or len(lowered) < 2:
-        return []
-
-    candidates: set[str] = set()
-
-    # Standard accent-stripped form (with ß -> ss and œ -> oe, æ -> ae)
-    base_replaced = (
-        lowered.replace("ß", "ss")
-        .replace("œ", "oe")
-        .replace("æ", "ae")
-    )
-    stripped = _strip_accents(base_replaced).upper()
-    if len(stripped) >= 2 and stripped.isascii() and stripped.isalpha():
-        candidates.add(stripped)
-
-    if language == "de" and any(ch in lowered for ch in ("ä", "ö", "ü")):
-        expanded = (
-            base_replaced.replace("ä", "ae")
-            .replace("ö", "oe")
-            .replace("ü", "ue")
-        )
-        expanded_clean = _strip_accents(expanded).upper()
-        if len(expanded_clean) >= 2 and expanded_clean.isascii() and expanded_clean.isalpha():
-            candidates.add(expanded_clean)
-
-    return list(candidates)
 
 
 def extract_syllables(word: str) -> list[str]:
@@ -337,34 +152,6 @@ def extract_syllables(word: str) -> list[str]:
         valid.append(syl)
 
     return valid
-
-
-@functools.lru_cache(maxsize=8)
-def get_wordlist(language: str) -> frozenset[str]:
-    """Load and cache the normalized uppercase A-Z dictionary for a language."""
-    lang = normalize_language(language)
-    words: set[str] = set(EXTRA_VALID_WORDS.get(lang, ()))
-
-    raw_tokens = top_n_list(lang, 75000)
-    for token in raw_tokens:
-        if not token.isalpha():
-            continue
-        # For 2-letter words from noisy web corpora, require higher Zipf frequency unless in EXTRA_VALID_WORDS
-        if len(token) == 2 and zipf_frequency(token, lang) < 4.3:
-            continue
-        for form in normalize_word_forms(token, lang):
-            if 2 <= len(form) <= 15:
-                words.add(form)
-
-    return frozenset(words)
-
-
-def is_valid_word(word: str, language: str) -> bool:
-    """Return True if `word` (2+ uppercase A-Z letters) is in the language dictionary."""
-    cleaned = word.strip().upper()
-    if len(cleaned) < 2 or not cleaned.isascii() or not cleaned.isalpha():
-        return False
-    return cleaned in get_wordlist(language)
 
 
 @functools.lru_cache(maxsize=8)
