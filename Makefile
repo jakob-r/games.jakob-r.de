@@ -1,5 +1,5 @@
 .PHONY: dev db db-down wait-db backend frontend install test check build \
-	docker-up docker-down og
+	docker-up docker-down og locations
 
 DOCKER_COMPOSE ?= docker-compose
 
@@ -54,6 +54,11 @@ check:
 
 build:
 	cd frontend && pnpm run build
+
+# Regenerate North South Sort locations from Wikidata (+ LLM curation if OPENROUTER_API_KEY is set).
+# Pass options via ARGS, e.g. make locations ARGS="--only event"
+locations:
+	cd backend && uv run python -m games_platform.games.north_south_sort.generate_locations $(ARGS)
 
 CHROME ?= /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 

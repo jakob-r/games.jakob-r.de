@@ -25,7 +25,12 @@ def llm_configured() -> bool:
     return bool(os.environ.get("OPENROUTER_API_KEY", "").strip())
 
 
-async def chat(messages: list[dict[str, Any]], *, max_tokens: int = 64) -> str:
+async def chat(
+    messages: list[dict[str, Any]],
+    *,
+    max_tokens: int = 64,
+    timeout: httpx.Timeout = LLM_TIMEOUT,
+) -> str:
     """Send a chat completion request and return the answer text."""
     api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     if not api_key:
@@ -42,7 +47,7 @@ async def chat(messages: list[dict[str, Any]], *, max_tokens: int = 64) -> str:
         "provider": {"data_collection": "deny"},
     }
     try:
-        async with httpx.AsyncClient(timeout=LLM_TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
                 f"{base_url}/chat/completions",
                 json=body,
