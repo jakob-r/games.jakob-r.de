@@ -8,6 +8,12 @@
  */
 const SERVER_ORIGIN: string = (import.meta.env.VITE_SERVER_ORIGIN ?? '').replace(/\/+$/, '');
 
+/**
+ * True when the page runs on a different origin than the API (native shell). The
+ * SameSite=Lax session cookie does not work there, so auth uses a bearer token instead.
+ */
+export const crossOrigin = SERVER_ORIGIN !== '';
+
 /** Absolute URL for an API path like `/api/rooms` (relative when same-origin). */
 export function apiUrl(path: string): string {
 	return `${SERVER_ORIGIN}${path}`;

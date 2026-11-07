@@ -5,7 +5,7 @@ import time
 from collections import defaultdict, deque
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, EmailStr, Field
 
@@ -94,14 +94,40 @@ def _clear_session_cookie(response: Response) -> None:
     response.delete_cookie(SESSION_COOKIE, path="/", httponly=True, samesite="lax")
 
 
+# Native shells (Capacitor, page origin capacitor://localhost) cannot use the SameSite=Lax
+# cookie. They send this header and get the session token in the JSON body instead, then
+# authenticate with `Authorization: Bearer <token>`. Browsers keep the HttpOnly cookie.
+TOKEN_TRANSPORT_HEADER = "X-Session-Transport"
+
+
+def _wants_token(request: Request) -> bool:
+    return request.headers.get(TOKEN_TRANSPORT_HEADER, "").lower() == "token"
+
+
+def _session_raw(request: Request) -> str | None:
+    """Session token from the cookie, or else from an `Authorization: Bearer` header."""
+    if raw := request.cookies.get(SESSION_COOKIE):
+        return raw
+    scheme, _, token = request.headers.get("Authorization", "").partition(" ")
+    if scheme.lower() == "bearer" and token.strip():
+        return token.strip()
+    return None
+
+
+def _issue_session(request: Request, response: Response, raw: str) -> dict[str, str]:
+    """Hand a new session to the client: as body field for native shells, else as cookie."""
+    if _wants_token(request):
+        return {"session_token": raw}
+    _set_session_cookie(response, raw)
+    return {}
+
+
 def create_auth_router(service: AuthService) -> APIRouter:
     router = APIRouter(prefix="/api/auth", tags=["auth"])
     limiter = RateLimiter()
 
-    async def optional_user(
-        raw: str | None = Cookie(default=None, alias=SESSION_COOKIE),
-    ) -> dict[str, Any] | None:
-        return await service.user_for_session(raw)
+    async def optional_user(request: Request) -> dict[str, Any] | None:
+        return await service.user_for_session(_session_raw(request))
 
     async def require_user(
         user: Annotated[dict[str, Any] | None, Depends(optional_user)],
@@ -110,9 +136,9 @@ def create_auth_router(service: AuthService) -> APIRouter:
             raise HTTPException(status_code=401, detail="Not signed in")
         return user
 
-    async def _login(response: Response, user: dict[str, Any]) -> dict[str, Any]:
-        _set_session_cookie(response, await service.create_session(user["id"]))
-        return public_user(user)
+    async def _login(request: Request, response: Response, user: dict[str, Any]) -> dict[str, Any]:
+        raw = await service.create_session(user["id"])
+        return {**public_user(user), **_issue_session(request, response, raw)}
 
     @router.get("/providers")
     async def providers() -> dict[str, bool]:
@@ -123,7 +149,7 @@ def create_auth_router(service: AuthService) -> APIRouter:
         return {"user": public_user(user) if user else None}
 
     @router.post("/register")
-    async def register(body: RegisterBody, response: Response) -> dict[str, Any]:
+    async def register(body: RegisterBody, request: Request, response: Response) -> dict[str, Any]:
         limiter.check("register", 30)
         limiter.check(f"register:{body.email.lower()}", 5, 3600)
         try:
@@ -133,22 +159,20 @@ def create_auth_router(service: AuthService) -> APIRouter:
         except AuthError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
         await service.send_token_email("email_verification", user)
-        return await _login(response, user)
+        return await _login(request, response, user)
 
     @router.post("/login")
-    async def login(body: LoginBody, response: Response) -> dict[str, Any]:
+    async def login(body: LoginBody, request: Request, response: Response) -> dict[str, Any]:
         limiter.check("login", 120)
         limiter.check(f"login:{body.email.lower()}", 10, 300)
         user = await service.authenticate(body.email, body.password)
         if user is None:
             raise HTTPException(status_code=401, detail="Wrong email or password")
-        return await _login(response, user)
+        return await _login(request, response, user)
 
     @router.post("/logout", status_code=204)
-    async def logout(
-        response: Response, raw: str | None = Cookie(default=None, alias=SESSION_COOKIE)
-    ) -> None:
-        await service.delete_session(raw)
+    async def logout(request: Request, response: Response) -> None:
+        await service.delete_session(_session_raw(request))
         _clear_session_cookie(response)
 
     @router.post("/verify-email")
@@ -258,6 +282,7 @@ def create_auth_router(service: AuthService) -> APIRouter:
     @router.post("/account/password")
     async def change_password(
         body: PasswordBody,
+        request: Request,
         response: Response,
         user: Annotated[dict[str, Any], Depends(require_user)],
     ) -> dict[str, str]:
@@ -266,9 +291,9 @@ def create_auth_router(service: AuthService) -> APIRouter:
             await service.change_password(user, body.current_password, body.new_password)
         except AuthError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
-        # All sessions were revoked; keep this browser signed in.
-        _set_session_cookie(response, await service.create_session(user["id"]))
-        return {"message": "Password updated."}
+        # All sessions were revoked; keep this browser (or app) signed in.
+        raw = await service.create_session(user["id"])
+        return {"message": "Password updated.", **_issue_session(request, response, raw)}
 
     @router.post("/account/delete", status_code=204)
     async def delete_account(

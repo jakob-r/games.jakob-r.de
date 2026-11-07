@@ -1,5 +1,38 @@
 import { profile } from './profile.svelte';
-import { apiUrl } from './server';
+import { apiUrl, crossOrigin } from './server';
+
+// Cross-origin (native shell) only: the session token the server hands out in the JSON body
+// when asked via `X-Session-Transport: token`. Browsers use the HttpOnly cookie and never
+// see the token.
+const SESSION_TOKEN_KEY = 'games_session_token';
+
+function readSessionToken(): string | null {
+	try {
+		return localStorage.getItem(SESSION_TOKEN_KEY);
+	} catch {
+		return null;
+	}
+}
+
+function writeSessionToken(token: string | null): void {
+	try {
+		if (token) localStorage.setItem(SESSION_TOKEN_KEY, token);
+		else localStorage.removeItem(SESSION_TOKEN_KEY);
+	} catch {
+		// storage unavailable: the session just won't survive a restart
+	}
+}
+
+function authHeaders(hasBody: boolean): Record<string, string> {
+	const headers: Record<string, string> = {};
+	if (hasBody) headers['Content-Type'] = 'application/json';
+	if (crossOrigin) {
+		headers['X-Session-Transport'] = 'token';
+		const token = readSessionToken();
+		if (token) headers['Authorization'] = `Bearer ${token}`;
+	}
+	return headers;
+}
 
 export interface AccountUser {
 	id: number;
@@ -24,10 +57,14 @@ export async function authRequest<T = unknown>(
 	try {
 		const res = await fetch(apiUrl(`/api/auth${path}`), {
 			method,
-			headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+			headers: authHeaders(body !== undefined),
 			body: body === undefined ? undefined : JSON.stringify(body)
 		});
 		const data = res.status === 204 ? null : await res.json().catch(() => null);
+		if (crossOrigin && typeof data?.session_token === 'string') {
+			writeSessionToken(data.session_token);
+			delete data.session_token;
+		}
 		if (!res.ok) {
 			const detail = data?.detail;
 			const error =
@@ -55,7 +92,8 @@ class AuthStore {
 			authRequest<{ google: boolean }>('/providers', undefined, 'GET')
 		]);
 		this.googleEnabled = providers.data?.google ?? false;
-		this.setUser(me.data?.user ?? null);
+		// Only a real answer signs out (and drops a stored token); a network error keeps it.
+		if (me.ok) this.setUser(me.data?.user ?? null);
 		this.loaded = true;
 	}
 
@@ -66,8 +104,10 @@ class AuthStore {
 		if (user) {
 			profile.setPlayerId(user.player_id);
 			if (user.name) profile.setName(user.name);
-		} else if (wasSignedIn) {
-			profile.resetAnonymous();
+		} else {
+			// Signed out, account deleted or the token expired: drop a stale token.
+			writeSessionToken(null);
+			if (wasSignedIn) profile.resetAnonymous();
 		}
 	}
 

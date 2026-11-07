@@ -211,3 +211,51 @@ def test_mail_console_backend_does_not_raise(caplog: pytest.LogCaptureFixture) -
     import asyncio
 
     asyncio.run(mail.send_email(to="a@example.com", subject="s", body="b"))
+
+
+def test_token_transport_for_native_clients(client: TestClient, sent: list[dict[str, str]]) -> None:
+    """Native shells get the session token in the body and authenticate with a bearer header."""
+    email = _email()
+    native = {"X-Session-Transport": "token"}
+    res = client.post(
+        "/api/auth/register",
+        json={"email": email, "password": "hunter2hunter2", "name": "Nat", "player_id": None},
+        headers=native,
+    )
+    assert res.status_code == 200
+    token = res.json()["session_token"]
+    assert "games_session" not in res.cookies
+    client.cookies.clear()
+
+    bearer = {**native, "Authorization": f"Bearer {token}"}
+    assert client.get("/api/auth/me").json()["user"] is None
+    assert client.get("/api/auth/me", headers=bearer).json()["user"]["email"] == email
+
+    # Password change revokes all sessions and hands out a fresh token.
+    changed = client.post(
+        "/api/auth/account/password",
+        json={"current_password": "hunter2hunter2", "new_password": "correct-horse-battery"},
+        headers=bearer,
+    )
+    assert changed.status_code == 200
+    new_token = changed.json()["session_token"]
+    assert client.get("/api/auth/me", headers=bearer).json()["user"] is None
+    bearer = {**native, "Authorization": f"Bearer {new_token}"}
+    assert client.get("/api/auth/me", headers=bearer).json()["user"]["email"] == email
+
+    assert client.post("/api/auth/logout", headers=bearer).status_code == 204
+    assert client.get("/api/auth/me", headers=bearer).json()["user"] is None
+
+    # Login in token mode; browsers (no header) still get the cookie and no token.
+    login = client.post(
+        "/api/auth/login",
+        json={"email": email, "password": "correct-horse-battery"},
+        headers=native,
+    )
+    assert login.json()["session_token"]
+    client.cookies.clear()
+    browser = client.post(
+        "/api/auth/login", json={"email": email, "password": "correct-horse-battery"}
+    )
+    assert "session_token" not in browser.json()
+    assert client.get("/api/auth/me").json()["user"]["email"] == email
