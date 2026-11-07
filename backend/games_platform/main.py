@@ -36,6 +36,7 @@ from games_platform.games.emoji_charades.game import emoji_charades_game
 from games_platform.games.kaesekaestchen.game import kaesekaestchen_game
 from games_platform.games.minesweeper.game import minesweeper_game
 from games_platform.games.silbenstreit.game import silbenstreit_game
+from games_platform.games.spellsprawl.game import spellsprawl_game
 from games_platform.games.sudoku.game import sudoku_game
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ ALL_GAMES: dict[str, GameDefinition] = {
     minesweeper_game.slug: minesweeper_game,
     silbenstreit_game.slug: silbenstreit_game,
     emoji_charades_game.slug: emoji_charades_game,
+    spellsprawl_game.slug: spellsprawl_game,
 }
 
 
