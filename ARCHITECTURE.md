@@ -70,8 +70,9 @@ To share components across games while allowing any game to be extracted and run
      - `standalone.py`: Standalone FastAPI entrypoint (`uv run uvicorn games_platform.games.minesweeper.standalone:app`).
    - **Frontend (`frontend/src/lib/games/minesweeper/`)**:
      - `MinesweeperGame.svelte`: Mobile-first dig/flag modes, long-press flagging, player-colored flags, boom FX on mine hits, and challenge confirm for opponent flags.
+   - **Shared dictionary (`backend/games_platform/core/dictionary.py`)**: `wordfreq`-backed word lists (`de`, `en`, `fr`, `es`, normalized to A–Z), `is_valid_word`, and per-language `1–10` letter rarity scores (`LETTER_SCORES`, `get_letter_score`). Used by Silbenstreit and Spellsprawl.
    - **Backend (`backend/games_platform/games/silbenstreit/`)**:
-     - `dictionary.py`: `wordfreq`-backed dictionary validation, per-language `1–10` letter rarity scores, and syllable-sampled board generator (`4×4` to `8×8` in `de`, `en`, `fr`, `es`) ensuring orthographic clusters like `QU` stay accompanied.
+     - `dictionary.py`: Re-exports the shared dictionary and adds the syllable-sampled board generator (`4×4` to `8×8` in `de`, `en`, `fr`, `es`) ensuring orthographic clusters like `QU` stay accompanied.
      - `game.py`: `SilbenstreitGame` implementing `GameDefinition` (round-based word submission, tile ownership transfer, `extra_score_deltas` board-ownership scoring, orthogonal tile protection, and word reuse prevention).
      - `standalone.py`: Standalone FastAPI entrypoint (`uv run uvicorn games_platform.games.silbenstreit.standalone:app`).
    - **Frontend (`frontend/src/lib/games/silbenstreit/`)**:
@@ -86,6 +87,14 @@ To share components across games while allowing any game to be extracted and run
    - **Frontend (`frontend/src/lib/games/emoji-charades/`)**:
      - `emojis.ts`: The tunable emoji palette (Concepts and Actions as antonym pairs; People, Things, Shapes, Colors, Foods, Animals, Countries as lists).
      - `EmojiCharadesGame.svelte`: Word picker, multi-sentence emoji editor (tap to select, move, delete; add/remove sentences), guess input with close hints, in-person award chips, reveal card, and host end-game.
+
+   - **Backend (`backend/games_platform/games/spellsprawl/`)**:
+     - `board.py`: Pure logic for the sparse infinite grid (`cells` keyed `"row,col"`, coordinates clamped to ±1000): placement geometry (one line, gaps only filled by existing letters), main word as the full run, Scrabble-style cross-words, score = rarity of pre-existing letters in main + cross-words, and bounding-box area.
+     - `game.py`: `SpellsprawlGame` (1–8 players, round-based via `turn_order`, all formed words must be in the dictionary, main words cannot repeat, islands allowed, pass turn; ends on `words` / `points` / `area` targets or when everyone passed twice). State includes `letter_scores` so the client can preview points.
+     - `standalone.py`: Standalone FastAPI entrypoint.
+   - **Frontend (`frontend/src/lib/games/spellsprawl/`)**:
+     - `board.ts`: Client mirror of the run/cross-word logic for the live preview only (server stays authoritative).
+     - `SpellsprawlGame.svelte`: Scrollable/zoomable grid (bounding box + margin, padded to fill the viewport; letters absolutely positioned over a CSS grid background, taps hit-tested by coordinates). Typing goes through an off-screen `<input>` (system keyboard on mobile; input diffed against a one-space sentinel so Android virtual keyboards work). Tap a cell to start, tap it again or use →/↓ to switch direction (locked after two new letters); typing a letter equal to an existing cell consumes it, otherwise existing cells are skipped; tap a pending letter to overwrite, Backspace / Escape / Enter.
 
 `ActionOutcome.extra_score_deltas` lets a single action credit other players (minesweeper flag challenges); `RoomManager` applies those deltas after the actor's score update.
 

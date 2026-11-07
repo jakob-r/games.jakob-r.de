@@ -152,6 +152,41 @@
 			filter="url(#scribble-filter)"
 		/>
 	</svg>
+{:else if slug === 'spellsprawl'}
+	<svg
+		class={className}
+		viewBox="0 0 48 48"
+		fill="none"
+		role="img"
+		aria-hidden={titleAttr ? undefined : true}
+		aria-label={titleAttr}
+	>
+		{#if titleAttr}<title>{titleAttr}</title>{/if}
+		<!-- Crossing letter tiles sprawling off the edge -->
+		{#each [[4, 18, 'W'], [14, 18, 'O'], [24, 18, 'R'], [34, 18, 'D'], [24, 8, 'A'], [24, 28, 'N'], [24, 38, 'T']] as [x, y, ch] (`${x},${y}`)}
+			<rect
+				{x}
+				{y}
+				width="9.5"
+				height="9.5"
+				stroke="#1a1917"
+				stroke-width="1.4"
+				fill={x === 24 && y === 18 ? '#1a1917' : '#faf8f4'}
+				fill-opacity={x === 24 && y === 18 ? 0.16 : 1}
+				filter="url(#scribble-filter)"
+			/>
+			<text
+				x={Number(x) + 4.75}
+				y={Number(y) + 7.6}
+				text-anchor="middle"
+				font-family="Arial, sans-serif"
+				font-size="7"
+				font-weight="600"
+				fill="#1a1917">{ch}</text
+			>
+		{/each}
+		<path d="M44 22.5h3M44 25h2" stroke="#1a1917" stroke-width="1.2" stroke-linecap="round" opacity="0.5" />
+	</svg>
 {:else if slug === 'emoji-charades'}
 	<svg
 		class={className}

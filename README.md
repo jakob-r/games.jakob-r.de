@@ -25,6 +25,7 @@
 - **Co-op Minesweeper** — dig and flag the same minefield together
 - **Silbenstreit** — claim letter tiles with words, steal, and surround
 - **Emoji Charades** — explain words, movies, and quotes with emojis; play in person or remotely
+- **Spellsprawl** — spell words on an endless grid where only reused letters score
 
 ## Use it
 

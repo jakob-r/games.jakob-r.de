@@ -5,7 +5,8 @@ export type GameSlug =
 	| 'kaesekaestchen'
 	| 'minesweeper'
 	| 'silbenstreit'
-	| 'emoji-charades';
+	| 'emoji-charades'
+	| 'spellsprawl';
 
 export interface GameInfo {
 	slug: GameSlug;
@@ -92,6 +93,18 @@ export const GAMES: GameInfo[] = [
 			scoring_enabled: true
 		},
 		createLabel: 'New Emoji Charades →'
+	},
+	{
+		slug: 'spellsprawl',
+		title: 'Spellsprawl',
+		tagline: 'Spell words on an endless grid — only reused letters score.',
+		description:
+			'A 1–8 player word game on an infinite grid. Type words across or down anywhere, Scrabble-style, in German, English, French, or Spanish. New letters score nothing: only letters already on the grid count, so weave your words through rare letters. Play to 50 words, 500 points, or until the grid sprawls past 500 cells.',
+		playersLabel: '1–8',
+		playersAria: '1 to 8 players',
+		boxSeed: 51,
+		defaultConfig: { language: 'de', end_condition: 'words', end_target: 50 },
+		createLabel: 'New Spellsprawl →'
 	}
 ];
 

@@ -32,6 +32,8 @@
 			size?: number;
 			language?: string;
 			mode?: string;
+			end_condition?: string;
+			end_target?: number;
 		};
 		score: number;
 		player_count: number;
@@ -186,6 +188,17 @@
 			const sz = item.config?.size ?? 5;
 			const lang = (item.config?.language ?? 'de').toUpperCase();
 			return `${sz}×${sz} • ${lang}`;
+		}
+		if (item.game_slug === 'spellsprawl') {
+			const lang = (item.config?.language ?? 'de').toUpperCase();
+			const target = item.config?.end_target ?? 50;
+			const end =
+				item.config?.end_condition === 'points'
+					? `${target} pts`
+					: item.config?.end_condition === 'area'
+						? `grid ${target}`
+						: `${target} words`;
+			return `${lang} • ${end}`;
 		}
 		if (item.game_slug === 'emoji-charades') {
 			const mode = item.config?.mode === 'remote' ? 'Remote' : 'In person';
