@@ -1,3 +1,5 @@
+import { apiUrl } from './server';
+
 const STORAGE_KEY = 'games_turn_notifications_v1';
 
 /** Page title owned by the turn bell. Route heads fall back when this is null. */
@@ -169,7 +171,7 @@ export class TurnNotificationController {
 			const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
 			await navigator.serviceWorker.ready;
 
-			const keyRes = await fetch('/api/notifications/vapid-public-key');
+			const keyRes = await fetch(apiUrl('/api/notifications/vapid-public-key'));
 			if (!keyRes.ok) {
 				this.pushSubscribed = false;
 				return false;
@@ -203,7 +205,7 @@ export class TurnNotificationController {
 			}
 
 			const subRes = await fetch(
-				`/api/rooms/${encodeURIComponent(this.roomId)}/notifications/subscribe`,
+				apiUrl(`/api/rooms/${encodeURIComponent(this.roomId)}/notifications/subscribe`),
 				{
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
@@ -241,7 +243,7 @@ export class TurnNotificationController {
 
 		try {
 			await fetch(
-				`/api/rooms/${encodeURIComponent(this.roomId)}/notifications/subscribe?player_id=${encodeURIComponent(this.playerId)}${endpointParam}`,
+				apiUrl(`/api/rooms/${encodeURIComponent(this.roomId)}/notifications/subscribe?player_id=${encodeURIComponent(this.playerId)}${endpointParam}`),
 				{ method: 'DELETE' }
 			);
 		} catch {

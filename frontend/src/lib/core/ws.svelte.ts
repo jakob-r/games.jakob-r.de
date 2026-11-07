@@ -1,3 +1,5 @@
+import { apiUrl, wsUrl } from './server';
+
 export interface PlayerInfo {
 	player_id: string;
 	name: string;
@@ -208,13 +210,12 @@ export class RoomSocketClient {
 			}
 		}
 
-		const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 		const query = new URLSearchParams({
 			player_id: this.playerId,
 			name: this.playerName,
 			color: this.playerColor
 		});
-		const url = `${protocol}//${window.location.host}/ws/${this.gameSlug}/${this.roomId}?${query.toString()}`;
+		const url = wsUrl(`/ws/${this.gameSlug}/${this.roomId}?${query.toString()}`);
 
 		const socket = new WebSocket(url);
 		this.ws = socket;
@@ -321,7 +322,7 @@ export class RoomSocketClient {
 	async removePlayer(targetPlayerId: string): Promise<boolean> {
 		if (!this.roomId || !this.playerId) return false;
 		const res = await fetch(
-			`/api/rooms/${encodeURIComponent(this.roomId)}/players/${encodeURIComponent(targetPlayerId)}?actor_id=${encodeURIComponent(this.playerId)}`,
+			apiUrl(`/api/rooms/${encodeURIComponent(this.roomId)}/players/${encodeURIComponent(targetPlayerId)}?actor_id=${encodeURIComponent(this.playerId)}`),
 			{ method: 'DELETE' }
 		);
 		return res.ok;

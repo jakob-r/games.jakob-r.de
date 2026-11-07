@@ -6,6 +6,7 @@
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
 	import { auth, authRequest, type AccountUser } from '$lib/core/auth.svelte';
 	import { profile } from '$lib/core/profile.svelte';
+	import { apiUrl } from '$lib/core/server';
 
 	type Mode = 'login' | 'register' | 'forgot';
 
@@ -25,7 +26,7 @@
 		mode === 'register' ? 'Create account' : mode === 'forgot' ? 'Reset password' : 'Sign in'
 	);
 	const googleHref = $derived(
-		`/api/auth/oauth/google/start?next=${encodeURIComponent(next)}&player_id=${encodeURIComponent(profile.playerId)}`
+		apiUrl(`/api/auth/oauth/google/start?next=${encodeURIComponent(next)}&player_id=${encodeURIComponent(profile.playerId)}`)
 	);
 
 	onMount(() => {

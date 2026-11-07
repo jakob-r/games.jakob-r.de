@@ -1,4 +1,5 @@
 import { profile } from './profile.svelte';
+import { apiUrl } from './server';
 
 export interface AccountUser {
 	id: number;
@@ -21,7 +22,7 @@ export async function authRequest<T = unknown>(
 	method: 'GET' | 'POST' = 'POST'
 ): Promise<ApiResult<T>> {
 	try {
-		const res = await fetch(`/api/auth${path}`, {
+		const res = await fetch(apiUrl(`/api/auth${path}`), {
 			method,
 			headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
 			body: body === undefined ? undefined : JSON.stringify(body)

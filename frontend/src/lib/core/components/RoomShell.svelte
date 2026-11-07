@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { profile } from '$lib/core/profile.svelte';
+	import { apiUrl, currentPublicUrl } from '$lib/core/server';
 	import type { PlayerInfo, RoomSocketClient } from '$lib/core/ws.svelte';
 	import DeleteRoomModal from './DeleteRoomModal.svelte';
 	import Lobby from './Lobby.svelte';
@@ -45,7 +46,7 @@
 		deletingRoom = true;
 		try {
 			const res = await fetch(
-				`/api/rooms/${encodeURIComponent(roomId)}?player_id=${encodeURIComponent(profile.playerId)}`,
+				apiUrl(`/api/rooms/${encodeURIComponent(roomId)}?player_id=${encodeURIComponent(profile.playerId)}`),
 				{ method: 'DELETE' }
 			);
 			if (res.ok) {
@@ -63,7 +64,7 @@
 		leavingRoom = true;
 		try {
 			const res = await fetch(
-				`/api/rooms/${encodeURIComponent(roomId)}/players/${encodeURIComponent(profile.playerId)}`,
+				apiUrl(`/api/rooms/${encodeURIComponent(roomId)}/players/${encodeURIComponent(profile.playerId)}`),
 				{ method: 'DELETE' }
 			);
 			if (res.ok) {
@@ -78,7 +79,7 @@
 	async function copyRoomLink() {
 		if (typeof navigator === 'undefined' || typeof window === 'undefined') return;
 		try {
-			await navigator.clipboard.writeText(window.location.href);
+			await navigator.clipboard.writeText(currentPublicUrl());
 			copiedRoomLink = true;
 			setTimeout(() => (copiedRoomLink = false), 2000);
 		} catch {

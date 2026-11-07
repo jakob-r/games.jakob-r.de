@@ -30,7 +30,7 @@ General product concept lives in `idea.md`.
 Playing stays anonymous by default (random `player_id` in `localStorage`). Accounts are additive: `users.player_id` is the stable id, so stats and recent rooms follow the account. Sign-up adopts the browser's current anonymous id unless taken; after login the frontend (`auth.svelte.ts`) switches `profile.playerId` to the account's id and generates a fresh anonymous id on sign-out.
 
 - Backend (`core/auth.py`, `auth_api.py`, `oauth.py`, `mail.py`, routes under `/api/auth`): email + password (argon2), Google OpenID Connect (authorization code + PKCE, hand-written with `httpx`; a signed `games_oauth` cookie binds the flow to the browser), email verification and password reset via single-use hashed tokens. Sessions are opaque random tokens stored hashed in `auth_sessions` (HttpOnly, SameSite=Lax cookie `games_session`, 30 days sliding, `Secure` when `PUBLIC_BASE_URL` is https) — no JWTs. Password change/reset revokes all sessions. Rate limits are in memory and keyed by email, never by IP. If Google signs in to an address that was registered but never verified, the unverified password is dropped (prevents pre-registration takeover). Deleting an account removes its stats, push subscriptions and hosted rooms.
-- CORS is limited to `PUBLIC_BASE_URL` and `http://localhost:5173` because cookies carry login state.
+- CORS is limited to `PUBLIC_BASE_URL`, `http://localhost:5173` and the comma-separated `CORS_EXTRA_ORIGINS` (e.g. `capacitor://localhost`) because cookies carry login state. The `SameSite=Lax` session cookie is not sent from a native shell's origin, so a native app will need token auth (not implemented yet).
 - Frontend routes: `/login` (sign in / sign up / forgot), `/account`, `/verify-email`, `/reset-password` (SPA fallback, `noindex`).
 - Mail goes out via the SMTP server of Linevast (domain registrar and email provider; named in the privacy page). Config via env, see `.env.example` (`PUBLIC_BASE_URL`, `AUTH_MAIL_BACKEND`, `SMTP_*`, `GOOGLE_CLIENT_*`). Not implemented: change email, Apple sign-in.
 
@@ -51,6 +51,7 @@ To share components across games while allowing any game to be extracted and run
      - `profile.svelte.ts`: Player profile store (`localStorage` UUID, name configuration tracking, and primary color).
      - `color.ts`: Perceptual OKLCH similarity check and preset-palette `opponent_color(my_color, their_color)` resolver.
      - `ws.svelte.ts`: Auto-reconnecting typed WebSocket client.
+     - `server.ts`: `apiUrl`, `wsUrl`, `publicUrl`/`currentPublicUrl`. All API, WebSocket and share-link URLs go through it. Empty `VITE_SERVER_ORIGIN` (default) keeps them same-origin; a native shell (planned Capacitor iOS app, page origin `capacitor://localhost`) builds with `VITE_SERVER_ORIGIN=https://games.jakob-r.de` so it talks to the same server and shares the same rooms as web players.
      - `notifications.svelte.ts` + `static/sw.js`: Opt-in turn notifications combining the client `Notification` API, tab title `🔔` indicator, and Service Worker Web Push subscriptions.
      - `components/`: `ScribblyBox.svelte`, `ScribblyButton.svelte`, `ProfileBadge.svelte`, `NamePromptModal.svelte`, `RemovePlayerModal.svelte`, `PlayerBar.svelte`, `TurnNotificationBell.svelte`, `RoomShell.svelte`, and shared `Lobby.svelte`.
 2. **Self-Contained Game Modules (`games/<slug>`)**:
@@ -104,6 +105,7 @@ To share components across games while allowing any game to be extracted and run
 - Use `repr(e)` when logging or printing exceptions.
 - Use **Psycopg 3** async pools/cursors directly rather than heavy ORMs.
 - Landing pages end with a small footer: "by jakob-r" (→ https://www.jakob-r.de/coding/), source code, license (if the repo has one), the legal notice on jakob-r.de and the own privacy page `/privacy` (games.jakob-r.de processes data differently from the static jakob-r.de, so it has its own policy; keep it in sync with data handling and the proxy log setup on the VPS: nginx-proxy `LOG_FORMAT` without `$remote_addr`, size-capped json-file logs). Game sessions (`/{slug}/{roomId}`) have no footer.
+- PWA: `static/manifest.webmanifest` (standalone, served as `application/manifest+json`) plus `icon-192/512.png`, `apple-touch-icon.png` and `favicon.png`, all rendered from `og/icon.html` by `make icons`. Home-screen install also enables Web Push on iOS 16.4+.
 - Share image: `og/og.html` is rendered by `make og` (headless Chrome) to `frontend/static/og.png` (1200×630) and set as `og:image`. jakob-r.de/coding uses a copy of it. Re-render when the site changes noticeably.
 
 ## Production

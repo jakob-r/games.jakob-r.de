@@ -1,5 +1,5 @@
 .PHONY: dev db db-down wait-db backend frontend install test check build \
-	docker-up docker-down og
+	docker-up docker-down og icons
 
 DOCKER_COMPOSE ?= docker-compose
 
@@ -62,6 +62,15 @@ og:
 	"$(CHROME)" --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
 		--window-size=1200,630 --allow-file-access-from-files \
 		--screenshot="$(CURDIR)/frontend/static/og.png" "file://$(CURDIR)/og/og.html"
+
+# Render the PWA / home-screen icons from og/icon.html
+icons:
+	"$(CHROME)" --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+		--window-size=512,512 --allow-file-access-from-files \
+		--screenshot="$(CURDIR)/frontend/static/icon-512.png" "file://$(CURDIR)/og/icon.html"
+	sips -z 192 192 frontend/static/icon-512.png --out frontend/static/icon-192.png >/dev/null
+	sips -z 180 180 frontend/static/icon-512.png --out frontend/static/apple-touch-icon.png >/dev/null
+	sips -z 32 32 frontend/static/icon-512.png --out frontend/static/favicon.png >/dev/null
 
 docker-up:
 	test -f .env || cp .env.example .env

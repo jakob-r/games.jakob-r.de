@@ -8,6 +8,7 @@
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
 	import { auth } from '$lib/core/auth.svelte';
 	import { profile } from '$lib/core/profile.svelte';
+	import { apiUrl } from '$lib/core/server';
 	import {
 		GAMES,
 		SITE_ORIGIN,
@@ -80,8 +81,8 @@
 		if (!profile.playerId) return;
 		try {
 			const [recentRes, statsRes] = await Promise.all([
-				fetch(`/api/players/${encodeURIComponent(profile.playerId)}/recent`),
-				fetch(`/api/players/${encodeURIComponent(profile.playerId)}/stats`)
+				fetch(apiUrl(`/api/players/${encodeURIComponent(profile.playerId)}/recent`)),
+				fetch(apiUrl(`/api/players/${encodeURIComponent(profile.playerId)}/stats`))
 			]);
 			if (recentRes.ok) {
 				recentRooms = await recentRes.json();
@@ -97,7 +98,7 @@
 
 	async function loadPlayCounts() {
 		try {
-			const res = await fetch('/api/games');
+			const res = await fetch(apiUrl('/api/games'));
 			if (!res.ok) return;
 			const games: { slug: string; play_count?: number }[] = await res.json();
 			playCounts = Object.fromEntries(games.map((g) => [g.slug, g.play_count ?? 0]));
@@ -116,7 +117,7 @@
 		if (creatingSlug) return;
 		creatingSlug = game.slug;
 		try {
-			const res = await fetch('/api/rooms', {
+			const res = await fetch(apiUrl('/api/rooms'), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -142,7 +143,7 @@
 		const code = joinCode.trim().toLowerCase().replace(/^#/, '');
 		if (!code) return;
 		try {
-			const res = await fetch(`/api/rooms/${encodeURIComponent(code)}`);
+			const res = await fetch(apiUrl(`/api/rooms/${encodeURIComponent(code)}`));
 			if (res.ok) {
 				const room = await res.json();
 				await goto(`/${room.game_slug}/${room.room_id}`);
@@ -159,7 +160,7 @@
 		deletingRoomId = roomId;
 		try {
 			const res = await fetch(
-				`/api/rooms/${encodeURIComponent(roomId)}?player_id=${encodeURIComponent(profile.playerId)}`,
+				apiUrl(`/api/rooms/${encodeURIComponent(roomId)}?player_id=${encodeURIComponent(profile.playerId)}`),
 				{ method: 'DELETE' }
 			);
 			if (res.ok) {
@@ -181,7 +182,7 @@
 		leavingRoomId = roomId;
 		try {
 			const res = await fetch(
-				`/api/rooms/${encodeURIComponent(roomId)}/players/${encodeURIComponent(profile.playerId)}`,
+				apiUrl(`/api/rooms/${encodeURIComponent(roomId)}/players/${encodeURIComponent(profile.playerId)}`),
 				{ method: 'DELETE' }
 			);
 			if (res.ok) {

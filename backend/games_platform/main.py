@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import mimetypes
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -41,6 +42,9 @@ from games_platform.games.sudoku.game import sudoku_game
 
 logger = logging.getLogger(__name__)
 
+# Not in every system mime database; browsers expect this type for the PWA manifest.
+mimetypes.add_type("application/manifest+json", ".webmanifest")
+
 ALL_GAMES: dict[str, GameDefinition] = {
     sudoku_game.slug: sudoku_game,
     kaesekaestchen_game.slug: kaesekaestchen_game,
@@ -49,6 +53,12 @@ ALL_GAMES: dict[str, GameDefinition] = {
     emoji_charades_game.slug: emoji_charades_game,
     spellsprawl_game.slug: spellsprawl_game,
 }
+
+
+def _extra_cors_origins() -> list[str]:
+    """Extra origins from `CORS_EXTRA_ORIGINS` (comma separated), e.g. `capacitor://localhost` for a native shell."""
+    raw = os.environ.get("CORS_EXTRA_ORIGINS", "")
+    return [origin.strip().rstrip("/") for origin in raw.split(",") if origin.strip()]
 
 
 def _mount_static(app: FastAPI) -> None:
@@ -150,7 +160,7 @@ def create_app(
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=sorted({public_base_url(), "http://localhost:5173"}),
+        allow_origins=sorted({public_base_url(), "http://localhost:5173", *_extra_cors_origins()}),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

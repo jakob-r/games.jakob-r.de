@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { resolvePlayerColor } from '$lib/core/color';
 	import type { PlayerInfo } from '$lib/core/ws.svelte';
+	import { currentPublicUrl } from '$lib/core/server';
 	import RemovePlayerModal from './RemovePlayerModal.svelte';
 	import ScribblyBox from './ScribblyBox.svelte';
 	import ScribblyButton from './ScribblyButton.svelte';
@@ -37,7 +38,7 @@
 
 	let me = $derived(players.find((p) => p.player_id === myPlayerId));
 	let isHost = $derived(hostPlayerId === myPlayerId);
-	let shareUrl = $derived(typeof window !== 'undefined' ? window.location.href : '');
+	let shareUrl = $derived(typeof window !== 'undefined' ? currentPublicUrl() : '');
 	let activePlayerToRemove = $derived(
 		playerToRemove ? (players.find((p) => p.player_id === playerToRemove?.player_id) ?? null) : null
 	);
@@ -45,7 +46,7 @@
 	async function copyInviteUrl() {
 		if (typeof navigator === 'undefined') return;
 		try {
-			await navigator.clipboard.writeText(window.location.href);
+			await navigator.clipboard.writeText(currentPublicUrl());
 			copied = true;
 			setTimeout(() => (copied = false), 2000);
 		} catch {

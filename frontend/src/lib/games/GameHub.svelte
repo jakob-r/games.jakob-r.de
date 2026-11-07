@@ -7,6 +7,7 @@
 	import ScribblyBox from '$lib/core/components/ScribblyBox.svelte';
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
 	import { profile } from '$lib/core/profile.svelte';
+	import { apiUrl } from '$lib/core/server';
 	import {
 		SITE_ORIGIN,
 		type GameInfo,
@@ -66,7 +67,7 @@
 		if (!profile.playerId) return;
 		try {
 			const res = await fetch(
-				`/api/players/${encodeURIComponent(profile.playerId)}/recent`
+				apiUrl(`/api/players/${encodeURIComponent(profile.playerId)}/recent`)
 			);
 			if (!res.ok) return;
 			const rooms: RecentRoom[] = await res.json();
@@ -88,7 +89,7 @@
 		creating = true;
 		createError = null;
 		try {
-			const res = await fetch('/api/rooms', {
+			const res = await fetch(apiUrl('/api/rooms'), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -118,7 +119,7 @@
 		deletingRoomId = roomId;
 		try {
 			const res = await fetch(
-				`/api/rooms/${encodeURIComponent(roomId)}?player_id=${encodeURIComponent(profile.playerId)}`,
+				apiUrl(`/api/rooms/${encodeURIComponent(roomId)}?player_id=${encodeURIComponent(profile.playerId)}`),
 				{ method: 'DELETE' }
 			);
 			if (res.ok) {
@@ -139,7 +140,7 @@
 		leavingRoomId = roomId;
 		try {
 			const res = await fetch(
-				`/api/rooms/${encodeURIComponent(roomId)}/players/${encodeURIComponent(profile.playerId)}`,
+				apiUrl(`/api/rooms/${encodeURIComponent(roomId)}/players/${encodeURIComponent(profile.playerId)}`),
 				{ method: 'DELETE' }
 			);
 			if (res.ok) {
