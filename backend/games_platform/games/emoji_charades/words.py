@@ -158,7 +158,7 @@ _RAW_WORDS: dict[Language, dict[Category, list[str]]] = {
             "Rentier",
             "Libelle",
             "Glühwürmchen",
-            "Murmeltier",
+            "Kugelfisch",
             "Luchs",
             "Wiesel",
             "Walross",
