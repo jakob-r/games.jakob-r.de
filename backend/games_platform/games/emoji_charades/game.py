@@ -199,6 +199,10 @@ class EmojiCharadesGame:
             return None
         return {"type": "guess", "text": guess}
 
+    def bot_action_is_stale(self, before: dict[str, Any], now: dict[str, Any]) -> bool:
+        """True when the clues changed while the AI was guessing on the old ones."""
+        return hint_signature(before) != hint_signature(now)
+
     def create_initial_state(
         self,
         config: dict[str, Any],

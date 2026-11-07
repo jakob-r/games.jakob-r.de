@@ -34,7 +34,7 @@ CLIENT_MESSAGE_ADAPTER: TypeAdapter[ClientMessage] = TypeAdapter(ClientMessage)
 MULTIPLIER_WINDOW_SECONDS = 10.0
 MULTIPLIER_FACTOR = 1.1
 # Bots act once the game state has been quiet (no human action) for this long.
-BOT_DEBOUNCE_SECONDS = 1.0
+BOT_DEBOUNCE_SECONDS = 3.0
 
 
 def generate_room_id(length: int = 6) -> str:
@@ -218,6 +218,12 @@ class RoomManager:
                 fresh = await self.db.get_room(room_id)
                 if fresh is None or fresh["status"] != "playing":
                     return
+                # A human changed what the bot reacts to while it was thinking (e.g. a new
+                # clue): drop the outdated action. That change restarted the debounce timer,
+                # so the bot gets another turn once things are quiet again.
+                is_stale = getattr(game, "bot_action_is_stale", None)
+                if is_stale is not None and is_stale(room["state"], fresh["state"]):
+                    continue
                 try:
                     await self._handle_game_action(fresh, game, bot_id, action)
                 except ValidationError as e:

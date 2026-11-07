@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -420,6 +421,83 @@ def test_ai_can_guess_in_person_and_scores() -> None:
     assert outcome.state["phase"] == "reveal"
     assert outcome.state["last_result"]["winner_id"] == AI_PLAYER_ID
     assert outcome.is_correct_entry
+
+
+def test_bot_debounce_is_three_seconds() -> None:
+    assert room_manager_module.BOT_DEBOUNCE_SECONDS == 3.0
+
+
+def test_ai_action_is_stale_only_when_clues_change() -> None:
+    config = _config()
+    before = _explaining(config)
+    before["sentences"] = [["🚢"]]
+    other_guess = {**before, "guesses": [{"player_id": "b", "text": "Boot", "correct": False}]}
+    new_clue = {**before, "sentences": [["🚢", "🧊"]]}
+    assert not GAME.bot_action_is_stale(before, other_guess)
+    assert GAME.bot_action_is_stale(before, new_clue)
+
+
+def test_websocket_new_clue_while_ai_thinks_restarts_wait(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A clue sent during the AI's LLM call drops that guess and restarts the quiet wait."""
+    debounce = 0.2
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
+    monkeypatch.setattr(room_manager_module, "BOT_DEBOUNCE_SECONDS", debounce)
+    app = create_app(database=Database())
+    secret: dict[str, str] = {}
+    seen_views: list[dict[str, Any]] = []
+    times: dict[str, float] = {}
+
+    async def fake_ask(view: dict[str, Any]) -> str:
+        seen_views.append(view)
+        if len(seen_views) == 1:
+            # The explainer adds a clue while the AI is still "thinking".
+            manager = app.state.room_manager
+            room_id = secret["room_id"]
+            async with manager._get_lock(room_id):
+                room = await manager.db.get_room(room_id)
+                await manager._handle_game_action(
+                    room,
+                    manager.get_game("emoji-charades"),
+                    "host_ai2",
+                    {"type": "set_sentences", "sentences": [["⭐", "🌙"]]},
+                )
+            times["clue"] = time.monotonic()
+        else:
+            times["second_ask"] = time.monotonic()
+        return secret["word"]
+
+    monkeypatch.setattr(game_module, "ask_guess", fake_ask)
+
+    with TestClient(app) as client:
+        room = client.post(
+            "/api/rooms",
+            json={
+                "game_slug": "emoji-charades",
+                "host_player_id": "host_ai2",
+                "host_name": "Anna",
+                "config": {"mode": "remote", "ai_player": True},
+            },
+        ).json()
+        secret["room_id"] = room["room_id"]
+        url = f"/ws/emoji-charades/{room['room_id']}?player_id=host_ai2&name=Anna&color=%232563eb"
+        with client.websocket_connect(url) as ws:
+            _recv_state(ws)
+            ws.send_json({"type": "start_game"})
+            _recv_state(ws)
+            ws.send_json({"type": "game_action", "action": {"type": "choose_word", "index": 0}})
+            secret["word"] = _recv_state(ws)["state"]["word"]["text"]
+            ws.send_json(
+                {"type": "game_action", "action": {"type": "set_sentences", "sentences": [["⭐"]]}}
+            )
+            ended = ws.receive_json()
+            while ended["type"] != "round_ended":
+                ended = ws.receive_json()
+            assert ended["winner_id"] == AI_PLAYER_ID
+
+    assert [v["sentences"] for v in seen_views] == [[["⭐"]], [["⭐", "🌙"]]]
+    assert times["second_ask"] - times["clue"] >= debounce * 0.9
 
 
 def test_websocket_ai_player_guesses_after_quiet_second(monkeypatch: pytest.MonkeyPatch) -> None:
