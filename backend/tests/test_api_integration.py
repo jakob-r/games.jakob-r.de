@@ -21,6 +21,7 @@ def test_full_multiplayer_sudoku_room_lifecycle() -> None:
         assert res.status_code == 200
         games = res.json()
         assert any(g["slug"] == "sudoku" for g in games)
+        assert all(isinstance(g["play_count"], int) for g in games)
 
         # 2. Host creates a Sudoku room
         create_res = client.post(

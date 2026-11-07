@@ -485,6 +485,16 @@ class Database:
             rows = await cur.fetchall()
             return [dict(r) for r in rows]
 
+    async def get_play_counts(self) -> dict[str, int]:
+        """Number of started (non-lobby) rooms per game still kept in the database."""
+        pool = self._require_pool()
+        async with pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "SELECT game_slug, COUNT(*) AS n FROM rooms WHERE status <> 'lobby' GROUP BY game_slug"
+            )
+            rows = await cur.fetchall()
+            return {r["game_slug"]: int(r["n"]) for r in rows}
+
     async def get_player_stats(self, player_id: str) -> list[dict[str, Any]]:
         pool = self._require_pool()
         async with pool.connection() as conn, conn.cursor() as cur:

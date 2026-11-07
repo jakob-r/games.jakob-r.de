@@ -57,6 +57,11 @@
 	let stats = $state<PlayerStatsSummary | null>(null);
 	let joinCode = $state<string>('');
 	let joinError = $state<string | null>(null);
+	let playCounts = $state<Record<string, number>>({});
+	// Most played first; stable sort keeps catalog order for ties and before counts load.
+	const sortedGames = $derived(
+		[...GAMES].sort((a, b) => (playCounts[b.slug] ?? 0) - (playCounts[a.slug] ?? 0))
+	);
 
 	const landingJsonLd = {
 		'@type': 'ItemList',
@@ -90,9 +95,21 @@
 		}
 	}
 
+	async function loadPlayCounts() {
+		try {
+			const res = await fetch('/api/games');
+			if (!res.ok) return;
+			const games: { slug: string; play_count?: number }[] = await res.json();
+			playCounts = Object.fromEntries(games.map((g) => [g.slug, g.play_count ?? 0]));
+		} catch (e) {
+			console.error('Failed to load play counts:', e);
+		}
+	}
+
 	onMount(() => {
 		profile.init();
 		loadPlayerDashboard();
+		loadPlayCounts();
 	});
 
 	async function createRoom(game: GameInfo) {
@@ -277,7 +294,7 @@
 		</ScribblyBox>
 
 		<!-- Games -->
-		{#each GAMES as game (game.slug)}
+		{#each sortedGames as game (game.slug)}
 			<ScribblyBox seed={game.boxSeed} class="bg-[#faf8f4] p-4 sm:p-6">
 				<div class="flex items-start gap-3 sm:gap-4">
 					<a

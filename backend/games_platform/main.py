@@ -167,12 +167,14 @@ def create_app(
 
     @app.get("/api/games")
     async def list_games() -> list[dict[str, Any]]:
+        play_counts = await active_db.get_play_counts()
         return [
             {
                 "slug": g.slug,
                 "title": g.title,
                 "description": g.description,
                 "default_config": g.default_config(),
+                "play_count": play_counts.get(g.slug, 0),
             }
             for g in manager.games.values()
         ]
