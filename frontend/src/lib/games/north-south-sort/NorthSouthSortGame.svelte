@@ -34,7 +34,7 @@
 		points: number;
 		factor: number;
 		card: Card;
-		slot: number | null;
+		slot: number;
 	}
 
 	interface SkippedMove {
@@ -143,14 +143,34 @@
 	let canPlace = $derived(isMyTurn && selectedCard !== null);
 
 	// Slots from north (top) to south (bottom): slot i lies between axis[i-1] and axis[i].
+	// A misplaced card is briefly shown where it was put, then drops off (see .miss-card).
+	let miss = $state<{ card: Card; slot: number; points: number; key: number } | null>(null);
+	let missTimer: ReturnType<typeof setTimeout> | null = null;
+
 	let rows = $derived.by(() => {
-		const out: ({ kind: 'slot'; slot: number } | { kind: 'card'; card: Card })[] = [];
+		const out: (
+			| { kind: 'slot'; slot: number }
+			| { kind: 'card'; card: Card }
+			| { kind: 'miss'; card: Card; points: number; key: number }
+		)[] = [];
 		for (let i = axis.length; i >= 0; i--) {
 			out.push({ kind: 'slot', slot: i });
+			if (miss && miss.slot === i)
+				out.push({ kind: 'miss', card: miss.card, points: miss.points, key: miss.key });
 			if (i > 0) out.push({ kind: 'card', card: axis[i - 1] });
 		}
 		return out;
 	});
+
+	function showMiss(card: Card, slot: number, points: number) {
+		if (missTimer) clearTimeout(missTimer);
+		miss = { card, slot, points, key: Date.now() };
+		missTimer = setTimeout(() => (miss = null), 1900);
+	}
+
+	function scrollIntoViewAction(node: HTMLElement) {
+		node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+	}
 
 	let elapsedSeconds = $derived.by(() => {
 		if (!gameState.turn_started_at) return 0;
@@ -296,9 +316,13 @@
 				message = REASONS[ev.reason] ?? null;
 			} else if (ev.type === 'location_placed' || ev.type === 'turn_skipped') {
 				message = null;
+				if (ev.type === 'location_placed' && !ev.correct) {
+					showMiss(ev.card as Card, ev.slot, ev.points);
+				}
 			}
 		});
 		return () => {
+			if (missTimer) clearTimeout(missTimer);
 			unsub();
 			client.disconnect();
 		};
@@ -522,7 +546,7 @@
 				<div class="font-hand absolute top-1 left-2 text-sm text-[#6e6a63]">N ↑</div>
 				<div class="font-hand absolute bottom-1 left-2 text-sm text-[#6e6a63]">S ↓</div>
 				<ol class="relative max-h-[min(62vh,620px)] overflow-y-auto px-3 py-6" aria-label="North–south axis">
-					{#each rows as row (row.kind === 'slot' ? `s${row.slot}` : `c${row.card.id}`)}
+					{#each rows as row (row.kind === 'slot' ? `s${row.slot}` : row.kind === 'miss' ? `m${row.key}` : `c${row.card.id}`)}
 						{#if row.kind === 'slot'}
 							<li class="relative flex justify-center">
 								{#if canPlace}
@@ -537,6 +561,23 @@
 								{:else}
 									<div class="h-2"></div>
 								{/if}
+							</li>
+						{:else if row.kind === 'miss'}
+							<li
+								use:scrollIntoViewAction
+								class="miss-card relative flex items-center gap-2 rounded border-2 border-[#b5523b] bg-[#fbe9e4] px-2.5 py-1.5 text-[#7a2e1e]"
+								aria-label="{row.card.name} was misplaced"
+							>
+								<span class="text-lg leading-none font-bold">✗</span>
+								<div class="min-w-0 flex-1">
+									<span class="truncate font-semibold">{row.card.name}</span>
+									<span class="ml-1 text-[10px] font-semibold uppercase">
+										{CATEGORY_INFO[row.card.category].label}
+									</span>
+								</div>
+								<span class="font-mono-num shrink-0 text-sm font-semibold">
+									{formatPoints(row.points)}
+								</span>
 							</li>
 						{:else}
 							{@const card = row.card}
@@ -723,6 +764,61 @@
 		}
 		100% {
 			transform: scale(1);
+		}
+	}
+	.miss-card {
+		z-index: 10;
+		max-height: 5rem;
+		animation: miss 1.8s ease-in forwards;
+		pointer-events: none;
+	}
+	/* Appear in place, shake, hold, then drop away. */
+	@keyframes miss {
+		0% {
+			opacity: 0;
+			transform: scale(0.94);
+		}
+		8% {
+			opacity: 1;
+			transform: scale(1);
+		}
+		14%,
+		26%,
+		38% {
+			transform: translateX(-7px) rotate(-1deg);
+		}
+		20%,
+		32%,
+		44% {
+			transform: translateX(7px) rotate(1deg);
+		}
+		50%,
+		62% {
+			opacity: 1;
+			max-height: 5rem;
+			transform: translateX(0);
+		}
+		/* Fall over the cards below while the gap closes. */
+		100% {
+			opacity: 0;
+			max-height: 0;
+			padding-block: 0;
+			border-width: 0;
+			transform: translateY(140px) rotate(9deg);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.miss-card {
+			animation: miss-fade 1.8s ease-in forwards;
+		}
+		@keyframes miss-fade {
+			0%,
+			70% {
+				opacity: 1;
+			}
+			100% {
+				opacity: 0;
+			}
 		}
 	}
 </style>

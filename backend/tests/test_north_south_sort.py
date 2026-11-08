@@ -159,7 +159,7 @@ def test_wrong_placement_is_discarded_and_hidden() -> None:
     assert out.state["discarded"] == [{"id": "E3", "player_id": A}]
     assert A in out.state["round_failures"]
     event = out.events[0]
-    assert not event["correct"] and event["slot"] is None
+    assert not event["correct"] and event["slot"] == 0
     assert "lat" not in event["card"] and "country" not in event["card"]
 
     view = game.get_public_view(out.state, {})

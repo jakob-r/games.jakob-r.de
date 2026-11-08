@@ -147,7 +147,7 @@ export type ServerEvent =
 			points: number;
 			factor: number;
 			card: { id: string; name: string; category: string; points: number };
-			slot: number | null;
+			slot: number;
 	  }
 	| {
 			type: 'turn_skipped';

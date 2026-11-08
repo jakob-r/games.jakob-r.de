@@ -398,7 +398,8 @@ class NorthSouthSortGame:
             "factor": factor,
             # A wrong card stays hidden: name only, no position.
             "card": self._card(card.id, language, reveal=correct),
-            "slot": action.slot if correct else None,
+            # The attempted slot (not the true position), so clients can show the miss.
+            "slot": action.slot,
         }
         state["move_count"] = int(state.get("move_count", 0)) + 1
         state["last_move"] = move
