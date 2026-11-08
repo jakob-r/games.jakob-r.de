@@ -48,7 +48,6 @@
 	interface ServerTotals {
 		games_finished: number;
 		points_scored: number;
-		top_score: number;
 	}
 
 	interface GameStats {
@@ -561,14 +560,6 @@
 								>{serverTotals.points_scored.toLocaleString('en')}</span
 							> points scored
 						</li>
-						{#if serverTotals.top_score > 0}
-							<li>
-								<span class="font-mono-num text-[#1a1917]"
-									>{serverTotals.top_score.toLocaleString('en')}</span
-								>
-								highest score in one game
-							</li>
-						{/if}
 					</ul>
 				</div>
 			{/if}
