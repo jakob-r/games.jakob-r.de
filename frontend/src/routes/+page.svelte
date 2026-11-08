@@ -42,12 +42,14 @@
 	}
 
 	interface PlayerStatsSummary {
-		rooms_joined: number;
-		active_rooms: number;
 		games_completed: number;
-		games_won: number;
-		total_score: number;
-		best_score: number;
+	}
+
+	interface GameStats {
+		game_slug: string;
+		games_played: number;
+		best_score_single: number | null;
+		best_score_multi: number | null;
 	}
 
 	let creatingSlug = $state<GameSlug | null>(null);
@@ -56,6 +58,17 @@
 	let leavingRoomId = $state<string | null>(null);
 	let recentRooms = $state<RecentRoom[]>([]);
 	let stats = $state<PlayerStatsSummary | null>(null);
+	let statsByGame = $state<GameStats[]>([]);
+	// Most played first, then catalog title.
+	const sortedStatsByGame = $derived(
+		[...statsByGame]
+			.filter((g) => g.games_played > 0)
+			.sort(
+				(a, b) =>
+					b.games_played - a.games_played ||
+					formatGameTitle(a.game_slug).localeCompare(formatGameTitle(b.game_slug))
+			)
+	);
 	let joinCode = $state<string>('');
 	let joinError = $state<string | null>(null);
 	let playCounts = $state<Record<string, number>>({});
@@ -90,6 +103,7 @@
 			if (statsRes.ok) {
 				const data = await statsRes.json();
 				stats = data.summary;
+				statsByGame = data.by_game ?? [];
 			}
 		} catch (e) {
 			console.error('Failed to load player dashboard:', e);
@@ -500,32 +514,31 @@
 		<!-- Personal Stats -->
 		<ScribblyBox seed={43} class="bg-[#faf8f4] p-4 sm:p-6">
 			<h2 class="font-hand mb-3 text-xl">Stats</h2>
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-				<div class="rounded border border-[#1a1917]/20 bg-[#f3efe6]/60 p-3">
-					<div class="text-xs text-[#6e6a63]">Rooms</div>
-					<div class="font-mono-num mt-1 text-2xl font-bold">
-						{stats?.rooms_joined ?? 0}
-					</div>
-				</div>
-				<div class="rounded border border-[#1a1917]/20 bg-[#f3efe6]/60 p-3">
-					<div class="text-xs text-[#6e6a63]">Completed</div>
-					<div class="font-mono-num mt-1 text-2xl font-bold">
-						{stats?.games_completed ?? 0}
-					</div>
-				</div>
-				<div class="rounded border border-[#1a1917]/20 bg-[#f3efe6]/60 p-3">
-					<div class="text-xs text-[#6e6a63]">Best Score</div>
-					<div class="font-mono-num mt-1 text-2xl font-bold">
-						{stats?.best_score ?? 0}
-					</div>
-				</div>
-				<div class="rounded border border-[#1a1917]/20 bg-[#f3efe6]/60 p-3">
-					<div class="text-xs text-[#6e6a63]">Total Points</div>
-					<div class="font-mono-num mt-1 text-2xl font-bold">
-						{stats?.total_score ?? 0}
-					</div>
-				</div>
-			</div>
+			<p class="text-sm">
+				Completed games: <span class="font-mono-num font-bold">{stats?.games_completed ?? 0}</span>
+			</p>
+			{#if sortedStatsByGame.length > 0}
+				<ul class="mt-3 space-y-2 text-sm">
+					{#each sortedStatsByGame as g (g.game_slug)}
+						<li>
+							<span class="font-medium">{formatGameTitle(g.game_slug)}</span>
+							<ul class="ml-5 list-disc text-[#6e6a63] marker:text-[#1a1917]/40">
+								<li>
+									Played: <span class="font-mono-num text-[#1a1917]">{g.games_played}</span>
+								</li>
+								<li>
+									Best single player:
+									<span class="font-mono-num text-[#1a1917]">{g.best_score_single ?? '–'}</span>
+								</li>
+								<li>
+									Best multiplayer:
+									<span class="font-mono-num text-[#1a1917]">{g.best_score_multi ?? '–'}</span>
+								</li>
+							</ul>
+						</li>
+					{/each}
+				</ul>
+			{/if}
 		</ScribblyBox>
 	</div>
 

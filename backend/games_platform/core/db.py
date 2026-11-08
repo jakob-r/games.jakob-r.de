@@ -98,6 +98,10 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     expires_at TIMESTAMPTZ NOT NULL
 );
 
+-- Added after launch: best score split by solo (1 player in room) vs. multiplayer (2+, bots count).
+ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS best_score_single DOUBLE PRECISION;
+ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS best_score_multi DOUBLE PRECISION;
+
 -- Added after launch: the account's ink colour ('' = not set yet).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS color TEXT NOT NULL DEFAULT '';
 
@@ -170,7 +174,35 @@ class Database:
         """Ensure all required tables and indexes exist."""
         pool = self._require_pool()
         async with pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'player_stats' AND column_name = 'best_score_single'
+                """
+            )
+            needs_split_backfill = await cur.fetchone() is None
             await cur.execute(SCHEMA_SQL)
+            if needs_split_backfill:
+                # One-off: derive the solo/multiplayer best from finished rooms still kept.
+                await cur.execute(
+                    """
+                    UPDATE player_stats ps
+                    SET best_score_single = b.best_single, best_score_multi = b.best_multi
+                    FROM (
+                        SELECT rp.player_id, r.game_slug,
+                               MAX(rp.score) FILTER (WHERE pc.n = 1) AS best_single,
+                               MAX(rp.score) FILTER (WHERE pc.n > 1) AS best_multi
+                        FROM room_players rp
+                        JOIN rooms r ON r.id = rp.room_id
+                        JOIN (
+                            SELECT room_id, COUNT(*) AS n FROM room_players GROUP BY room_id
+                        ) pc ON pc.room_id = rp.room_id
+                        WHERE r.status = 'finished'
+                        GROUP BY rp.player_id, r.game_slug
+                    ) b
+                    WHERE ps.player_id = b.player_id AND ps.game_slug = b.game_slug
+                    """
+                )
 
     async def create_room(
         self,
@@ -432,6 +464,7 @@ class Database:
         if not players:
             return
         max_score = max(float(p["score"]) for p in players)
+        solo = len(players) == 1
         pool = self._require_pool()
         async with pool.connection() as conn, conn.cursor() as cur:
             for p in players:
@@ -439,18 +472,25 @@ class Database:
                     continue
                 score = float(p["score"])
                 won = 1 if score >= max_score else 0
+                single = score if solo else None
+                multi = None if solo else score
                 await cur.execute(
                     """
-                    INSERT INTO player_stats (player_id, game_slug, games_played, games_won, total_score, best_score, updated_at)
-                    VALUES (%s, %s, 1, %s, %s, %s, NOW())
+                    INSERT INTO player_stats (
+                        player_id, game_slug, games_played, games_won, total_score, best_score,
+                        best_score_single, best_score_multi, updated_at
+                    )
+                    VALUES (%s, %s, 1, %s, %s, %s, %s, %s, NOW())
                     ON CONFLICT (player_id, game_slug) DO UPDATE
                     SET games_played = player_stats.games_played + 1,
                         games_won = player_stats.games_won + EXCLUDED.games_won,
                         total_score = player_stats.total_score + EXCLUDED.total_score,
                         best_score = GREATEST(player_stats.best_score, EXCLUDED.best_score),
+                        best_score_single = GREATEST(player_stats.best_score_single, EXCLUDED.best_score_single),
+                        best_score_multi = GREATEST(player_stats.best_score_multi, EXCLUDED.best_score_multi),
                         updated_at = NOW()
                     """,
-                    (p["player_id"], game_slug, won, score, score),
+                    (p["player_id"], game_slug, won, score, score, single, multi),
                 )
 
     async def get_recent_rooms_for_player(
@@ -503,7 +543,8 @@ class Database:
         async with pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                SELECT player_id, game_slug, games_played, games_won, total_score, best_score, updated_at
+                SELECT player_id, game_slug, games_played, games_won, total_score, best_score,
+                       best_score_single, best_score_multi, updated_at
                 FROM player_stats
                 WHERE player_id = %s
                 ORDER BY game_slug ASC

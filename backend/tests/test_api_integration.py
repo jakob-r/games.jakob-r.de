@@ -475,3 +475,68 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
         assert len(dispatched) == 1
 
         client.delete(f"/api/rooms/{room_id}?player_id=host_1")
+
+
+def test_player_stats_split_best_score_single_and_multi() -> None:
+    test_db = Database()
+    app = create_app(database=test_db)
+
+    with TestClient(app) as client:
+        rooms: list[str] = []
+        for host in ("split_a", "split_a", "split_a"):
+            res = client.post(
+                "/api/rooms",
+                json={
+                    "game_slug": "sudoku",
+                    "host_player_id": host,
+                    "host_name": "A",
+                    "host_color": "#2563eb",
+                    "config": {"difficulty": "easy"},
+                },
+            )
+            rooms.append(res.json()["room_id"])
+        solo_hi, solo_lo, multi = rooms
+
+        async def _finish() -> None:
+            pool = test_db._require_pool()
+            async with pool.connection() as conn, conn.cursor() as cur:
+                await cur.execute(
+                    "DELETE FROM player_stats WHERE player_id IN ('split_a', 'split_b')"
+                )
+                await cur.execute(
+                    """
+                    INSERT INTO room_players (room_id, player_id, name, color, score)
+                    VALUES (%s, 'split_b', 'B', '#dc2626', 99)
+                    """,
+                    (multi,),
+                )
+                for room_id, score in ((solo_hi, 40), (solo_lo, 10), (multi, 25)):
+                    await cur.execute(
+                        "UPDATE room_players SET score = %s WHERE room_id = %s AND player_id = 'split_a'",
+                        (score, room_id),
+                    )
+                    await test_db.record_game_finished(room_id, "sudoku")
+                    await cur.execute("DELETE FROM rooms WHERE id = %s", (room_id,))
+
+        assert client.portal is not None
+        client.portal.call(_finish)
+
+        data = client.get("/api/players/split_a/stats").json()
+        assert data["summary"]["games_completed"] == 3
+        (sudoku,) = data["by_game"]
+        assert sudoku["games_played"] == 3
+        assert sudoku["best_score_single"] == 40
+        assert sudoku["best_score_multi"] == 25
+
+        b = client.get("/api/players/split_b/stats").json()["by_game"][0]
+        assert b["best_score_single"] is None
+        assert b["best_score_multi"] == 99
+
+        async def _cleanup() -> None:
+            pool = test_db._require_pool()
+            async with pool.connection() as conn, conn.cursor() as cur:
+                await cur.execute(
+                    "DELETE FROM player_stats WHERE player_id IN ('split_a', 'split_b')"
+                )
+
+        client.portal.call(_cleanup)

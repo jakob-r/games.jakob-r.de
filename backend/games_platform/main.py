@@ -55,6 +55,10 @@ ALL_GAMES: dict[str, GameDefinition] = {
 }
 
 
+def _round_or_none(value: float | None) -> float | None:
+    return None if value is None else round(float(value), 2)
+
+
 def _mount_static(app: FastAPI) -> None:
     """Serve ACME challenges and the built SPA when STATIC_DIR is set (production)."""
     acme_webroot = os.environ.get("ACME_WEBROOT", "").strip()
@@ -367,6 +371,8 @@ def create_app(
                     "games_won": int(r["games_won"]),
                     "total_score": round(float(r["total_score"]), 2),
                     "best_score": round(float(r["best_score"]), 2),
+                    "best_score_single": _round_or_none(r["best_score_single"]),
+                    "best_score_multi": _round_or_none(r["best_score_multi"]),
                 }
                 for r in rows
             ],
