@@ -226,10 +226,11 @@ class NorthSouthSortGame:
             "category": loc.category,
             "points": CATEGORY_POINTS[loc.category],
             "name": loc.name_de if de else loc.name_en,
-            "country": (loc.country_de if de else loc.country_en) or "",
         }
         if reveal:
+            # Country is a strong hint, so unplayed (hand) cards show the name only.
             card.update(
+                country=(loc.country_de if de else loc.country_en) or "",
                 lat=loc.lat,
                 lon=loc.lon,
                 description=loc.description_de if de else loc.description_en,

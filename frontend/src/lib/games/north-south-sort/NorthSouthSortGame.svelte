@@ -19,7 +19,7 @@
 		category: Category;
 		points: number;
 		name: string;
-		country: string;
+		country?: string;
 		lat?: number;
 		lon?: number;
 		description?: string;
@@ -663,8 +663,13 @@
 								</span>
 								<span class="font-mono-num">{card.points}</span>
 							</div>
-							<div class="line-clamp-2 text-sm leading-tight font-semibold">{card.name}</div>
-							<div class="truncate text-[11px] opacity-70">{card.country}</div>
+							<div
+								lang={gameState.language ?? 'de'}
+								title={card.name}
+								class="line-clamp-4 text-sm leading-tight font-semibold hyphens-auto [overflow-wrap:anywhere]"
+							>
+								{card.name}
+							</div>
 						</button>
 					{:else}
 						<div class="flex-1 py-2 text-center text-sm text-[#6e6a63]">No cards left.</div>
