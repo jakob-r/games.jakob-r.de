@@ -70,7 +70,7 @@ To share components across games while allowing any game to be extracted and run
      - `standalone.py`: Standalone FastAPI entrypoint (`uv run uvicorn games_platform.games.minesweeper.standalone:app`).
    - **Frontend (`frontend/src/lib/games/minesweeper/`)**:
      - `MinesweeperGame.svelte`: Mobile-first dig/flag modes, long-press flagging, player-colored flags, boom FX on mine hits, and challenge confirm for opponent flags.
-   - **Shared dictionary (`backend/games_platform/core/dictionary.py`)**: `wordfreq`-backed word lists (`de`, `en`, `fr`, `es`, normalized to A–Z), `is_valid_word`, and per-language `1–10` letter rarity scores (`LETTER_SCORES`, `get_letter_score`). Used by Silbenstreit and Spellsprawl.
+   - **Shared dictionary (`backend/games_platform/core/dictionary.py`)**: `wordfreq`-backed word lists (`de`, `en`, `fr`, `es`, normalized to A–Z; German additionally merges the bundled full-form list `core/data/de_words.txt.gz` from [enz/german-wordlist](https://github.com/enz/german-wordlist), CC0, ~686k words incl. inflections, ≥3 letters), `is_valid_word`, and per-language `1–10` letter rarity scores (`LETTER_SCORES`, `get_letter_score`). Used by Silbenstreit and Spellsprawl.
    - **Backend (`backend/games_platform/games/silbenstreit/`)**:
      - `dictionary.py`: Re-exports the shared dictionary and adds the syllable-sampled board generator (`4×4` to `8×8` in `de`, `en`, `fr`, `es`) ensuring orthographic clusters like `QU` stay accompanied.
      - `game.py`: `SilbenstreitGame` implementing `GameDefinition` (round-based word submission, tile ownership transfer, `extra_score_deltas` board-ownership scoring, orthogonal tile protection, and word reuse prevention).

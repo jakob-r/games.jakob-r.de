@@ -1,14 +1,25 @@
-"""Shared word dictionaries (wordfreq) and per-language letter rarity scores (1-10)."""
+"""Shared word dictionaries and per-language letter rarity scores (1-10).
+
+Word lists come from `wordfreq` (top 75k tokens per language). German is additionally
+backed by a bundled full-form word list built for word games (enz/german-wordlist, CC0),
+which covers rarer words and all inflections (e.g. BETOEREN, BETOERT).
+"""
 
 from __future__ import annotations
 
 import functools
+import gzip
 import unicodedata
+from pathlib import Path
 
 from wordfreq import top_n_list, zipf_frequency
 
 SUPPORTED_LANGUAGES: tuple[str, ...] = ("de", "en", "fr", "es")
 DEFAULT_LANGUAGE = "de"
+
+_DATA_DIR = Path(__file__).parent / "data"
+# Bundled full word lists (one UTF-8 word per line, gzipped), merged on top of wordfreq.
+BUNDLED_WORDLISTS: dict[str, str] = {"de": "de_words.txt.gz"}
 
 # Integer rarity scores between 1 and 10 per language (higher = rarer letter).
 LETTER_SCORES: dict[str, dict[str, int]] = {
@@ -231,6 +242,18 @@ def get_wordlist(language: str) -> frozenset[str]:
         for form in normalize_word_forms(token, lang):
             if 2 <= len(form) <= 15:
                 words.add(form)
+
+    bundled = BUNDLED_WORDLISTS.get(lang)
+    if bundled:
+        with gzip.open(_DATA_DIR / bundled, "rt", encoding="utf-8") as fh:
+            for line in fh:
+                token = line.strip()
+                # 2-letter words stay curated via EXTRA_VALID_WORDS
+                if len(token) < 3 or not token.isalpha():
+                    continue
+                for form in normalize_word_forms(token, lang):
+                    if 3 <= len(form) <= 15:
+                        words.add(form)
 
     return frozenset(words)
 
