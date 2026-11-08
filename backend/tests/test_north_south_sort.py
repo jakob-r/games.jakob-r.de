@@ -228,6 +228,30 @@ def test_skip_and_draw_hand() -> None:
     assert again.events[0]["reason"] == "has_hand"
 
 
+def test_skip_swaps_whole_hand_and_returns_old_cards() -> None:
+    game, state = new_state()
+    setup_board(
+        state,
+        ["C1"],
+        {A: {"city": "C2", "landmark": "L1", "event": "E1"}, B: {"city": "C3"}},
+    )
+    out = act(game, state, A, {"type": "skip"})
+    hand = out.state["hands"][A]
+    assert hand["city"] == "C4" and hand["landmark"] in {"L2", "L3"}
+    assert hand["event"] in {"E2", "E3"}
+    used = set(out.state["used_ids"])
+    assert not {"C2", "L1", "E1"} & used  # old cards are back in the pool
+    assert set(hand.values()) <= used and "C3" in used
+
+
+def test_skip_keeps_card_when_pool_is_empty() -> None:
+    game, state = new_state({"categories": ["city"]})
+    setup_board(state, ["C1"], {A: {"city": "C2"}, B: {"city": "C3"}})
+    state["used_ids"] = ["C1", "C2", "C3", "C4"]
+    out = act(game, state, A, {"type": "skip"})
+    assert out.state["hands"][A]["city"] == "C2"
+
+
 def test_end_after_rounds() -> None:
     game, state = new_state({"end_condition": "rounds", "end_target": 1})
     out = act(game, state, A, {"type": "skip"})

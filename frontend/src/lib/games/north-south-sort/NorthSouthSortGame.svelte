@@ -228,7 +228,7 @@
 
 	function describeMove(move: PlacedMove | SkippedMove): string {
 		const who = playerName(move.player_id);
-		if (move.type === 'turn_skipped') return `${who} skipped.`;
+		if (move.type === 'turn_skipped') return `${who} skipped and swapped cards.`;
 		const bonus = move.correct && move.factor > 1 ? ` (×${move.factor})` : '';
 		return `${who}: ${move.card.name} ${move.correct ? '✓' : '✗'} ${formatPoints(move.points)}${bonus}`;
 	}
@@ -451,7 +451,7 @@
 			<p class="border-t border-[#1a1917]/15 pt-3 text-xs text-[#6e6a63]">
 				On your turn, pick one of your cards and place it north or south of the locations on the
 				axis. Right: score its value{cfgTimed ? ' (×2 within 10 s, ×1.5 within 20 s)' : ''}. Wrong:
-				lose its value, and the card stays hidden until the end.
+				lose its value, and the card stays hidden until the end. Skipping swaps all your cards.
 			</p>
 		</div>
 	{/snippet}
@@ -719,9 +719,10 @@
 						type="button"
 						disabled={!isMyTurn}
 						onclick={skip}
-						class="shrink-0 cursor-pointer rounded border-[1.5px] border-[#1a1917] px-2 text-xs font-semibold transition hover:bg-[#f2eee6] disabled:cursor-default disabled:opacity-40"
+						title="Skip your turn and get new cards"
+						class="shrink-0 cursor-pointer rounded border-[1.5px] border-[#1a1917] px-2 text-xs leading-tight font-semibold transition hover:bg-[#f2eee6] disabled:cursor-default disabled:opacity-40"
 					>
-						Skip
+						Skip<br /><span class="font-normal opacity-70">new cards</span>
 					</button>
 				</div>
 			</div>

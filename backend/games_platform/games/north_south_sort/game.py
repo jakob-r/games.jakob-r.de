@@ -344,7 +344,25 @@ class NorthSouthSortGame:
                 return self._place(next_state, player_id, parsed)
         return _rejected(next_state, player_id, "invalid_action")  # pragma: no cover
 
+    def _swap_hand(self, state: dict[str, Any], player_id: str) -> None:
+        """Replace every card in the hand; the old cards go back into the pool.
+
+        New cards are drawn before the old ones are released, so a slot never gets the
+        same card back. A slot keeps its card if the pool has nothing else left.
+        """
+        hand: dict[str, str | None] = state["hands"].get(player_id) or {}
+        released: list[str] = []
+        for category, old in hand.items():
+            new = self._draw(state, category)
+            if new is None:
+                continue
+            hand[category] = new
+            if old is not None:
+                released.append(old)
+        state["used_ids"] = [i for i in state["used_ids"] if i not in set(released)]
+
     def _skip(self, state: dict[str, Any], player_id: str) -> ActionOutcome:
+        self._swap_hand(state, player_id)
         if player_id not in state["round_failures"]:
             state["round_failures"].append(player_id)
         state["move_count"] = int(state.get("move_count", 0)) + 1
