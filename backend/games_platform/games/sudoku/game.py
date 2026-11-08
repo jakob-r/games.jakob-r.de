@@ -152,10 +152,7 @@ class SudokuGame:
         # Block check
         br, bc = (row // 3) * 3, (col // 3) * 3
         block_empty = [
-            (r, c)
-            for r in range(br, br + 3)
-            for c in range(bc, bc + 3)
-            if grid_before[r][c] == 0
+            (r, c) for r in range(br, br + 3) for c in range(bc, bc + 3) if grid_before[r][c] == 0
         ]
         if block_empty == [(row, col)]:
             completed_units.append("block")
@@ -193,9 +190,7 @@ class SudokuGame:
         cells: list[list[dict[str, Any]]] = next_state["cells"]
         notes: list[list[dict[str, str]]] = next_state["notes"]
         solution: list[list[int]] = next_state["solution"]
-        hard_cells: list[list[bool]] = next_state.get(
-            "hard_cells", [[False] * 9 for _ in range(9)]
-        )
+        hard_cells: list[list[bool]] = next_state.get("hard_cells", [[False] * 9 for _ in range(9)])
         scoring_enabled = bool(config.get("scoring_enabled", True))
 
         match parsed:

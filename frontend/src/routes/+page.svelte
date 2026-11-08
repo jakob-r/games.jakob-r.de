@@ -241,7 +241,7 @@
 					: item.config?.end_condition === 'failed_round'
 						? 'until all miss'
 						: `${target} rounds`;
-			return `${continent} • ${end}`;
+			return `${continent} • ${item.config?.difficulty ?? 'medium'} • ${end}`;
 		}
 		if (item.game_slug === 'emoji-charades') {
 			const mode = item.config?.mode === 'remote' ? 'Remote' : 'In person';

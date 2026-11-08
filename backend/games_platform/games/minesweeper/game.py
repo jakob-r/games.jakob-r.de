@@ -97,10 +97,7 @@ def place_mines(
         forbidden.add(_key(rr, cc))
 
     candidates = [
-        _key(r, c)
-        for r in range(height)
-        for c in range(width)
-        if _key(r, c) not in forbidden
+        _key(r, c) for r in range(height) for c in range(width) if _key(r, c) not in forbidden
     ]
     count = min(mine_count, len(candidates))
     if count <= 0:
@@ -156,9 +153,7 @@ class MinesweeperGame:
     ) -> dict[str, Any]:
         _ = player_ids
         difficulty = str(config.get("difficulty", "easy"))
-        width, height, mine_count = DIFFICULTY_PRESETS.get(
-            difficulty, DIFFICULTY_PRESETS["easy"]
-        )
+        width, height, mine_count = DIFFICULTY_PRESETS.get(difficulty, DIFFICULTY_PRESETS["easy"])
         cells = [[_empty_cell() for _ in range(width)] for _ in range(height)]
         return {
             "width": width,
@@ -212,10 +207,7 @@ class MinesweeperGame:
 
         mine_count = int(state["mine_count"])
         flagged_count = sum(
-            1
-            for r in range(height)
-            for c in range(width)
-            if cells_in[r][c]["status"] == "flagged"
+            1 for r in range(height) for c in range(width) if cells_in[r][c]["status"] == "flagged"
         )
         mine_revealed_count = sum(
             1
@@ -359,21 +351,13 @@ class MinesweeperGame:
 
         match parsed:
             case RevealAction():
-                return self._apply_reveal(
-                    next_state, cell, row, col, player_id, scoring_enabled
-                )
+                return self._apply_reveal(next_state, cell, row, col, player_id, scoring_enabled)
             case FlagAction():
-                return self._apply_flag(
-                    next_state, cell, row, col, player_id, scoring_enabled
-                )
+                return self._apply_flag(next_state, cell, row, col, player_id, scoring_enabled)
             case UnflagAction():
-                return self._apply_unflag(
-                    next_state, cell, row, col, player_id, scoring_enabled
-                )
+                return self._apply_unflag(next_state, cell, row, col, player_id, scoring_enabled)
             case ChallengeFlagAction():
-                return self._apply_challenge(
-                    next_state, cell, row, col, player_id, scoring_enabled
-                )
+                return self._apply_challenge(next_state, cell, row, col, player_id, scoring_enabled)
 
         return ActionOutcome(state=next_state)
 
@@ -429,9 +413,7 @@ class MinesweeperGame:
                     "col": col,
                     "player_id": player_id,
                     "revealed_count": count,
-                    "cells": [
-                        {"row": r, "col": c, "adjacent": adj} for r, c, adj in revealed
-                    ],
+                    "cells": [{"row": r, "col": c, "adjacent": adj} for r, c, adj in revealed],
                     "points_delta": pts,
                 }
             ],
@@ -573,9 +555,7 @@ class MinesweeperGame:
                     "challenger_delta": transfer,
                     "owner_delta": -transfer,
                     "revealed_count": len(revealed),
-                    "cells": [
-                        {"row": r, "col": c, "adjacent": adj} for r, c, adj in revealed
-                    ],
+                    "cells": [{"row": r, "col": c, "adjacent": adj} for r, c, adj in revealed],
                 }
             ],
             points_delta=transfer,

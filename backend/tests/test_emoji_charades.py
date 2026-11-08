@@ -43,7 +43,9 @@ def _state(config: dict[str, Any], players: tuple[str, ...] = ("a", "b", "c")) -
     return state
 
 
-def _explaining(config: dict[str, Any], players: tuple[str, ...] = ("a", "b", "c")) -> dict[str, Any]:
+def _explaining(
+    config: dict[str, Any], players: tuple[str, ...] = ("a", "b", "c")
+) -> dict[str, Any]:
     state = _state(config, players)
     outcome = GAME.apply_action(state, config, players[0], {"type": "choose_word", "index": 0}, 1.0)
     assert outcome.state["phase"] == "explaining"
@@ -135,13 +137,18 @@ def test_remote_round_wrong_close_and_correct_guess() -> None:
     state = outcome.state
     assert state["sentences"] == [["🦁", "👑"], ["🎬"]]
 
-    rejected = GAME.apply_action(state, config, "b", {"type": "set_sentences", "sentences": [[]]}, 1.0)
+    rejected = GAME.apply_action(
+        state, config, "b", {"type": "set_sentences", "sentences": [[]]}, 1.0
+    )
     assert rejected.state is state
     assert rejected.events[0]["type"] == "action_rejected"
 
-    assert GAME.apply_action(state, config, "a", {"type": "guess", "text": word}, 1.0).events[0][
-        "reason"
-    ] == "not_allowed"
+    assert (
+        GAME.apply_action(state, config, "a", {"type": "guess", "text": word}, 1.0).events[0][
+            "reason"
+        ]
+        == "not_allowed"
+    )
 
     wrong = GAME.apply_action(state, config, "b", {"type": "guess", "text": "xyzzy"}, 1.0)
     assert wrong.events[0]["type"] == "guess_wrong"
@@ -165,7 +172,9 @@ def test_timed_remote_guess_also_scores_explainer() -> None:
     config = _config(mode="remote", timed=True)
     state = _explaining(config)
     assert state["deadline"] is not None
-    outcome = GAME.apply_action(state, config, "b", {"type": "guess", "text": state["word"]["text"]}, 1.0)
+    outcome = GAME.apply_action(
+        state, config, "b", {"type": "guess", "text": state["word"]["text"]}, 1.0
+    )
     assert outcome.points_delta == 1.0
     assert outcome.extra_score_deltas == {"a": 1.0}
 
@@ -173,12 +182,18 @@ def test_timed_remote_guess_also_scores_explainer() -> None:
 def test_in_person_award_scoring() -> None:
     config = _config(mode="in_person")
     state = _explaining(config)
-    assert GAME.apply_action(state, config, "b", {"type": "guess", "text": "x"}, 1.0).events[0][
-        "reason"
-    ] == "not_allowed"
-    assert GAME.apply_action(state, config, "a", {"type": "award", "player_id": "a"}, 1.0).events[0][
-        "reason"
-    ] == "invalid_player"
+    assert (
+        GAME.apply_action(state, config, "b", {"type": "guess", "text": "x"}, 1.0).events[0][
+            "reason"
+        ]
+        == "not_allowed"
+    )
+    assert (
+        GAME.apply_action(state, config, "a", {"type": "award", "player_id": "a"}, 1.0).events[0][
+            "reason"
+        ]
+        == "invalid_player"
+    )
 
     untimed = GAME.apply_action(state, config, "a", {"type": "award", "player_id": "c"}, 1.0)
     assert not untimed.is_correct_entry
@@ -188,7 +203,9 @@ def test_in_person_award_scoring() -> None:
 
     timed_config = _config(mode="in_person", timed=True)
     timed_state = _explaining(timed_config)
-    timed = GAME.apply_action(timed_state, timed_config, "a", {"type": "award", "player_id": "b"}, 1.0)
+    timed = GAME.apply_action(
+        timed_state, timed_config, "a", {"type": "award", "player_id": "b"}, 1.0
+    )
     assert timed.is_correct_entry
     assert timed.points_delta == 1.0
     assert timed.extra_score_deltas == {"b": 1.0}
@@ -207,9 +224,12 @@ def test_time_up_only_after_deadline() -> None:
 
     untimed_config = _config(timed=False)
     untimed = _explaining(untimed_config)
-    assert GAME.apply_action(untimed, untimed_config, "b", {"type": "time_up"}, 1.0).events[0][
-        "reason"
-    ] == "not_allowed"
+    assert (
+        GAME.apply_action(untimed, untimed_config, "b", {"type": "time_up"}, 1.0).events[0][
+            "reason"
+        ]
+        == "not_allowed"
+    )
 
 
 def test_explainers_rotate_circularly_including_mid_game_joiner() -> None:
@@ -220,7 +240,9 @@ def test_explainers_rotate_circularly_including_mid_game_joiner() -> None:
         if joiner_round == 1:
             state["turn_order"].append("late")
         seen.append(state["explainer_id"])
-        state = GAME.apply_action(state, config, state["explainer_id"], {"type": "give_up"}, 1.0).state
+        state = GAME.apply_action(
+            state, config, state["explainer_id"], {"type": "give_up"}, 1.0
+        ).state
         state = GAME.apply_action(state, config, "anyone", {"type": "next_round"}, 1.0).state
         assert state["phase"] == "choosing"
     assert seen == ["a", "b", "late", "a", "b"]
@@ -232,7 +254,9 @@ def test_used_words_are_not_offered_again() -> None:
     state = _explaining(config)
     chosen = state["word"]["text"]
     for _ in range(10):
-        state = GAME.apply_action(state, config, state["explainer_id"], {"type": "give_up"}, 1.0).state
+        state = GAME.apply_action(
+            state, config, state["explainer_id"], {"type": "give_up"}, 1.0
+        ).state
         state = GAME.apply_action(state, config, "a", {"type": "next_round"}, 1.0).state
         assert chosen not in [c["text"] for c in state["choices"]]
 
@@ -319,9 +343,7 @@ def test_websocket_per_viewer_state_and_host_end_game() -> None:
             rest = client.get(f"/api/rooms/{room_id}").json()
             assert word not in str(rest["state"])
 
-            guesser_ws.send_json(
-                {"type": "game_action", "action": {"type": "guess", "text": word}}
-            )
+            guesser_ws.send_json({"type": "game_action", "action": {"type": "guess", "text": word}})
             reveal = _recv_state(guesser_ws)
             _recv_state(explainer_ws)
             assert reveal["state"]["phase"] == "reveal"
@@ -526,9 +548,12 @@ def test_websocket_ai_player_guesses_after_quiet_second(monkeypatch: pytest.Monk
         room_id = room["room_id"]
         ai_row = next(p for p in room["players"] if p["player_id"] == AI_PLAYER_ID)
         assert ai_row["is_bot"] and ai_row["is_ready"] and ai_row["is_connected"]
-        assert client.delete(
-            f"/api/rooms/{room_id}/players/{AI_PLAYER_ID}", params={"actor_id": "host_ai1"}
-        ).status_code == 403
+        assert (
+            client.delete(
+                f"/api/rooms/{room_id}/players/{AI_PLAYER_ID}", params={"actor_id": "host_ai1"}
+            ).status_code
+            == 403
+        )
 
         url = f"/ws/emoji-charades/{room_id}?player_id=host_ai1&name=Anna&color=%232563eb"
         with client.websocket_connect(url) as ws:

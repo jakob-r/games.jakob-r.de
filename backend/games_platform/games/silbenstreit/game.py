@@ -38,9 +38,7 @@ class PassTurnAction(BaseModel):
 
 type SilbenstreitAction = SubmitWordAction | PassTurnAction
 
-SILBENSTREIT_ACTION_ADAPTER: TypeAdapter[SilbenstreitAction] = TypeAdapter(
-    SilbenstreitAction
-)
+SILBENSTREIT_ACTION_ADAPTER: TypeAdapter[SilbenstreitAction] = TypeAdapter(SilbenstreitAction)
 
 
 def compute_protected_grid(
@@ -83,12 +81,7 @@ def compute_board_scores(
 
 
 def count_unowned_tiles(size: int, owners: list[list[str | None]]) -> int:
-    return sum(
-        1
-        for r in range(size)
-        for c in range(size)
-        if owners[r][c] is None
-    )
+    return sum(1 for r in range(size) for c in range(size) if owners[r][c] is None)
 
 
 class SilbenstreitGame:
@@ -138,12 +131,8 @@ class SilbenstreitGame:
         language: str = validated["language"]
 
         letters, values = generate_board(size=size, language=language)
-        owners: list[list[str | None]] = [
-            [None for _ in range(size)] for _ in range(size)
-        ]
-        protected: list[list[bool]] = [
-            [False for _ in range(size)] for _ in range(size)
-        ]
+        owners: list[list[str | None]] = [[None for _ in range(size)] for _ in range(size)]
+        protected: list[list[bool]] = [[False for _ in range(size)] for _ in range(size)]
 
         turn_order: list[str] = list(player_ids or [])[:MAX_PLAYERS]
         current_player_id: str | None = turn_order[0] if turn_order else None
@@ -316,9 +305,7 @@ class SilbenstreitGame:
                     word_chars.append(letters[r][c])
 
                 word = "".join(word_chars).upper()
-                played_words: list[dict[str, Any]] = list(
-                    next_state.get("played_words") or []
-                )
+                played_words: list[dict[str, Any]] = list(next_state.get("played_words") or [])
                 already_used = any(
                     str(entry.get("word", "")).upper() == word for entry in played_words
                 )
@@ -367,16 +354,12 @@ class SilbenstreitGame:
                     new_scores.setdefault(pid, 0)
                 next_state["player_scores"] = new_scores
 
-                actor_delta = float(
-                    new_scores.get(player_id, 0) - old_scores.get(player_id, 0)
-                )
+                actor_delta = float(new_scores.get(player_id, 0) - old_scores.get(player_id, 0))
                 extra_deltas: dict[str, float] = {}
                 for other_id in set(old_scores.keys()) | set(new_scores.keys()):
                     if other_id == player_id:
                         continue
-                    diff = float(
-                        new_scores.get(other_id, 0) - old_scores.get(other_id, 0)
-                    )
+                    diff = float(new_scores.get(other_id, 0) - old_scores.get(other_id, 0))
                     if diff != 0:
                         extra_deltas[other_id] = diff
 

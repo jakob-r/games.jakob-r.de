@@ -290,9 +290,7 @@ class RoomManager:
             self.midgame_inactive_players.pop(room_id, None)
             for conn in conns:
                 try:
-                    await conn.websocket.send_json(
-                        {"type": "room_deleted", "room_id": room_id}
-                    )
+                    await conn.websocket.send_json({"type": "room_deleted", "room_id": room_id})
                     await conn.websocket.close(code=4004, reason="Room deleted")
                 except (RuntimeError, OSError) as e:
                     logger.debug("WebSocket close failed for %s: %s", conn.player_id, repr(e))
@@ -324,9 +322,7 @@ class RoomManager:
 
         is_kicked = effective_actor != player_id
         removed = await self.db.remove_room_player(room_id, player_id)
-        conns = [
-            c for c in self.connections.get(room_id, []) if c.player_id == player_id
-        ]
+        conns = [c for c in self.connections.get(room_id, []) if c.player_id == player_id]
         for conn in conns:
             self._remove_connection(room_id, conn)
             try:
@@ -382,9 +378,7 @@ class RoomManager:
                     state["current_turn_index"] = next_idx
                     state["current_player_id"] = new_order[next_idx]
                 elif state.get("current_player_id") in new_order:
-                    state["current_turn_index"] = new_order.index(
-                        state["current_player_id"]
-                    )
+                    state["current_turn_index"] = new_order.index(state["current_player_id"])
                 if room["status"] == "playing":
                     game = self.get_game(room["game_slug"])
                     on_player_removed = getattr(game, "on_player_removed", None)
@@ -444,9 +438,7 @@ class RoomManager:
             self.locks.pop(room_id, None)
             for conn in conns:
                 try:
-                    await conn.websocket.send_json(
-                        {"type": "room_deleted", "room_id": room_id}
-                    )
+                    await conn.websocket.send_json({"type": "room_deleted", "room_id": room_id})
                     await conn.websocket.close(code=4004, reason="Room expired")
                 except (RuntimeError, OSError) as e:
                     logger.debug("WebSocket close failed for %s: %s", conn.player_id, repr(e))
@@ -670,9 +662,7 @@ class RoomManager:
                         return
                     old_player_id = conn.player_id
                     existing_players = await self.db.get_room_players(room_id)
-                    was_existing = any(
-                        p["player_id"] == msg.player_id for p in existing_players
-                    )
+                    was_existing = any(p["player_id"] == msg.player_id for p in existing_players)
                     conn.player_id = msg.player_id
                     await self.db.upsert_room_player(
                         room_id=room_id,
@@ -797,9 +787,7 @@ class RoomManager:
                             actor_id=conn.player_id,
                         )
                     except PermissionError as e:
-                        await conn.websocket.send_json(
-                            {"type": "error", "message": str(e)}
-                        )
+                        await conn.websocket.send_json({"type": "error", "message": str(e)})
 
                 case CursorMoveMessage():
                     self.cursors.setdefault(room_id, {})[conn.player_id] = {
@@ -846,9 +834,7 @@ class RoomManager:
         active_multiplier = compute_effective_multiplier(stored_mult, last_correct_at, now)
 
         prev_turn_player_id = (
-            room["state"].get("current_player_id")
-            if isinstance(room["state"], dict)
-            else None
+            room["state"].get("current_player_id") if isinstance(room["state"], dict) else None
         )
         outcome = game.apply_action(
             state=room["state"],
@@ -858,11 +844,7 @@ class RoomManager:
             player_multiplier=active_multiplier,
         )
 
-        if (
-            outcome.is_correct_entry
-            or outcome.is_mistake
-            or outcome.state != room["state"]
-        ):
+        if outcome.is_correct_entry or outcome.is_mistake or outcome.state != room["state"]:
             self.mark_player_active(room_id, player_id)
 
         new_score = float(player_row["score"])
@@ -925,9 +907,7 @@ class RoomManager:
             self._schedule_bots(room_id, game, room["config"])
 
         next_turn_player_id = (
-            outcome.state.get("current_player_id")
-            if isinstance(outcome.state, dict)
-            else None
+            outcome.state.get("current_player_id") if isinstance(outcome.state, dict) else None
         )
         if (
             not outcome.is_finished

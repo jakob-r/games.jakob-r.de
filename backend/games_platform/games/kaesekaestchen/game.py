@@ -25,9 +25,7 @@ class DrawLineAction(BaseModel):
 
 type KaesekaestchenAction = DrawLineAction
 
-KAESEKAESTCHEN_ACTION_ADAPTER: TypeAdapter[KaesekaestchenAction] = TypeAdapter(
-    KaesekaestchenAction
-)
+KAESEKAESTCHEN_ACTION_ADAPTER: TypeAdapter[KaesekaestchenAction] = TypeAdapter(KaesekaestchenAction)
 
 
 def parse_edge_key(key: str, width: int, height: int) -> tuple[str, int, int] | None:
@@ -176,8 +174,7 @@ def edge_touches_active_square(
             or (row < height and active_squares[row][col])
         )
     return bool(
-        (col > 0 and active_squares[row][col - 1])
-        or (col < width and active_squares[row][col])
+        (col > 0 and active_squares[row][col - 1]) or (col < width and active_squares[row][col])
     )
 
 
@@ -247,20 +244,14 @@ class KaesekaestchenGame:
         active_squares = compute_active_squares(width, height, border_edge_keys)
 
         # Ensure at least one square is active (fallback to full rectangle if all squares were 1x1 blocked)
-        total_active = sum(
-            1 for r in range(height) for c in range(width) if active_squares[r][c]
-        )
+        total_active = sum(1 for r in range(height) for c in range(width) if active_squares[r][c])
         if total_active == 0:
             active_squares = [[True] * width for _ in range(height)]
             border_edge_keys = set()
             total_active = width * height
 
-        h_edges: list[list[str | None]] = [
-            [None for _ in range(width)] for _ in range(height + 1)
-        ]
-        v_edges: list[list[str | None]] = [
-            [None for _ in range(width + 1)] for _ in range(height)
-        ]
+        h_edges: list[list[str | None]] = [[None for _ in range(width)] for _ in range(height + 1)]
+        v_edges: list[list[str | None]] = [[None for _ in range(width + 1)] for _ in range(height)]
 
         # Pre-populate valid border edges that touch at least one active square
         for key in border_edge_keys:

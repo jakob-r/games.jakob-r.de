@@ -76,9 +76,7 @@ def build_messages(view: dict[str, Any]) -> list[dict[str, str]]:
         if sentence:
             lines.append(f"{i}. {' '.join(sentence)}")
     wrong = [
-        str(g["text"])
-        for g in view.get("guesses") or []
-        if g.get("text") and not g.get("correct")
+        str(g["text"]) for g in view.get("guesses") or [] if g.get("text") and not g.get("correct")
     ][-MAX_PROMPT_GUESSES:]
     if wrong:
         lines.append("Already guessed (wrong, do not repeat): " + "; ".join(wrong))

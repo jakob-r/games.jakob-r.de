@@ -48,6 +48,7 @@
 	interface NorthSouthState {
 		language?: string;
 		continent?: string;
+		difficulty?: string;
 		categories?: Category[];
 		timed?: boolean;
 		end_condition?: EndCondition;
@@ -78,6 +79,11 @@
 		{ code: 'north_america', label: 'N. America' },
 		{ code: 'south_america', label: 'S. America' },
 		{ code: 'oceania', label: 'Oceania' }
+	];
+	const DIFFICULTIES = [
+		{ code: 'easy', label: 'Easy' },
+		{ code: 'medium', label: 'Medium' },
+		{ code: 'hard', label: 'Hard' }
 	];
 	const CATEGORY_INFO: Record<Category, { label: string; color: string }> = {
 		city: { label: 'City', color: '#3b6ea5' },
@@ -115,6 +121,7 @@
 
 	let cfgLanguage = $derived(String(room?.config?.language ?? 'de'));
 	let cfgContinent = $derived(String(room?.config?.continent ?? 'world'));
+	let cfgDifficulty = $derived(String(room?.config?.difficulty ?? 'medium'));
 	let cfgCategories = $derived<Category[]>(
 		Array.isArray(room?.config?.categories) ? (room?.config?.categories as Category[]) : ALL_CATEGORIES
 	);
@@ -123,6 +130,7 @@
 	let cfgTarget = $derived(Number(room?.config?.end_target ?? 10));
 
 	let continent = $derived(gameState.continent ?? cfgContinent);
+	let difficulty = $derived(gameState.difficulty ?? cfgDifficulty);
 	let timed = $derived(gameState.timed ?? cfgTimed);
 	let endCondition = $derived(gameState.end_condition ?? cfgEnd);
 	let endTarget = $derived(gameState.end_target ?? cfgTarget);
@@ -195,6 +203,7 @@
 		return { factor: 1, left: 0, limit: 0 };
 	});
 
+	let difficultyLabel = $derived(DIFFICULTIES.find((d) => d.code === difficulty)?.label ?? 'Medium');
 	let continentLabel = $derived(CONTINENTS.find((c) => c.code === continent)?.label ?? 'World');
 	let endSummary = $derived.by(() => {
 		if (endCondition === 'points') return `${endTarget} pts`;
@@ -344,7 +353,7 @@
 	});
 </script>
 
-<RoomShell {client} {roomId} title="North South Sort" subtitleItems={[continentLabel, endSummary]}>
+<RoomShell {client} {roomId} title="North South Sort" subtitleItems={[continentLabel, difficultyLabel, endSummary]}>
 	{#snippet headerActions()}
 		<TurnNotificationBell
 			{roomId}
@@ -377,6 +386,25 @@
 						</button>
 					{/each}
 				</div>
+			</div>
+
+			<div>
+				<span class="mb-1.5 block text-xs font-medium text-[#6e6a63] uppercase">Difficulty</span>
+				<div class="grid grid-cols-3 gap-2">
+					{#each DIFFICULTIES as d (d.code)}
+						<button
+							type="button"
+							disabled={!isHost}
+							onclick={() => updateConfig({ difficulty: d.code })}
+							class="cfg-btn {cfgDifficulty === d.code ? 'cfg-on' : 'cfg-off'}"
+						>
+							{d.label}
+						</button>
+					{/each}
+				</div>
+				<p class="mt-1 text-xs text-[#6e6a63]">
+					Easy: only the best-known third of the places · Medium: two thirds · Hard: everything.
+				</p>
 			</div>
 
 			<div>

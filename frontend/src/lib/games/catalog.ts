@@ -119,6 +119,7 @@ export const GAMES: GameInfo[] = [
 		defaultConfig: {
 			language: 'de',
 			continent: 'world',
+			difficulty: 'medium',
 			categories: ['city', 'landmark', 'event'],
 			timed: false,
 			end_condition: 'rounds',

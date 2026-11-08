@@ -89,9 +89,7 @@ type EmojiCharadesAction = Annotated[
     Field(discriminator="type"),
 ]
 
-EMOJI_CHARADES_ACTION_ADAPTER: TypeAdapter[EmojiCharadesAction] = TypeAdapter(
-    EmojiCharadesAction
-)
+EMOJI_CHARADES_ACTION_ADAPTER: TypeAdapter[EmojiCharadesAction] = TypeAdapter(EmojiCharadesAction)
 
 
 def pick_choices(
@@ -362,8 +360,10 @@ class EmojiCharadesGame:
 
             case GuessAction():
                 # The AI player types its guesses in in-person games too.
-                if phase != "explaining" or is_explainer or (
-                    mode != "remote" and player_id != AI_PLAYER_ID
+                if (
+                    phase != "explaining"
+                    or is_explainer
+                    or (mode != "remote" and player_id != AI_PLAYER_ID)
                 ):
                     return rejected("not_allowed")
                 word = next_state.get("word") or {}
@@ -394,7 +394,12 @@ class EmojiCharadesGame:
                 return ActionOutcome(
                     state=next_state,
                     events=[
-                        {"type": "guess_wrong", "player_id": player_id, "text": text, "close": close}
+                        {
+                            "type": "guess_wrong",
+                            "player_id": player_id,
+                            "text": text,
+                            "close": close,
+                        }
                     ],
                 )
 

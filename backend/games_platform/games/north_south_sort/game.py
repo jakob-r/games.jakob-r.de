@@ -34,6 +34,12 @@ PLAY_CONTINENTS = (
 )
 DEFAULT_CONTINENT = "world"
 
+# Difficulty filters the cards: each (continent, category) pool is ranked by how well known
+# a location is, and the bands are cumulative (easy ⊂ medium ⊂ hard = everything).
+DIFFICULTIES = ("easy", "medium", "hard")
+DIFFICULTY_SHARE = {"easy": 1 / 3, "medium": 2 / 3, "hard": 1.0}
+DEFAULT_DIFFICULTY = "medium"
+
 type EndCondition = Literal["rounds", "points", "failed_round"]
 
 END_CONDITIONS: tuple[EndCondition, ...] = ("rounds", "points", "failed_round")
@@ -93,17 +99,28 @@ def locations_by_id() -> dict[str, Location]:
     return {loc.id: loc for loc in load_locations()}
 
 
+def difficulty_score(loc: Location) -> float:
+    """Higher = better known: LLM fame (1–5) plus the number of Wikipedia languages (log)."""
+    return loc.fame + 2 * math.log10(max(loc.sitelinks, 1))
+
+
 @cache
 def _pools() -> dict[tuple[str, str], tuple[str, ...]]:
-    pools: dict[tuple[str, str], list[str]] = defaultdict(list)
+    """Ids per (continent, category), best known first ("world" ranks across continents)."""
+    pools: dict[tuple[str, str], list[Location]] = defaultdict(list)
     for loc in load_locations():
-        pools[(loc.continent, loc.category)].append(loc.id)
-        pools[("world", loc.category)].append(loc.id)
-    return {key: tuple(ids) for key, ids in pools.items()}
+        pools[(loc.continent, loc.category)].append(loc)
+        pools[("world", loc.category)].append(loc)
+    return {
+        key: tuple(loc.id for loc in sorted(locs, key=lambda x: (-difficulty_score(x), x.id)))
+        for key, locs in pools.items()
+    }
 
 
-def pool(continent: str, category: str) -> tuple[str, ...]:
-    return _pools().get((continent, category), ())
+def pool(continent: str, category: str, difficulty: str = "hard") -> tuple[str, ...]:
+    ids = _pools().get((continent, category), ())
+    share = DIFFICULTY_SHARE.get(difficulty, 1.0)
+    return ids[: math.ceil(len(ids) * share)]
 
 
 def gap_degrees(south: Location | None, north: Location | None) -> float:
@@ -154,6 +171,7 @@ class NorthSouthSortGame:
         return {
             "language": DEFAULT_LANGUAGE,
             "continent": DEFAULT_CONTINENT,
+            "difficulty": DEFAULT_DIFFICULTY,
             "categories": list(CATEGORIES),
             "timed": False,
             "end_condition": DEFAULT_END_CONDITION,
@@ -167,6 +185,9 @@ class NorthSouthSortGame:
         continent = str(raw_config.get("continent") or DEFAULT_CONTINENT)
         if continent not in PLAY_CONTINENTS:
             continent = DEFAULT_CONTINENT
+        difficulty = str(raw_config.get("difficulty") or DEFAULT_DIFFICULTY)
+        if difficulty not in DIFFICULTIES:
+            difficulty = DEFAULT_DIFFICULTY
         raw_categories = raw_config.get("categories")
         if not isinstance(raw_categories, list):
             raw_categories = list(CATEGORIES)
@@ -182,6 +203,7 @@ class NorthSouthSortGame:
         return {
             "language": language,
             "continent": continent,
+            "difficulty": difficulty,
             "categories": categories,
             "timed": bool(raw_config.get("timed", False)),
             "end_condition": condition,
@@ -200,6 +222,7 @@ class NorthSouthSortGame:
         state: dict[str, Any] = {
             "language": cfg["language"],
             "continent": cfg["continent"],
+            "difficulty": cfg["difficulty"],
             "categories": cfg["categories"],
             "timed": cfg["timed"],
             "end_condition": cfg["end_condition"],
@@ -228,7 +251,11 @@ class NorthSouthSortGame:
 
     def _draw(self, state: dict[str, Any], category: str) -> str | None:
         used = set(state["used_ids"])
-        candidates = [i for i in pool(state["continent"], category) if i not in used]
+        candidates = [
+            i
+            for i in pool(state["continent"], category, state.get("difficulty", "hard"))
+            if i not in used
+        ]
         if not candidates:
             return None
         choice = self.rng.choice(candidates)

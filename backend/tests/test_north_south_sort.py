@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import random
-from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -24,7 +23,9 @@ from games_platform.main import create_app
 A, B = "player_a", "player_b"
 
 
-def loc(id_: str, category: str, lat: float, half: float = 0.1) -> Location:
+def loc(
+    id_: str, category: str, lat: float, half: float = 0.1, fame: int = 3, sitelinks: int = 50
+) -> Location:
     return Location(
         id=id_,
         category=category,  # type: ignore[arg-type]
@@ -44,16 +45,16 @@ def loc(id_: str, category: str, lat: float, half: float = 0.1) -> Location:
         country_en="Testland",
         country_de="Testland",
         continent="europe",
-        fame=3,
-        sitelinks=50,
+        fame=fame,
+        sitelinks=sitelinks,
     )
 
 
 FAKE = [
-    loc("C1", "city", 50.0),
-    loc("C2", "city", 40.0),
-    loc("C3", "city", 60.0),
-    loc("C4", "city", 30.0),
+    loc("C1", "city", 50.0, fame=5),
+    loc("C2", "city", 40.0, fame=3, sitelinks=200),
+    loc("C3", "city", 60.0, fame=3, sitelinks=20),
+    loc("C4", "city", 30.0, fame=2),
     loc("L1", "landmark", 45.0),
     loc("L2", "landmark", 55.0),
     loc("L3", "landmark", 35.0),
@@ -66,11 +67,8 @@ FAKE = [
 @pytest.fixture(autouse=True)
 def fake_locations(monkeypatch: pytest.MonkeyPatch) -> None:
     by_id = {x.id: x for x in FAKE}
-    pools: dict[tuple[str, str], list[str]] = defaultdict(list)
-    for x in FAKE:
-        pools[(x.continent, x.category)].append(x.id)
-        pools[("world", x.category)].append(x.id)
-    frozen = {k: tuple(v) for k, v in pools.items()}
+    monkeypatch.setattr(game_module, "load_locations", lambda: FAKE)
+    frozen = game_module._pools.__wrapped__()  # the real ranking, on the fake locations
     monkeypatch.setattr(game_module, "locations_by_id", lambda: by_id)
     monkeypatch.setattr(game_module, "_pools", lambda: frozen)
 
@@ -94,7 +92,8 @@ def new_state(
     config: dict[str, Any] | None = None, players: list[str] | None = None
 ) -> tuple[NorthSouthSortGame, dict[str, Any]]:
     game = NorthSouthSortGame(rng=random.Random(1))
-    state = game.create_initial_state(config or {}, players or [A, B])
+    # Most tests want the full pool; difficulty has its own tests.
+    state = game.create_initial_state({"difficulty": "hard", **(config or {})}, players or [A, B])
     return game, state
 
 
@@ -367,6 +366,7 @@ def test_validate_config() -> None:
     assert cfg == {
         "language": "de",
         "continent": "world",
+        "difficulty": "medium",
         "categories": ["event"],
         "timed": True,
         "end_condition": "points",
@@ -374,6 +374,44 @@ def test_validate_config() -> None:
     }
     assert game.validate_config({"categories": []})["categories"] == ["city", "landmark", "event"]
     assert game.validate_config({"end_condition": "failed_round"})["end_target"] == 0
+    assert game.validate_config({"difficulty": "easy"})["difficulty"] == "easy"
+    assert game.validate_config({"difficulty": "brutal"})["difficulty"] == "medium"
+
+
+def test_difficulty_score_orders_by_fame_then_languages() -> None:
+    by_id = {x.id: x for x in FAKE}
+    scores = [game_module.difficulty_score(by_id[i]) for i in ("C1", "C2", "C3", "C4")]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_difficulty_pools_are_cumulative() -> None:
+    easy = game_module.pool("europe", "city", "easy")
+    medium = game_module.pool("europe", "city", "medium")
+    hard = game_module.pool("europe", "city", "hard")
+    assert easy == ("C1", "C2")  # ceil(4 / 3)
+    assert medium == ("C1", "C2", "C3")  # ceil(8 / 3)
+    assert hard == ("C1", "C2", "C3", "C4")
+    assert game_module.pool("europe", "city", "bogus") == hard
+
+
+def test_easy_game_draws_only_from_easy_pool() -> None:
+    for seed in range(10):
+        game = NorthSouthSortGame(rng=random.Random(seed))
+        state = game.create_initial_state({"difficulty": "easy"}, [A])
+        dealt = [state["axis"][0]["id"], *(i for i in state["hands"][A].values() if i)]
+        allowed = {
+            i
+            for category in ("city", "landmark", "event")
+            for i in game_module.pool("world", category, "easy")
+        }
+        assert set(dealt) <= allowed
+
+
+def test_state_without_difficulty_draws_from_full_pool() -> None:
+    game, state = new_state()
+    del state["difficulty"]
+    state["used_ids"] = ["C1", "C2", "C3"]
+    assert game._draw(state, "city") == "C4"
 
 
 def test_real_dataset_pools_cover_every_continent(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -383,6 +421,8 @@ def test_real_dataset_pools_cover_every_continent(monkeypatch: pytest.MonkeyPatc
     for continent in game_module.PLAY_CONTINENTS:
         for category in ("city", "landmark", "event"):
             assert len(game_module.pool(continent, category)) >= 20, (continent, category)
+            easy = game_module.pool(continent, category, "easy")
+            assert len(easy) >= 8, (continent, category)
 
 
 def test_north_south_sort_websocket_lifecycle() -> None:

@@ -69,10 +69,7 @@ def test_full_multiplayer_sudoku_room_lifecycle() -> None:
             # Peer adds a corner note to an empty cell
             cells = playing_1["state"]["cells"]
             empty_cells = [
-                (r, c)
-                for r in range(9)
-                for c in range(9)
-                if cells[r][c]["value"] is None
+                (r, c) for r in range(9) for c in range(9) if cells[r][c]["value"] is None
             ]
             empty_r, empty_c = empty_cells[0]
             ws2.send_json(
@@ -142,7 +139,9 @@ def test_full_multiplayer_sudoku_room_lifecycle() -> None:
             assert bob_after_2["multiplier"] == 1.21
 
             # Join a new player into the running game, do nothing, and disconnect -> auto-leaves the room
-            ws_url_spectator = f"/ws/sudoku/{room_id}?player_id=peer_idle&name=IdleSpectator&color=%239333ea"
+            ws_url_spectator = (
+                f"/ws/sudoku/{room_id}?player_id=peer_idle&name=IdleSpectator&color=%239333ea"
+            )
             with client.websocket_connect(ws_url_spectator) as ws_idle:
                 joined_snap_1 = ws1.receive_json()
                 _ = ws2.receive_json()
@@ -171,23 +170,17 @@ def test_full_multiplayer_sudoku_room_lifecycle() -> None:
         forbidden_host_leave = client.delete(f"/api/rooms/{room_id}/players/host_1")
         assert forbidden_host_leave.status_code == 403
 
-        forbidden_peer_kick = client.delete(
-            f"/api/rooms/{room_id}/players/host_1?actor_id=peer_2"
-        )
+        forbidden_peer_kick = client.delete(f"/api/rooms/{room_id}/players/host_1?actor_id=peer_2")
         assert forbidden_peer_kick.status_code == 403
 
         # Join a third player and have host remove them
         ws_url_3 = f"/ws/sudoku/{room_id}?player_id=peer_3&name=Charlie&color=%2316a34a"
         with client.websocket_connect(ws_url_3) as ws3:
             _ = ws3.receive_json()
-            non_host_kick = client.delete(
-                f"/api/rooms/{room_id}/players/peer_3?actor_id=peer_2"
-            )
+            non_host_kick = client.delete(f"/api/rooms/{room_id}/players/peer_3?actor_id=peer_2")
             assert non_host_kick.status_code == 403
 
-            host_kick = client.delete(
-                f"/api/rooms/{room_id}/players/peer_3?actor_id=host_1"
-            )
+            host_kick = client.delete(f"/api/rooms/{room_id}/players/peer_3?actor_id=host_1")
             assert host_kick.status_code == 200
             assert host_kick.json() == {
                 "status": "removed",
@@ -231,15 +224,30 @@ def test_room_expiration_cleanup() -> None:
         # r_with_moves_old: playing with moves, 370 days old -> should be deleted
         r1 = client.post(
             "/api/rooms",
-            json={"game_slug": "sudoku", "host_player_id": "u1", "host_name": "A", "host_color": "#2563eb"},
+            json={
+                "game_slug": "sudoku",
+                "host_player_id": "u1",
+                "host_name": "A",
+                "host_color": "#2563eb",
+            },
         ).json()["room_id"]
         r2 = client.post(
             "/api/rooms",
-            json={"game_slug": "sudoku", "host_player_id": "u1", "host_name": "A", "host_color": "#2563eb"},
+            json={
+                "game_slug": "sudoku",
+                "host_player_id": "u1",
+                "host_name": "A",
+                "host_color": "#2563eb",
+            },
         ).json()["room_id"]
         r3 = client.post(
             "/api/rooms",
-            json={"game_slug": "sudoku", "host_player_id": "u1", "host_name": "A", "host_color": "#2563eb"},
+            json={
+                "game_slug": "sudoku",
+                "host_player_id": "u1",
+                "host_name": "A",
+                "host_color": "#2563eb",
+            },
         ).json()["room_id"]
 
         async def _backdate() -> list[str]:
@@ -278,7 +286,9 @@ def test_room_expiration_cleanup() -> None:
         assert client.get(f"/api/rooms/{r2}").status_code == 200
         assert client.get(f"/api/rooms/{r3}").status_code == 404
         assert client.get("/api/players/stats_old/stats").json()["summary"]["games_completed"] == 0
-        assert client.get("/api/players/stats_recent/stats").json()["summary"]["games_completed"] == 1
+        assert (
+            client.get("/api/players/stats_recent/stats").json()["summary"]["games_completed"] == 1
+        )
         client.delete(f"/api/rooms/{r2}?player_id=u1")
 
         async def _drop_stats() -> None:
@@ -359,9 +369,7 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
         stranger = subscribe("peer_2", peer_endpoint)
         assert stranger.status_code == 403
 
-        status_before = client.get(
-            f"/api/rooms/{room_id}/notifications/status?player_id=peer_2"
-        )
+        status_before = client.get(f"/api/rooms/{room_id}/notifications/status?player_id=peer_2")
         assert status_before.status_code == 200
         assert status_before.json()["subscribed"] is False
 
@@ -388,15 +396,12 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
         for index in range(2, 6):
             endpoint = quote(f"https://fcm.googleapis.com/fcm/send/peer2-{index}", safe="")
             removed = client.delete(
-                f"/api/rooms/{room_id}/notifications/subscribe"
-                f"?player_id=peer_2&endpoint={endpoint}"
+                f"/api/rooms/{room_id}/notifications/subscribe?player_id=peer_2&endpoint={endpoint}"
             )
             assert removed.status_code == 200
             assert removed.json()["deleted"] == 1
 
-        status_after = client.get(
-            f"/api/rooms/{room_id}/notifications/status?player_id=peer_2"
-        )
+        status_after = client.get(f"/api/rooms/{room_id}/notifications/status?player_id=peer_2")
         assert status_after.status_code == 200
         assert status_after.json() == {
             "room_id": room_id,
@@ -435,15 +440,11 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
         assert f"/{room_id}" in str(dispatched[0]["data"])
 
         # 5. Unsubscribe peer_2 and verify status
-        unsub_res = client.delete(
-            f"/api/rooms/{room_id}/notifications/subscribe?player_id=peer_2"
-        )
+        unsub_res = client.delete(f"/api/rooms/{room_id}/notifications/subscribe?player_id=peer_2")
         assert unsub_res.status_code == 200
         assert unsub_res.json()["deleted"] == 1
 
-        status_final = client.get(
-            f"/api/rooms/{room_id}/notifications/status?player_id=peer_2"
-        )
+        status_final = client.get(f"/api/rooms/{room_id}/notifications/status?player_id=peer_2")
         assert status_final.json()["subscribed"] is False
 
         # 6. A 401 from the push service drops that endpoint.
@@ -469,12 +470,8 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
 
             client.portal.call(app.state.room_manager.flush_push_tasks)
 
-        status_pruned = client.get(
-            f"/api/rooms/{room_id}/notifications/status?player_id=peer_2"
-        )
+        status_pruned = client.get(f"/api/rooms/{room_id}/notifications/status?player_id=peer_2")
         assert status_pruned.json()["subscribed"] is False
         assert len(dispatched) == 1
 
         client.delete(f"/api/rooms/{room_id}?player_id=host_1")
-
-

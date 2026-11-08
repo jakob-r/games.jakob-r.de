@@ -71,9 +71,7 @@ def test_protection_and_ownership_stealing() -> None:
         ["L", "I", "N", "E"],
         ["D", "O", "G", "S"],
     ]
-    state["values"] = [
-        [get_letter_score(ch, "en") for ch in row] for row in state["letters"]
-    ]
+    state["values"] = [[get_letter_score(ch, "en") for ch in row] for row in state["letters"]]
 
     # Turn 1: p1 plays CATS at (0,0), (0,1), (0,2), (0,3) + (1,0) -> let's play "COLD" at (0,0),(1,0),(2,0),(3,0)
     m1 = game.apply_action(
@@ -251,9 +249,7 @@ def test_four_player_turn_rotation_and_multi_steal() -> None:
         ["L", "I", "N", "E"],
         ["B", "I", "R", "D"],
     ]
-    state["values"] = [
-        [get_letter_score(ch, "en") for ch in row] for row in state["letters"]
-    ]
+    state["values"] = [[get_letter_score(ch, "en") for ch in row] for row in state["letters"]]
     # Pre-assign (0,0) to p2 and (0,1) to p3 so p1 steals from both in one word
     state["owners"][0][0] = "p2"
     state["owners"][0][1] = "p3"
