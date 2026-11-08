@@ -92,7 +92,7 @@ class FragmentoryGame:
             if deck:
                 hands[pid] = deck.pop()
         return {
-            "cells": {cell_key(0, 0): make_cell("cross", 0)},
+            "cells": {cell_key(0, 0): make_cell("t", 0)},
             "deck": deck,
             "hands": hands,
             "turn_order": turn_order,

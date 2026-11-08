@@ -244,7 +244,7 @@
 			return `${continent} • ${item.config?.difficulty ?? 'medium'} • ${end}`;
 		}
 		if (item.game_slug === 'fragmentory') {
-			return '38 cards';
+			return '42 cards';
 		}
 		if (item.game_slug === 'emoji-charades') {
 			const mode = item.config?.mode === 'remote' ? 'Remote' : 'In person';

@@ -245,7 +245,8 @@ Scoring:
 - Occupied areas that are fully enclosed by lines get double points, indicated by a slightly darker color.
 
 Clarifications:
-- The starting cross is an extra card; the deck keeps all 38 cards.
+- The starting card is an extra T piece; the deck keeps all its cards.
+- The deck also has 4 blank cards without any line (one area); 42 cards in total.
 - Claiming an area is optional. A card that fits nowhere is discarded.
 - A player may only occupy a new area if the move does not increase one of their current areas (no area of the placed card joins an area holding their colour). So the area is chosen after placing the card; the areas that may be occupied are marked with empty circles.
 - Unclaimed (white) areas can be placed next to anything and merge immediately. A tie turns the area gray; it resolves once one colour leads by two cards (through later merges).

@@ -175,10 +175,11 @@ def test_game_turns_and_scores() -> None:
     game = FragmentoryGame()
     state = game.create_initial_state({}, [A, B])
     assert state["current_player_id"] == A
-    assert len(state["deck"]) == 38 - 2
+    assert len(state["deck"]) == 42 - 2
+    assert state["cells"][cell_key(0, 0)]["type"] == "t"
     view = game.get_public_view(state, {})
-    assert "deck" not in view and view["deck_size"] == 36
-    assert sum(view["deck_counts"].values()) == 36
+    assert "deck" not in view and view["deck_size"] == 40
+    assert sum(view["deck_counts"].values()) == 40
 
     out = game.apply_action(state, {}, B, {"type": "place", "row": 0, "col": 1, "rot": 1}, 1.0)
     assert out.events[0]["reason"] == "not_your_turn"
@@ -190,7 +191,7 @@ def test_game_turns_and_scores() -> None:
     assert out.events[0]["type"] == "card_placed"
     assert out.points_delta == 2 - 1  # territory 2, area grew by 1
     assert out.state["current_player_id"] == B
-    assert out.state["hands"][A] != "" and len(out.state["deck"]) == 35
+    assert out.state["hands"][A] != "" and len(out.state["deck"]) == 39
 
     out = game.apply_action(out.state, {}, B, {"type": "discard"}, 1.0)
     assert out.events[0]["reason"] == "card_fits"
@@ -241,6 +242,6 @@ def test_random_game_runs_to_the_end() -> None:
             totals[other] += delta
         state = out.state
         moves += 1
-    assert moves == 38
+    assert moves == 42
     assert not state["hands"] and not state["deck"]
     assert totals == {pid: float(v) for pid, v in total_scores(state).items()}

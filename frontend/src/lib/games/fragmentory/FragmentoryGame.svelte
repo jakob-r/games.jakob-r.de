@@ -14,15 +14,16 @@
 		CARD_ORDER,
 		CARD_SHAPES,
 		CARD_TYPES,
+		DECK_COUNTS,
 		GRAY,
 		boundingArea,
 		boundingBox,
-		cardAreas,
 		cellKey,
 		claimAllowed,
 		computeRegions,
 		fits,
 		growsOwnArea,
+		shapeKey,
 		frontier,
 		labelPoint,
 		parseKey,
@@ -81,6 +82,8 @@
 	};
 	const GRAY_FILL = '#8a857c';
 	const INK = '#1a1917';
+
+	const DECK_TOTAL = Object.values(DECK_COUNTS).reduce((a, b) => a + b, 0);
 
 	const client = new RoomSocketClient();
 
@@ -239,15 +242,22 @@
 	function rotate() {
 		if (!myCard) return;
 		message = null;
+		const card = myCard;
 		if (!pending) {
-			rot = (rot + 1) % 4;
+			const current = shapeKey(card, rot);
+			for (let step = 1; step < 4; step++) {
+				if (shapeKey(card, (rot + step) % 4) !== current) {
+					rot = (rot + step) % 4;
+					break;
+				}
+			}
 			return;
 		}
-		const card = myCard;
 		const p = pending;
-		for (let step = 1; step <= 4; step++) {
+		const current = shapeKey(card, rot);
+		for (let step = 1; step < 4; step++) {
 			const r = (rot + step) % 4;
-			if (fits(cells, p.row, p.col, card, r)) {
+			if (shapeKey(card, r) !== current && fits(cells, p.row, p.col, card, r)) {
 				rot = r;
 				break;
 			}
@@ -319,19 +329,8 @@
 		<rect x="0" y="0" width="1" height="1" rx="0.04" fill="#fff" stroke={INK} stroke-width="0.03" />
 		<g transform="rotate({r * 90} .5 .5)">
 			{#each CARD_SHAPES[type].areas as d, i (i)}
-				{#if interactive && pending}
-					<path
-						{d}
-						role="button"
-						tabindex="0"
-						aria-label="Claim area {i + 1}"
-						aria-pressed={claim === i}
-						class="area-btn {claimOptions[i] ? 'cursor-pointer' : ''}"
-						fill={claim === i ? profile.primaryColor : '#fff'}
-						fill-opacity={claim === i ? 0.75 : 1}
-						onclick={() => toggleClaim(i)}
-						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleClaim(i)}
-					/>
+				{#if interactive && pending && claim === i}
+					<path {d} fill={profile.primaryColor} fill-opacity="0.75" />
 				{/if}
 			{/each}
 			<path d={CARD_SHAPES[type].lines} stroke={INK} stroke-width="0.07" stroke-linecap="round" fill="none" />
@@ -339,6 +338,21 @@
 				<circle cx=".5" cy=".45" r=".06" fill={INK} />
 			{/if}
 		</g>
+		{#if interactive}
+			<rect
+				x="0"
+				y="0"
+				width="1"
+				height="1"
+				fill="transparent"
+				role="button"
+				tabindex="0"
+				aria-label="Rotate card"
+				class="cursor-pointer"
+				onclick={rotate}
+				onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && rotate()}
+			/>
+		{/if}
 		{#if interactive && pending}
 			{@render claimMarks(type, r, 0.08)}
 		{/if}
@@ -362,7 +376,10 @@
 				fill={claim === i ? profile.primaryColor : '#fff'}
 				stroke={INK}
 				stroke-width={radius * 0.3}
-				onclick={() => toggleClaim(i)}
+				onclick={(e) => {
+					e.stopPropagation();
+					toggleClaim(i);
+				}}
 				onkeydown={() => {}}
 			/>
 		{/if}
@@ -403,7 +420,7 @@
 					enclosed by lines score double.
 				</li>
 				<li>Growing the used rectangle costs 1 point per new unit.</li>
-				<li>The game ends when all 38 cards are played.</li>
+				<li>The game ends when all 42 cards are played.</li>
 			</ul>
 		</div>
 	{/snippet}
@@ -506,7 +523,7 @@
 								aria-label="Place card at row {spot.row}, column {spot.col}"
 								class="spot cursor-pointer"
 								fill={INK}
-								fill-opacity={spot.rots.includes(rot) ? 0.13 : 0.05}
+								fill-opacity="0.1"
 								onclick={() => chooseSpot(spot.row, spot.col, spot.rots)}
 								onkeydown={(e) =>
 									(e.key === 'Enter' || e.key === ' ') && chooseSpot(spot.row, spot.col, spot.rots)}
@@ -528,18 +545,6 @@
 								{#each CARD_SHAPES[cell.type].areas as d, i (i)}
 									{@const style = areaStyle(key, i)}
 									<path {d} fill={style.fill} fill-opacity={style.opacity} class="area-fill" />
-									{#if isPending && claimOptions[i]}
-										<path
-											{d}
-											fill="transparent"
-											class="cursor-pointer"
-											role="button"
-											tabindex="-1"
-											aria-label="Claim area {i + 1}"
-											onclick={() => toggleClaim(i)}
-											onkeydown={() => {}}
-										/>
-									{/if}
 								{/each}
 								<path
 									d={CARD_SHAPES[cell.type].lines}
@@ -554,6 +559,20 @@
 								{/if}
 							</g>
 							{#if isPending && myCard}
+								<!-- Tap the placed card to rotate it; tap a circle to occupy an area. -->
+								<rect
+									x="0"
+									y="0"
+									width="1"
+									height="1"
+									fill="transparent"
+									role="button"
+									tabindex="-1"
+									aria-label="Rotate card"
+									class="cursor-pointer"
+									onclick={rotate}
+									onkeydown={() => {}}
+								/>
 								{@render claimMarks(myCard, rot, 0.09)}
 							{/if}
 							{#if cell.claimed !== null && cell.placed_by && !isPending}
@@ -653,7 +672,7 @@
 							{:else if !claimOptions.some(Boolean)}
 								No new area here{growsMine ? ' — this move grows your area' : ''}. Place it?
 							{:else if claim === null}
-								Tap a circle to occupy that area (optional), then place.
+								Tap the card to rotate, a circle to occupy that area (optional), then place.
 							{:else}
 								Ready to place.
 							{/if}
@@ -702,7 +721,7 @@
 		>
 			<div class="w-full max-w-sm rounded border-[2px] border-[#1a1917] bg-[#faf8f4] p-4" role="dialog" aria-modal="true" aria-label="Cards left in the deck">
 				<div class="mb-3 flex items-center justify-between">
-					<h2 class="font-hand text-xl">Deck · {deckSize} left</h2>
+					<h2 class="font-hand text-xl">Deck · {deckSize}/{DECK_TOTAL}</h2>
 					<button type="button" class="cursor-pointer text-xl leading-none" aria-label="Close" onclick={() => (showDeck = false)}>×</button>
 				</div>
 				<ul class="space-y-2">
@@ -710,8 +729,11 @@
 						<li class="flex items-center gap-3">
 							<CardIcon {type} size={36} />
 							<span class="flex-1 text-sm">{CARD_LABELS[type]}</span>
-							<span class="text-xs text-[#6e6a63]">{cardAreas(type, 0).length} area{cardAreas(type, 0).length > 1 ? 's' : ''}</span>
-							<span class="font-mono-num w-6 text-right font-semibold">{gameState.deck_counts?.[type] ?? 0}</span>
+							<span class="font-mono-num text-right">
+								<span class="font-semibold">{gameState.deck_counts?.[type] ?? 0}</span><span
+									class="text-[#6e6a63]">/{DECK_COUNTS[type]}</span
+								>
+							</span>
 						</li>
 					{/each}
 				</ul>
@@ -756,7 +778,6 @@
 	svg [role='button'] {
 		outline: none;
 	}
-	.area-btn:focus-visible,
 	.spot:focus-visible {
 		fill-opacity: 0.22;
 	}

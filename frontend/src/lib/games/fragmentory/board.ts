@@ -6,7 +6,7 @@
  * E = 2, 3, S = 4 (east half), 5, W = 6 (south half), 7.
  */
 
-export type CardType = 'straight' | 'curve' | 'cross' | 't' | 'end';
+export type CardType = 'straight' | 'curve' | 'cross' | 't' | 'end' | 'blank';
 
 export interface Cell {
 	type: CardType;
@@ -53,17 +53,29 @@ export const CARD_TYPES: Record<CardType, { lines: number[]; areas: number[][] }
 			[5, 6]
 		]
 	},
-	end: { lines: [0], areas: [[0, 1, 2, 3, 4, 5, 6, 7]] }
+	end: { lines: [0], areas: [[0, 1, 2, 3, 4, 5, 6, 7]] },
+	blank: { lines: [], areas: [[0, 1, 2, 3, 4, 5, 6, 7]] }
 };
 
-export const CARD_ORDER: CardType[] = ['straight', 'curve', 'cross', 't', 'end'];
+export const CARD_ORDER: CardType[] = ['straight', 'curve', 'cross', 't', 'end', 'blank'];
+
+/** Cards per type in a full deck (mirrors DECK_COUNTS in board.py). */
+export const DECK_COUNTS: Record<CardType, number> = {
+	straight: 6,
+	curve: 12,
+	cross: 6,
+	t: 10,
+	end: 4,
+	blank: 4
+};
 
 export const CARD_LABELS: Record<CardType, string> = {
 	straight: 'Straight',
 	curve: 'Curve',
 	cross: 'Cross',
 	t: 'T section',
-	end: 'Line end'
+	end: 'Line end',
+	blank: 'Blank'
 };
 
 const SIDE_OFFSETS: [number, number][] = [
@@ -88,6 +100,14 @@ export function cardLines(type: CardType, rot: number): Set<number> {
 
 export function cardAreas(type: CardType, rot: number): number[][] {
 	return CARD_TYPES[type].areas.map((area) => area.map((h) => (h + 2 * rot) % 8));
+}
+
+/** Same key = the card looks the same in both rotations (e.g. a straight turned by 180°). */
+export function shapeKey(type: CardType, rot: number): string {
+	return cardAreas(type, rot)
+		.map((area) => [...area].sort((x, y) => x - y).join(','))
+		.sort()
+		.join('|');
 }
 
 function halfToArea(type: CardType, rot: number): number[] {
@@ -410,6 +430,11 @@ export const CARD_SHAPES: Record<
 		areas: ['M0 0H1V1H0Z'],
 		lines: 'M.5 0V.45',
 		labels: [[0.5, 0.72]]
+	},
+	blank: {
+		areas: ['M0 0H1V1H0Z'],
+		lines: '',
+		labels: [[0.5, 0.5]]
 	}
 };
 
