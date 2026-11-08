@@ -114,7 +114,7 @@ To share components across games while allowing any game to be extracted and run
      - `standalone.py`: Standalone FastAPI entrypoint.
    - **Frontend (`frontend/src/lib/games/fragmentory/`)**:
      - `board.ts`: Client mirror of `board.py` (regions, legal spots, claims, placement preview, scoring) plus the card shapes for drawing.
-     - `FragmentoryGame.svelte`: SVG board (cards + one ring of legal spots, dashed used-area frame), tap a spot, then tap the card (on the board or in the bar) or ↻ to rotate through the fitting rotations (visually identical ones, `shapeKey`, are skipped), then tap one of the empty circles (bottom bar or board) marking the areas that may be occupied; the pending move is previewed on the board and in the player bar (italics). Region shading: pale = one card, solid = open, dark = enclosed, gray = tie. Deck modal with cards left per type (`left/total`).
+     - `FragmentoryGame.svelte`: SVG board (cards + one ring of legal spots, dashed used-area frame), tap a spot, then tap the card (on the board or in the bar) or ↻ to rotate through the fitting rotations (visually identical ones, `shapeKey`, are skipped), then tap one of the empty circles (bottom bar or board) marking the areas that may be occupied; the pending move is previewed on the board and in the player bar (italics). Each player's latest card has a thin frame in their colour. Region shading: pale = one card, solid = open, dark = enclosed, gray = tie. Deck modal with cards left per type (`left/total`).
      - `CardIcon.svelte`: Small line-only card icon.
 
 `ActionOutcome.extra_score_deltas` lets a single action credit other players (minesweeper flag challenges); `RoomManager` applies those deltas after the actor's score update.

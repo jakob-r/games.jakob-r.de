@@ -148,6 +148,17 @@
 	let shownCells = $derived<Cells>(preview?.cells ?? cells);
 	let shownRegions = $derived(preview ? computeRegions(shownCells) : regionsNow);
 
+	// Each player's most recently placed card (key -> player id).
+	let lastCardOf = $derived.by(() => {
+		const latest = new Map<string, { key: string; move: number }>();
+		for (const [key, cell] of Object.entries(cells)) {
+			if (!cell.placed_by) continue;
+			const prev = latest.get(cell.placed_by);
+			if (!prev || cell.move > prev.move) latest.set(cell.placed_by, { key, move: cell.move });
+		}
+		return new Map([...latest].map(([pid, { key }]) => [key, pid]));
+	});
+
 	function totals(territory: Record<string, number>, penalties: Record<string, number>) {
 		const out: Record<string, number> = {};
 		for (const id of new Set([...Object.keys(territory), ...Object.keys(penalties)]))
@@ -599,6 +610,19 @@
 								stroke-dasharray={isPending ? '0.1 0.06' : 'none'}
 								pointer-events="none"
 							/>
+							{#if !isPending && lastCardOf.has(key)}
+								<!-- Thin frame in the colour of the player whose latest card this is. -->
+								<rect
+									x="0.025"
+									y="0.025"
+									width="0.95"
+									height="0.95"
+									fill="none"
+									stroke={playerColor(lastCardOf.get(key)!)}
+									stroke-width="0.025"
+									pointer-events="none"
+								/>
+							{/if}
 						</g>
 					{/each}
 
