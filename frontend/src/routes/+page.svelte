@@ -47,7 +47,6 @@
 
 	interface ServerTotals {
 		games_finished: number;
-		players: number;
 		points_scored: number;
 	}
 
@@ -560,11 +559,6 @@
 							<span class="font-mono-num text-[#1a1917]"
 								>{serverTotals.points_scored.toLocaleString('en')}</span
 							> points scored
-						</li>
-						<li>
-							<span class="font-mono-num text-[#1a1917]"
-								>{serverTotals.players.toLocaleString('en')}</span
-							> players with stats
 						</li>
 					</ul>
 				</div>

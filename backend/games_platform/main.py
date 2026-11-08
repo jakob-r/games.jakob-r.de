@@ -367,7 +367,6 @@ def create_app(
             },
             "server": {
                 "games_finished": int(totals.get("games_finished", 0)),
-                "players": int(totals.get("players", 0)),
                 "points_scored": round(float(totals.get("points_scored", 0))),
             },
             "by_game": [

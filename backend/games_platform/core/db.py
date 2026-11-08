@@ -539,14 +539,13 @@ class Database:
             return {r["game_slug"]: int(r["n"]) for r in rows}
 
     async def get_server_totals(self) -> dict[str, float]:
-        """A few site-wide fun numbers (finished rooms, human players with stats, points scored)."""
+        """A few site-wide fun numbers (finished rooms, points scored)."""
         pool = self._require_pool()
         async with pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
                 SELECT
                     (SELECT COUNT(*) FROM rooms WHERE status = 'finished') AS games_finished,
-                    COUNT(DISTINCT player_id) AS players,
                     COALESCE(SUM(total_score), 0) AS points_scored
                 FROM player_stats
                 """
