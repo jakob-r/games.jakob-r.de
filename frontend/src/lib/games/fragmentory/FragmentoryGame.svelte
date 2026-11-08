@@ -554,10 +554,12 @@
 					{/if}
 				</span>
 				<div class="flex shrink-0 gap-1.5">
-					<button type="button" onclick={() => (showDeck = true)} class="chip-btn">
+					<button type="button" onclick={() => (showDeck = true)} class="h-8 cursor-pointer border border-[#1a1917] bg-[#faf8f4] px-2.5 text-xs font-medium hover:bg-[#f2eee6]">
 						Deck · {deckSize}
 					</button>
-					<button type="button" onclick={() => (showRules = true)} class="chip-btn">Rules</button>
+					<button type="button" onclick={() => (showRules = true)} class="h-8 cursor-pointer border border-[#1a1917] bg-[#faf8f4] px-2.5 text-xs font-medium hover:bg-[#f2eee6]">
+						Rules
+					</button>
 				</div>
 			</div>
 
@@ -747,23 +749,23 @@
 								{/if}
 							</div>
 							<div class="flex flex-wrap gap-2">
-								<button
-									type="button"
-									disabled={!isMyTurn || canDiscard}
-									onclick={rotate}
-									class="action-btn"
-									aria-label="Rotate card"
-								>
+								<ScribblyButton onclick={rotate} disabled={!isMyTurn || canDiscard}>
 									↻ Rotate
-								</button>
+								</ScribblyButton>
 								{#if canDiscard}
-									<button type="button" onclick={discard} class="action-btn action-primary">Discard</button>
+									<ScribblyButton
+										onclick={discard}
+										variant="primary"
+										accentColor={profile.primaryColor}
+									>
+										Discard
+									</ScribblyButton>
 								{:else}
-									<button
-										type="button"
-										disabled={!isMyTurn || !preview}
+									<ScribblyButton
 										onclick={place}
-										class="action-btn action-primary"
+										disabled={!isMyTurn || !preview}
+										variant="primary"
+										accentColor={profile.primaryColor}
 									>
 										Place{#if previewScores?.[profile.playerId] !== undefined}
 											{@const me = players.find((p) => p.player_id === profile.playerId)}
@@ -771,10 +773,12 @@
 												{formatPoints((previewScores[profile.playerId] ?? 0) - (me?.score ?? 0))}
 											</span>
 										{/if}
-									</button>
+									</ScribblyButton>
 								{/if}
 								{#if isHost}
-									<button type="button" onclick={endGame} class="action-btn ml-auto">End game</button>
+									<ScribblyButton onclick={endGame} variant="ghost" class="ml-auto">
+										End game
+									</ScribblyButton>
 								{/if}
 							</div>
 						</div>
@@ -803,42 +807,43 @@
 	</div>
 
 	{#if showRules}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<div
-			class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
-			role="presentation"
+			class="fixed inset-0 z-50 flex items-center justify-center bg-[#1a1917]/40 p-4"
+			role="dialog"
+			tabindex="-1"
+			aria-modal="true"
+			aria-labelledby="fragmentory-rules-title"
 			onclick={(e) => e.target === e.currentTarget && (showRules = false)}
 		>
-			<div
-				class="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded border-[2px] border-[#1a1917] bg-[#faf8f4] p-4"
-				role="dialog"
-				aria-modal="true"
-				aria-label="Rules"
-			>
-				<div class="mb-3 flex items-center justify-between">
-					<h2 class="font-hand text-xl">Rules</h2>
-					<button
-						type="button"
-						class="cursor-pointer text-xl leading-none"
-						aria-label="Close"
-						onclick={() => (showRules = false)}>×</button
-					>
+			<ScribblyBox seed={71} class="w-full max-w-md bg-[#faf8f4] p-5 sm:p-6">
+				<h2 id="fragmentory-rules-title" class="font-hand mb-3 text-2xl">Rules</h2>
+				<div class="max-h-[60dvh] overflow-y-auto">
+					{@render rules()}
 				</div>
-				{@render rules()}
-			</div>
+				<div class="mt-5 flex justify-end">
+					<ScribblyButton onclick={() => (showRules = false)}>Close</ScribblyButton>
+				</div>
+			</ScribblyBox>
 		</div>
 	{/if}
 
 	{#if showDeck}
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 		<div
-			class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
-			role="presentation"
+			class="fixed inset-0 z-50 flex items-center justify-center bg-[#1a1917]/40 p-4"
+			role="dialog"
+			tabindex="-1"
+			aria-modal="true"
+			aria-labelledby="fragmentory-deck-title"
 			onclick={(e) => e.target === e.currentTarget && (showDeck = false)}
 		>
-			<div class="w-full max-w-sm rounded border-[2px] border-[#1a1917] bg-[#faf8f4] p-4" role="dialog" aria-modal="true" aria-label="Cards left in the deck">
-				<div class="mb-3 flex items-center justify-between">
-					<h2 class="font-hand text-xl">Deck · {deckSize}/{DECK_TOTAL}</h2>
-					<button type="button" class="cursor-pointer text-xl leading-none" aria-label="Close" onclick={() => (showDeck = false)}>×</button>
-				</div>
+			<ScribblyBox seed={79} class="w-full max-w-sm bg-[#faf8f4] p-5 sm:p-6">
+				<h2 id="fragmentory-deck-title" class="font-hand mb-3 text-2xl">
+					Deck · {deckSize}/{DECK_TOTAL}
+				</h2>
 				<ul class="space-y-2">
 					{#each CARD_ORDER as type (type)}
 						<li class="flex items-center gap-3">
@@ -853,47 +858,15 @@
 					{/each}
 				</ul>
 				<p class="mt-3 text-xs text-[#6e6a63]">Cards in players’ hands are not counted.</p>
-			</div>
+				<div class="mt-5 flex justify-end">
+					<ScribblyButton onclick={() => (showDeck = false)}>Close</ScribblyButton>
+				</div>
+			</ScribblyBox>
 		</div>
 	{/if}
 </RoomShell>
 
 <style>
-	.chip-btn {
-		cursor: pointer;
-		border-radius: 0.25rem;
-		border: 1.5px solid #1a1917;
-		padding: 0.125rem 0.5rem;
-		font-size: 0.75rem;
-		font-weight: 600;
-	}
-	.chip-btn:hover {
-		background: #f2eee6;
-	}
-	.action-btn {
-		cursor: pointer;
-		border-radius: 0.25rem;
-		border: 1.5px solid #1a1917;
-		padding: 0.4rem 0.8rem;
-		font-size: 0.85rem;
-		font-weight: 600;
-		background: #faf8f4;
-		transition: background-color 0.15s;
-	}
-	.action-btn:not(:disabled):hover {
-		background: #f2eee6;
-	}
-	.action-btn:disabled {
-		cursor: default;
-		opacity: 0.4;
-	}
-	.action-primary {
-		background: #1a1917;
-		color: #faf8f4;
-	}
-	.action-primary:not(:disabled):hover {
-		background: #33312d;
-	}
 	.spot {
 		transition: fill-opacity 0.15s;
 	}
