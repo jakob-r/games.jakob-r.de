@@ -208,4 +208,46 @@ Game play:
 7. The played location is immediately replaced by a new random location of the same category.
 8. The game ends when the game end condition is met.
 
+### Fragmentory
+
+A turn based multiplayer game where players try to build big territories by placing square cards with separation lines on the board.
+The goal of each player is to build the biggest territories in their own color.
+
+
+The cards:
+- 6 straight lines: two areas
+- 12 curves: two areas
+- 6 crosses: four areas
+- 10 T sections: three areas
+- 4 line ending pieces: one area
+- each card can be rotated
+- in an info modal every player can see how many cards of each type are left in the deck-
+
+The board:
+- infinite grid
+- the used area is (min needed hight for all cards) x (min needed width for all cards)
+
+1. The game starts with a cross card
+2. each player gets a random card from the deck, cards are visible to all players.
+3. the active player can rotate his card and decide which of the areas on the card he wants to occupy with their color.
+4. the player places the card on the board but it has to match on all sides:
+  * empty side to empty side
+  * side with a line to side with a line
+  * a occupied side cannot go next to a occupied side of another player
+  * an empty side can got next to an occupied side (no matter which color) and it will take the color of the occupied side
+5. if the new card increases the used area, the player gets minus points equal to units of (new used area - old used area)
+6. if the new card merges two occupied areas of different colors the color area with more units takes over the area. If there is a tie the area will be marked gray. The tie will be resolved as soon as one color area is bigger by two units.
+7. The game ends when the deck is empty.
+
+Scoring:
+- Increasing the used area decreases the score by the number of units of (new used area - old used area)
+- For each card that has an occupied area the player gets one point, except for areas with just one card - this should be indicated by a lighter color.
+- Occupied areas that are fully enclosed by lines get double points, indicated by a slightly darker color.
+
+
+
+
+
+
+
 
