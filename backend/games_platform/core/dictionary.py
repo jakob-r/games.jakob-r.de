@@ -3,6 +3,7 @@
 Languages with a bundled word list (`BUNDLED_WORDLISTS`) use only that list. Others fall back
 to `wordfreq` (top 75k tokens) plus curated 2-letter words.
 German: enz/german-wordlist (CC0), a full-form list built for word games.
+English: ENABLE (public domain), the classic word-game list incl. inflections.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ DEFAULT_LANGUAGE = "de"
 
 _DATA_DIR = Path(__file__).parent / "data"
 # Bundled full word lists (one UTF-8 word per line, gzipped); these replace wordfreq.
-BUNDLED_WORDLISTS: dict[str, str] = {"de": "de_words.txt.gz"}
+BUNDLED_WORDLISTS: dict[str, str] = {"de": "de_words.txt.gz", "en": "en_words.txt.gz"}
 
 # Integer rarity scores between 1 and 10 per language (higher = rarer letter).
 LETTER_SCORES: dict[str, dict[str, int]] = {
@@ -139,15 +140,6 @@ LETTER_SCORES: dict[str, dict[str, int]] = {
 
 # Standard valid 2-letter words per language to ensure classic Scrabble-style short plays work reliably.
 EXTRA_VALID_WORDS: dict[str, tuple[str, ...]] = {
-    "en": (
-        "AA", "AB", "AD", "AE", "AG", "AH", "AI", "AL", "AM", "AN", "AR", "AS", "AT", "AW", "AX", "AY",
-        "BA", "BE", "BI", "BO", "BY", "DA", "DE", "DO", "ED", "EF", "EH", "EL", "EM", "EN", "ER", "ES",
-        "ET", "EW", "EX", "FA", "FE", "GI", "GO", "HA", "HE", "HI", "HM", "HO", "ID", "IF", "IN", "IS",
-        "IT", "JO", "KA", "KI", "LA", "LI", "LO", "MA", "ME", "MI", "MM", "MO", "MU", "MY", "NA", "NE",
-        "NO", "NU", "OD", "OE", "OF", "OH", "OI", "OK", "OM", "ON", "OP", "OR", "OS", "OW", "OX", "OY",
-        "PA", "PE", "PI", "PO", "QI", "RE", "SH", "SI", "SO", "TA", "TE", "TI", "TO", "UH", "UM", "UN",
-        "UP", "US", "UT", "WE", "WO", "XI", "XU", "YA", "YE", "YO", "ZA",
-    ),
     "fr": (
         "AA", "AH", "AI", "AN", "AS", "AU", "AY", "BI", "BU", "CA", "CE", "CI", "DA", "DE", "DO", "DU",
         "EH", "EN", "ES", "ET", "EU", "EX", "FA", "FI", "GO", "HA", "HE", "HI", "HO", "IF", "IL", "IN",
