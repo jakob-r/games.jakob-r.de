@@ -557,6 +557,19 @@
 									{@const style = areaStyle(key, i)}
 									<path {d} fill={style.fill} fill-opacity={style.opacity} class="area-fill" />
 								{/each}
+								{#if !isPending && lastCardOf.has(key)}
+									<!-- The grid line of this card in the colour of the player whose latest card it is, under the card's lines. -->
+									<rect
+										x="0.0075"
+										y="0.0075"
+										width="0.985"
+										height="0.985"
+										fill="none"
+										stroke={playerColor(lastCardOf.get(key)!)}
+										stroke-width="0.015"
+										pointer-events="none"
+									/>
+								{/if}
 								<path
 									d={CARD_SHAPES[cell.type].lines}
 									stroke={INK}
@@ -605,24 +618,11 @@
 								height="1"
 								fill="none"
 								stroke={INK}
-								stroke-opacity={isPending ? 0.9 : 0.18}
+								stroke-opacity={isPending ? 0.9 : lastCardOf.has(key) ? 0 : 0.18}
 								stroke-width={isPending ? 0.05 : 0.015}
 								stroke-dasharray={isPending ? '0.1 0.06' : 'none'}
 								pointer-events="none"
 							/>
-							{#if !isPending && lastCardOf.has(key)}
-								<!-- Thin frame in the colour of the player whose latest card this is. -->
-								<rect
-									x="0.025"
-									y="0.025"
-									width="0.95"
-									height="0.95"
-									fill="none"
-									stroke={playerColor(lastCardOf.get(key)!)}
-									stroke-width="0.025"
-									pointer-events="none"
-								/>
-							{/if}
 						</g>
 					{/each}
 
