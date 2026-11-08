@@ -353,6 +353,7 @@ def create_app(
         games_won = sum(int(r["games_won"]) for r in rows)
         total_score = round(sum(float(r["total_score"]) for r in rows), 2)
         best_score = round(max((float(r["best_score"]) for r in rows), default=0.0), 2)
+        totals = await active_db.get_server_totals()
 
         return {
             "player_id": player_id,
@@ -363,6 +364,11 @@ def create_app(
                 "games_won": games_won,
                 "total_score": total_score,
                 "best_score": best_score,
+            },
+            "server": {
+                "games_finished": int(totals.get("games_finished", 0)),
+                "players": int(totals.get("players", 0)),
+                "points_scored": round(float(totals.get("points_scored", 0))),
             },
             "by_game": [
                 {

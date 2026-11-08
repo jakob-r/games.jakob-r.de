@@ -45,6 +45,12 @@
 		games_completed: number;
 	}
 
+	interface ServerTotals {
+		games_finished: number;
+		players: number;
+		points_scored: number;
+	}
+
 	interface GameStats {
 		game_slug: string;
 		games_played: number;
@@ -59,6 +65,7 @@
 	let recentRooms = $state<RecentRoom[]>([]);
 	let stats = $state<PlayerStatsSummary | null>(null);
 	let statsByGame = $state<GameStats[]>([]);
+	let serverTotals = $state<ServerTotals | null>(null);
 	// Most played first, then catalog title.
 	const sortedStatsByGame = $derived(
 		[...statsByGame]
@@ -104,6 +111,7 @@
 				const data = await statsRes.json();
 				stats = data.summary;
 				statsByGame = data.by_game ?? [];
+				serverTotals = data.server ?? null;
 			}
 		} catch (e) {
 			console.error('Failed to load player dashboard:', e);
@@ -513,7 +521,7 @@
 
 		<!-- Personal Stats -->
 		<ScribblyBox seed={43} class="bg-[#faf8f4] p-4 sm:p-6">
-			<h2 class="font-hand mb-3 text-xl">Stats</h2>
+			<h2 class="font-hand mb-3 text-xl">Your stats</h2>
 			<p class="text-sm">
 				Completed games: <span class="font-mono-num font-bold">{stats?.games_completed ?? 0}</span>
 			</p>
@@ -538,6 +546,28 @@
 						</li>
 					{/each}
 				</ul>
+			{/if}
+			{#if serverTotals}
+				<div class="mt-5 border-t border-[#1a1917]/15 pt-4">
+					<h3 class="font-hand mb-2 text-lg">Everyone on this site</h3>
+					<ul class="ml-5 list-disc space-y-0.5 text-sm text-[#6e6a63] marker:text-[#1a1917]/40">
+						<li>
+							<span class="font-mono-num text-[#1a1917]"
+								>{serverTotals.games_finished.toLocaleString('en')}</span
+							> games finished
+						</li>
+						<li>
+							<span class="font-mono-num text-[#1a1917]"
+								>{serverTotals.points_scored.toLocaleString('en')}</span
+							> points scored
+						</li>
+						<li>
+							<span class="font-mono-num text-[#1a1917]"
+								>{serverTotals.players.toLocaleString('en')}</span
+							> players with stats
+						</li>
+					</ul>
+				</div>
 			{/if}
 		</ScribblyBox>
 	</div>
