@@ -217,20 +217,22 @@
 		return points > 0 ? `+${points}` : `${points}`.replace('-', '−');
 	}
 
-	function describeMove(move: PlacedMove | DiscardedMove): string {
-		const who = playerName(move.player_id);
-		const mine = move.score_deltas?.[move.player_id] ?? 0;
-		if (move.type === 'card_discarded') return `${who} could not place a ${CARD_LABELS[move.card]}.`;
-		const parts = [`${who} placed a ${CARD_LABELS[move.card]}`];
-		if (move.area === null) parts.push('without claiming');
-		if (move.takeovers.length > 0)
-			parts.push(`— ${move.takeovers.map((t) => playerName(t.winner)).join(', ')} took over an area`);
-		return `${parts.join(' ')} (${formatPoints(mine)}).`;
+	/** Points of a move, with the area penalty split out: "+3 (+6 −3)". */
+	function movePoints(move: PlacedMove | DiscardedMove): string {
+		if (move.type === 'card_discarded') return 'discarded';
+		const total = move.score_deltas?.[move.player_id] ?? 0;
+		if (!move.penalty) return formatPoints(total);
+		return `${formatPoints(total)} (${formatPoints(total + move.penalty)} ${formatPoints(-move.penalty)})`;
 	}
+
+	function describeMove(move: PlacedMove | DiscardedMove): string {
+		return `${playerName(move.player_id)}: ${movePoints(move)}`;
+	}
+
 
 	let turnNotificationHint = $derived.by(() => {
 		if (!lastMove) return isPlaying ? `Fragmentory #${roomId} has started — your move!` : '';
-		return `${describeMove(lastMove)} Your move!`;
+		return `${describeMove(lastMove)}. Your move!`;
 	});
 
 	let winners = $derived.by(() => {
@@ -476,7 +478,12 @@
 					{#if message}
 						<span class="text-[#b5523b]">{message}</span>
 					{:else if lastMove}
-						<span class="text-[#6e6a63]">{describeMove(lastMove)}</span>
+						<span class="font-mono-num text-[#6e6a63]">
+							<span class="font-sans font-semibold" style="color: {playerColor(lastMove.player_id)}"
+								>{playerName(lastMove.player_id)}</span
+							>
+							{movePoints(lastMove)}
+						</span>
 					{:else if isPlaying}
 						<span class="text-[#6e6a63]">
 							{currentPlayerId === profile.playerId ? 'You start.' : `${playerName(currentPlayerId)} starts.`}
