@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { PRESET_PLAYER_COLORS } from '$lib/core/color';
+	import { auth } from '$lib/core/auth.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 
 	let {
@@ -26,6 +27,7 @@
 		const trimmed = draftName.trim();
 		if (trimmed) {
 			profile.setName(trimmed);
+			auth.saveProfile({ name: profile.name });
 			onChange?.(profile.name, profile.primaryColor);
 		}
 	}
@@ -48,6 +50,7 @@
 
 	function selectColor(hex: string) {
 		profile.setColor(hex);
+		auth.saveProfile({ color: profile.primaryColor });
 		onChange?.(profile.name, profile.primaryColor);
 	}
 </script>

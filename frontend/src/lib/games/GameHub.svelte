@@ -6,6 +6,7 @@
 	import SeoHead from '$lib/core/components/SeoHead.svelte';
 	import ScribblyBox from '$lib/core/components/ScribblyBox.svelte';
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
+	import { auth } from '$lib/core/auth.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 	import {
 		SITE_ORIGIN,
@@ -240,9 +241,11 @@
 	</header>
 
 	<div class="space-y-6">
-		<ScribblyBox seed={7} class="bg-[#faf8f4] p-4 sm:p-6">
-			<ProfileBadge />
-		</ScribblyBox>
+		{#if !auth.user}
+			<ScribblyBox seed={7} class="bg-[#faf8f4] p-4 sm:p-6">
+				<ProfileBadge />
+			</ScribblyBox>
+		{/if}
 
 		<ScribblyBox seed={game.boxSeed} class="bg-[#faf8f4] p-4 sm:p-6">
 			<h2 class="font-hand text-xl">Play</h2>

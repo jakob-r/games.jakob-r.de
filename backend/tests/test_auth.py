@@ -145,8 +145,24 @@ def test_change_password_and_delete_account(client: TestClient, sent: list[dict[
     )
 
 
+def test_update_profile_name_and_color(client: TestClient, sent: list[dict[str, str]]) -> None:
+    client.post("/api/auth/register", json={"email": _email(), "password": "hunter2hunter2"})
+    assert client.get("/api/auth/me").json()["user"]["color"] == ""
+
+    res = client.post("/api/auth/account/profile", json={"name": " Ada ", "color": "#DC2626"})
+    assert res.status_code == 200
+    assert (res.json()["name"], res.json()["color"]) == ("Ada", "#dc2626")
+
+    # Fields left out (or a blank name) keep their value.
+    res = client.post("/api/auth/account/profile", json={"name": "  ", "color": "#2563eb"})
+    assert (res.json()["name"], res.json()["color"]) == ("Ada", "#2563eb")
+    assert client.post("/api/auth/account/profile", json={"color": "red"}).status_code == 422
+    assert client.get("/api/auth/me").json()["user"]["color"] == "#2563eb"
+
+
 def test_requires_login(client: TestClient) -> None:
     assert client.post("/api/auth/account/name", json={"name": "x"}).status_code == 401
+    assert client.post("/api/auth/account/profile", json={"name": "x"}).status_code == 401
 
 
 def test_google_disabled_without_credentials(

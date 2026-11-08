@@ -4,6 +4,8 @@ export interface AccountUser {
 	id: number;
 	email: string;
 	name: string;
+	/** Account ink colour, '' until the user picks one. */
+	color: string;
 	player_id: string;
 	email_verified: boolean;
 	has_password: boolean;
@@ -65,9 +67,28 @@ class AuthStore {
 		if (user) {
 			profile.setPlayerId(user.player_id);
 			if (user.name) profile.setName(user.name);
+			if (user.color) profile.setColor(user.color);
+			else this.saveProfile({ color: profile.primaryColor });
 		} else if (wasSignedIn) {
 			profile.resetAnonymous();
 		}
+	}
+
+	private saveTimer: ReturnType<typeof setTimeout> | null = null;
+	private pending: { name?: string; color?: string } = {};
+
+	/** Store name/colour on the account (debounced, so typing and colour drags send one request). */
+	saveProfile(changes: { name?: string; color?: string }): void {
+		if (!this.user) return;
+		this.pending = { ...this.pending, ...changes };
+		if (this.saveTimer) clearTimeout(this.saveTimer);
+		this.saveTimer = setTimeout(async () => {
+			const body = this.pending;
+			this.pending = {};
+			this.saveTimer = null;
+			const res = await authRequest<AccountUser>('/account/profile', body);
+			if (res.ok && res.data && this.user) this.user = res.data;
+		}, 400);
 	}
 
 	async logout(): Promise<void> {

@@ -496,14 +496,15 @@
 						Game Over!
 					{/if}
 				</div>
-				{#if isHost}
-					<div class="mt-3 flex justify-center gap-2">
-						<ScribblyButton onclick={() => client.startGame()} variant="primary">
-							Play Again
+				<div class="mt-3 flex justify-center gap-2">
+					{#if isHost}
+						<ScribblyButton onclick={() => client.returnToLobby()} variant="primary">
+							New Round
 						</ScribblyButton>
-						<ScribblyButton onclick={() => client.returnToLobby()}>Lobby</ScribblyButton>
-					</div>
-				{/if}
+					{:else}
+						<p class="text-sm text-[#6e6a63]">Waiting for the host to start a new round…</p>
+					{/if}
+				</div>
 			</ScribblyBox>
 
 			<FinalMap

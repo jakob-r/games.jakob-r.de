@@ -354,9 +354,11 @@
 				</p>
 				<div class="mt-3 flex justify-center gap-2">
 					{#if isHost}
-						<ScribblyButton onclick={() => client.returnToLobby()}>
-							Back to Lobby
+						<ScribblyButton onclick={() => client.returnToLobby()} variant="primary">
+							New Round
 						</ScribblyButton>
+					{:else}
+						<p class="text-sm text-[#6e6a63]">Waiting for the host to start a new round…</p>
 					{/if}
 				</div>
 			</ScribblyBox>

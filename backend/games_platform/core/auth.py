@@ -81,6 +81,7 @@ def public_user(row: dict[str, Any]) -> dict[str, Any]:
         "id": row["id"],
         "email": row["email"],
         "name": row["display_name"],
+        "color": row.get("color") or "",
         "player_id": row["player_id"],
         "email_verified": row["email_verified_at"] is not None,
         "has_password": row["password_hash"] is not None,
@@ -203,6 +204,23 @@ class AuthService:
                 "INSERT INTO oauth_accounts (provider, subject, user_id) VALUES ('google', %s, %s)",
                 (subject, row["id"]),
             )
+            return row
+
+    async def update_profile(
+        self, user_id: int, *, name: str | None = None, color: str | None = None
+    ) -> dict[str, Any]:
+        async with self.db.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                UPDATE users SET
+                    display_name = COALESCE(%s, display_name),
+                    color = COALESCE(%s, color)
+                WHERE id = %s RETURNING *
+                """,
+                (name.strip()[:32] if name is not None else None, color, user_id),
+            )
+            row = await cur.fetchone()
+            assert row is not None
             return row
 
     async def update_name(self, user_id: int, name: str) -> dict[str, Any]:

@@ -98,6 +98,9 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
     expires_at TIMESTAMPTZ NOT NULL
 );
 
+-- Added after launch: the account's ink colour ('' = not set yet).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS color TEXT NOT NULL DEFAULT '';
+
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id);
 
 CREATE TABLE IF NOT EXISTS auth_email_tokens (

@@ -69,6 +69,11 @@ class NameBody(BaseModel):
     name: str = Field(max_length=64)
 
 
+class ProfileBody(BaseModel):
+    name: str | None = Field(default=None, max_length=64)
+    color: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
+
+
 class PasswordBody(BaseModel):
     current_password: str | None = Field(default=None, max_length=256)
     new_password: str = Field(max_length=256)
@@ -254,6 +259,14 @@ def create_auth_router(service: AuthService) -> APIRouter:
         body: NameBody, user: Annotated[dict[str, Any], Depends(require_user)]
     ) -> dict[str, Any]:
         return public_user(await service.update_name(user["id"], body.name))
+
+    @router.post("/account/profile")
+    async def change_profile(
+        body: ProfileBody, user: Annotated[dict[str, Any], Depends(require_user)]
+    ) -> dict[str, Any]:
+        name = body.name if body.name and body.name.strip() else None
+        color = body.color.lower() if body.color else None
+        return public_user(await service.update_profile(user["id"], name=name, color=color))
 
     @router.post("/account/password")
     async def change_password(

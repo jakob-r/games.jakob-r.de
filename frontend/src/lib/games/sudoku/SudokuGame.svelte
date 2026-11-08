@@ -281,16 +281,15 @@
 		{#if room?.status === 'finished'}
 			<ScribblyBox seed={55} class="bg-[#faf8f4] p-4 text-center">
 				<div class="font-hand text-xl">Board Completed!</div>
-				{#if isHost}
-					<div class="mt-3 flex justify-center gap-2">
-						<ScribblyButton onclick={() => client.startGame()} variant="primary">
-							New Board
+				<div class="mt-3 flex justify-center gap-2">
+					{#if isHost}
+						<ScribblyButton onclick={() => client.returnToLobby()} variant="primary">
+							New Round
 						</ScribblyButton>
-						<ScribblyButton onclick={() => client.returnToLobby()}>
-							Lobby
-						</ScribblyButton>
-					</div>
-				{/if}
+					{:else}
+						<p class="text-sm text-[#6e6a63]">Waiting for the host to start a new round…</p>
+					{/if}
+				</div>
 			</ScribblyBox>
 		{/if}
 

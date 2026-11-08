@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import AuthShell from '$lib/core/components/AuthShell.svelte';
+	import ProfileBadge from '$lib/core/components/ProfileBadge.svelte';
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
-	import { auth, authRequest, type AccountUser } from '$lib/core/auth.svelte';
+	import { auth, authRequest } from '$lib/core/auth.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 
-	let name = $state('');
 	let currentPassword = $state('');
 	let newPassword = $state('');
 	let deleteConfirmation = $state('');
@@ -16,9 +16,6 @@
 	$effect(() => {
 		if (auth.loaded && !auth.user) void goto('/login?next=/account', { replaceState: true });
 	});
-	$effect(() => {
-		if (auth.user) name = auth.user.name;
-	});
 
 	async function run(fn: () => Promise<{ ok: boolean; error: string }>, success: string) {
 		error = '';
@@ -27,17 +24,6 @@
 		if (res.ok) notice = success;
 		else error = res.error;
 		return res.ok;
-	}
-
-	function saveName() {
-		return run(async () => {
-			const res = await authRequest<AccountUser>('/account/name', { name });
-			if (res.ok && res.data) {
-				auth.user = res.data;
-				if (res.data.name) profile.setName(res.data.name);
-			}
-			return res;
-		}, 'Name saved.');
 	}
 
 	async function changePassword() {
@@ -98,17 +84,11 @@
 			<p class="text-xs font-medium text-[#15803d]" role="status">{notice}</p>
 		{/if}
 
-		<form
-			class="space-y-2"
-			onsubmit={(e) => {
-				e.preventDefault();
-				void saveName();
-			}}
-		>
-			<label for="acc-name" class="text-sm font-medium">Display name</label>
-			<input id="acc-name" type="text" bind:value={name} maxlength="32" class={inputClass} />
-			<ScribblyButton type="submit">Save name</ScribblyButton>
-		</form>
+		<section class="space-y-2">
+			<h2 class="text-sm font-medium">Name &amp; color</h2>
+			<p class="text-xs text-[#6e6a63]">Saved to your account and used in every game.</p>
+			<ProfileBadge />
+		</section>
 
 		<form
 			class="space-y-2"

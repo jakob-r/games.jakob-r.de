@@ -137,10 +137,24 @@
 		}
 	}
 
+	/** Accepts "abc123", "#abc123" or a pasted room link like https://…/sudoku/abc123?x#y. */
+	function parseRoomCode(input: string): string {
+		let text = input.trim();
+		if (text.includes('/')) {
+			try {
+				text = new URL(text, window.location.origin).pathname;
+			} catch {
+				text = text.split(/[?#]/)[0];
+			}
+			text = text.split('/').filter(Boolean).pop() ?? '';
+		}
+		return text.toLowerCase().replace(/^#/, '');
+	}
+
 	async function handleJoinByCode(e: SubmitEvent) {
 		e.preventDefault();
 		joinError = null;
-		const code = joinCode.trim().toLowerCase().replace(/^#/, '');
+		const code = parseRoomCode(joinCode);
 		if (!code) return;
 		try {
 			const res = await fetch(`/api/rooms/${encodeURIComponent(code)}`);
@@ -274,9 +288,10 @@
 			<input
 				type="text"
 				bind:value={joinCode}
-				placeholder="Room ID…"
-				maxlength="12"
-				class="font-mono-num w-28 rounded-md border-[1.6px] border-[#1a1917] bg-white px-2.5 py-1.5 text-xs focus:outline-none"
+				placeholder="Room ID or link…"
+				aria-label="Room ID or link"
+				maxlength="300"
+				class="font-mono-num w-32 rounded-md border-[1.6px] border-[#1a1917] bg-white px-2.5 py-1.5 text-xs focus:outline-none"
 			/>
 			<ScribblyButton type="submit">Join Room</ScribblyButton>
 			<ScribblyButton
@@ -300,90 +315,20 @@
 	{/if}
 
 	<div class="space-y-6">
-		<!-- Section 1: Player Identity & Primary Color -->
-		<ScribblyBox seed={7} class="bg-[#faf8f4] p-4 sm:p-6">
-			<ProfileBadge />
-		</ScribblyBox>
-
-		<!-- Games -->
-		{#each sortedGames as game (game.slug)}
-			<ScribblyBox seed={game.boxSeed} class="bg-[#faf8f4] p-4 sm:p-6">
-				<div class="flex items-start gap-3 sm:gap-4">
-					<a
-						href={gamePath(game.slug)}
-						class="shrink-0 transition-transform duration-150 hover:-rotate-2 hover:scale-105"
-						aria-label="{game.title} details"
-					>
-						<GameLogo slug={game.slug} class="h-14 w-14 sm:h-16 sm:w-16" />
-					</a>
-					<div class="min-w-0 flex-1">
-						<div class="flex items-center justify-between gap-2">
-							<a href={gamePath(game.slug)} class="group min-w-0">
-								<h2 class="font-hand text-2xl group-hover:underline group-hover:decoration-[#1a1917]/40 group-hover:underline-offset-4">
-									{game.title}
-								</h2>
-							</a>
-							<span
-								title={game.playersAria}
-								aria-label={game.playersAria}
-								class="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-[#6e6a63]"
-							>
-								<svg
-									class="h-4 w-4"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									aria-hidden="true"
-								>
-									<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-									<circle cx="9" cy="7" r="4" />
-									<path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-									<path d="M16 3.13a4 4 0 0 1 0 7.75" />
-								</svg>
-								<span class="font-mono-num">{game.playersLabel}</span>
-							</span>
-						</div>
-
-						<p class="mt-1.5 text-sm text-[#6e6a63]">
-							{game.tagline}
-						</p>
-
-						<div class="mt-4 flex flex-wrap items-center gap-2">
-							<ScribblyButton
-								onclick={() => createRoom(game)}
-								disabled={creatingSlug === game.slug}
-								variant="primary"
-								accentColor={profile.primaryColor}
-								class="w-full sm:w-auto"
-							>
-								{creatingSlug === game.slug ? 'Creating Room…' : game.createLabel}
-							</ScribblyButton>
-							<a
-								href={gamePath(game.slug)}
-								class="inline-flex w-full items-center justify-center rounded-md border-[1.8px] border-[#1a1917] bg-[#faf8f4] px-3.5 py-2 text-sm font-medium shadow-[2px_2px_0px_#1a1917] transition hover:bg-[#f2eee6] sm:w-auto"
-							>
-								About →
-							</a>
-						</div>
-					</div>
-				</div>
+		<!-- Player identity & color (signed-in users edit this under Account) -->
+		{#if !auth.user}
+			<ScribblyBox seed={7} class="bg-[#faf8f4] p-4 sm:p-6">
+				<ProfileBadge />
 			</ScribblyBox>
-		{/each}
+		{/if}
 
 		<!-- Recently Played & Resume -->
-		<ScribblyBox seed={31} class="bg-[#faf8f4] p-4 sm:p-6">
-			<div class="mb-3 flex items-center justify-between">
-				<h2 class="font-hand text-xl">Recent Games</h2>
-			</div>
+		{#if recentRooms.length > 0}
+			<ScribblyBox seed={31} class="bg-[#faf8f4] p-4 sm:p-6">
+				<div class="mb-3 flex items-center justify-between">
+					<h2 class="font-hand text-xl">Recent Games</h2>
+				</div>
 
-			{#if recentRooms.length === 0}
-				<p class="py-3 text-sm text-[#6e6a63]">
-					No recent games yet.
-				</p>
-			{:else}
 				<ul class="divide-y divide-[#1a1917]/10">
 					{#each recentRooms as item (item.room_id)}
 						<li class="flex items-center justify-between gap-3 py-2.5">
@@ -478,8 +423,76 @@
 						</li>
 					{/each}
 				</ul>
-			{/if}
-		</ScribblyBox>
+			</ScribblyBox>
+		{/if}
+
+		<!-- Games -->
+		{#each sortedGames as game (game.slug)}
+			<ScribblyBox seed={game.boxSeed} class="bg-[#faf8f4] p-4 sm:p-6">
+				<div class="flex items-start gap-3 sm:gap-4">
+					<a
+						href={gamePath(game.slug)}
+						class="shrink-0 transition-transform duration-150 hover:-rotate-2 hover:scale-105"
+						aria-label="{game.title} details"
+					>
+						<GameLogo slug={game.slug} class="h-14 w-14 sm:h-16 sm:w-16" />
+					</a>
+					<div class="min-w-0 flex-1">
+						<div class="flex items-center justify-between gap-2">
+							<a href={gamePath(game.slug)} class="group min-w-0">
+								<h2 class="font-hand text-2xl group-hover:underline group-hover:decoration-[#1a1917]/40 group-hover:underline-offset-4">
+									{game.title}
+								</h2>
+							</a>
+							<span
+								title={game.playersAria}
+								aria-label={game.playersAria}
+								class="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-[#6e6a63]"
+							>
+								<svg
+									class="h-4 w-4"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+									aria-hidden="true"
+								>
+									<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+									<circle cx="9" cy="7" r="4" />
+									<path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+									<path d="M16 3.13a4 4 0 0 1 0 7.75" />
+								</svg>
+								<span class="font-mono-num">{game.playersLabel}</span>
+							</span>
+						</div>
+
+						<p class="mt-1.5 text-sm text-[#6e6a63]">
+							{game.tagline}
+						</p>
+
+						<div class="mt-4 flex flex-wrap items-center gap-2">
+							<ScribblyButton
+								onclick={() => createRoom(game)}
+								disabled={creatingSlug === game.slug}
+								variant="primary"
+								accentColor={profile.primaryColor}
+								class="w-full sm:w-auto"
+							>
+								{creatingSlug === game.slug ? 'Creating Room…' : game.createLabel}
+							</ScribblyButton>
+							<a
+								href={gamePath(game.slug)}
+								class="inline-flex w-full items-center justify-center rounded-md border-[1.8px] border-[#1a1917] bg-[#faf8f4] px-3.5 py-2 text-sm font-medium shadow-[2px_2px_0px_#1a1917] transition hover:bg-[#f2eee6] sm:w-auto"
+							>
+								About →
+							</a>
+						</div>
+					</div>
+				</div>
+			</ScribblyBox>
+		{/each}
 
 		<!-- Personal Stats -->
 		<ScribblyBox seed={43} class="bg-[#faf8f4] p-4 sm:p-6">
