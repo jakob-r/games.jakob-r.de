@@ -13,7 +13,6 @@
 </script>
 
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { geoEquirectangular, geoGraticule10, geoPath, type GeoPermissibleObjects } from 'd3-geo';
 
 	let {
@@ -88,12 +87,22 @@
 				[bounds.e, bounds.s]
 			]
 		};
-		return geoEquirectangular().fitExtent(
-			[
-				[4, 4],
-				[WIDTH - 4, height - 4]
-			],
-			frame as unknown as GeoPermissibleObjects
+		return (
+			geoEquirectangular()
+				.fitExtent(
+					[
+						[4, 4],
+						[WIDTH - 4, height - 4]
+					],
+					frame as unknown as GeoPermissibleObjects
+				)
+				// Clip paths to the visible map. Unclipped, a zoomed-in land path spans tens of
+				// thousands of pixels and the scribble filter (sized to the path's bounding box)
+				// rasterises it at low resolution: blurry coastlines without outlines.
+				.clipExtent([
+					[0, 0],
+					[WIDTH, height]
+				])
 		);
 	});
 
@@ -131,9 +140,15 @@
 		}
 	}
 
-	onMount(() => {
+	// Zoomed-in maps (a single continent) get the finer coastline; it is only fetched then.
+	let detailed = $derived(bounds.e - bounds.w < 100);
+
+	$effect(() => {
 		let cancelled = false;
-		Promise.all([import('topojson-client'), import('world-atlas/land-110m.json')]).then(
+		const atlasImport = detailed
+			? import('world-atlas/land-50m.json')
+			: import('world-atlas/land-110m.json');
+		Promise.all([import('topojson-client'), atlasImport]).then(
 			([topojson, atlas]) => {
 				if (cancelled) return;
 				const topo = ('default' in atlas ? atlas.default : atlas) as unknown as Parameters<
