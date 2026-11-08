@@ -41,7 +41,14 @@ CARD_TYPES: dict[str, dict[str, Any]] = {
     "blank": {"lines": (), "areas": ((0, 1, 2, 3, 4, 5, 6, 7),)},
 }
 
-DECK_COUNTS: dict[str, int] = {"straight": 6, "curve": 12, "cross": 6, "t": 10, "end": 4, "blank": 4}
+DECK_COUNTS: dict[str, int] = {
+    "straight": 6,
+    "curve": 12,
+    "cross": 6,
+    "t": 10,
+    "end": 4,
+    "blank": 4,
+}
 
 
 def cell_key(row: int, col: int) -> str:
