@@ -476,12 +476,8 @@
 								tabindex="0"
 								aria-label="Place card at row {spot.row}, column {spot.col}"
 								class="spot cursor-pointer"
-								fill={spot.rots.includes(rot) ? '#1a1917' : 'transparent'}
-								fill-opacity="0.06"
-								stroke={INK}
-								stroke-opacity={spot.rots.includes(rot) ? 0.7 : 0.3}
-								stroke-width="0.03"
-								stroke-dasharray="0.08 0.06"
+								fill={INK}
+								fill-opacity={spot.rots.includes(rot) ? 0.13 : 0.05}
 								onclick={() => chooseSpot(spot.row, spot.col, spot.rots)}
 								onkeydown={(e) =>
 									(e.key === 'Enter' || e.key === ' ') && chooseSpot(spot.row, spot.col, spot.rots)}
@@ -528,15 +524,15 @@
 									<circle cx=".5" cy=".45" r=".05" fill={INK} pointer-events="none" />
 								{/if}
 							</g>
-							{#if cell.claimed !== null && cell.placed_by}
+							{#if cell.claimed !== null && cell.placed_by && !isPending}
+								<!-- Small mark where a player claimed an area; the pending claim shows as area fill only. -->
 								{@const [lx, ly] = labelPoint(cell.type, cell.rot, cell.claimed)}
 								<circle
 									cx={lx}
 									cy={ly}
-									r="0.07"
-									fill={playerColor(cell.placed_by)}
-									stroke={INK}
-									stroke-width="0.02"
+									r="0.035"
+									fill={INK}
+									fill-opacity="0.45"
 									pointer-events="none"
 								/>
 							{/if}
@@ -621,7 +617,7 @@
 							{#if canDiscard}
 								Your {CARD_LABELS[myCard!]} fits nowhere — discard it.
 							{:else if !pending}
-								Your turn — tap a dashed spot on the board.
+								Your turn — tap a shaded spot on the board.
 							{:else if claim === null}
 								Tap an area to claim it (optional), then place.
 							{:else}
@@ -728,11 +724,10 @@
 	}
 	.area-btn:focus-visible,
 	.spot:focus-visible {
-		stroke: #1a1917;
-		stroke-width: 0.06;
+		fill-opacity: 0.22;
 	}
 	.spot:hover {
-		fill-opacity: 0.16;
+		fill-opacity: 0.22;
 	}
 	.area-fill {
 		transition:
