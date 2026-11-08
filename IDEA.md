@@ -247,7 +247,8 @@ Scoring:
 Clarifications:
 - The starting cross is an extra card; the deck keeps all 38 cards.
 - Claiming an area is optional. A card that fits nowhere is discarded.
-- Unclaimed (white) areas can be placed next to anything and merge immediately. Gray areas are open to every player; a tie resolves once one colour leads by two cards.
+- A player may only occupy a new area if the move does not increase one of their current areas (no area of the placed card joins an area holding their colour). So the area is chosen after placing the card; the areas that may be occupied are marked with empty circles.
+- Unclaimed (white) areas can be placed next to anything and merge immediately. A tie turns the area gray; it resolves once one colour leads by two cards (through later merges).
 - When the deck is empty, the remaining hand cards are still played; the game ends when no cards are left.
 
 

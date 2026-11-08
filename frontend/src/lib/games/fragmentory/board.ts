@@ -248,6 +248,43 @@ export function frontier(cells: Cells): [number, number][] {
 	return out;
 }
 
+function touchingRegions(
+	cells: Cells,
+	regions: RegionMap,
+	row: number,
+	col: number,
+	type: CardType,
+	rot: number,
+	area: number
+): Region[] {
+	const out: Region[] = [];
+	for (const h of cardAreas(type, rot)[area]) {
+		const [dr, dc, nh] = neighborHalf(h);
+		const nkey = cellKey(row + dr, col + dc);
+		const n = cells[nkey];
+		if (n) out.push(regionOf(regions, nkey, halfToArea(n.type, n.rot)[nh]));
+	}
+	return out;
+}
+
+/** True when placing the card (unclaimed) would join one of the player's regions. */
+export function growsOwnArea(
+	cells: Cells,
+	regions: RegionMap,
+	row: number,
+	col: number,
+	type: CardType,
+	rot: number,
+	playerId: string
+): boolean {
+	return CARD_TYPES[type].areas.some((_, area) =>
+		touchingRegions(cells, regions, row, col, type, rot, area).some((r) =>
+			r.ownerCards.has(playerId)
+		)
+	);
+}
+
+/** No claim when the move grows an own area; a claimed area may not touch another player. */
 export function claimAllowed(
 	cells: Cells,
 	regions: RegionMap,
@@ -258,15 +295,11 @@ export function claimAllowed(
 	area: number,
 	playerId: string
 ): boolean {
-	for (const h of cardAreas(type, rot)[area]) {
-		const [dr, dc, nh] = neighborHalf(h);
-		const nkey = cellKey(row + dr, col + dc);
-		const n = cells[nkey];
-		if (!n) continue;
-		const color = regionColor(regionOf(regions, nkey, halfToArea(n.type, n.rot)[nh]));
-		if (color !== null && color !== GRAY && color !== playerId) return false;
-	}
-	return true;
+	if (growsOwnArea(cells, regions, row, col, type, rot, playerId)) return false;
+	return touchingRegions(cells, regions, row, col, type, rot, area).every((r) => {
+		const color = regionColor(r);
+		return color === null || color === GRAY;
+	});
 }
 
 export function placeCard(

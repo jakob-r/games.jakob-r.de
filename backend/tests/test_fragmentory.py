@@ -13,6 +13,7 @@ from games_platform.games.fragmentory.board import (
     claim_allowed,
     compute_regions,
     fits,
+    grows_own_area,
     legal_spots,
     make_cell,
     place_card,
@@ -76,37 +77,71 @@ def test_cannot_claim_next_to_opponent() -> None:
     regions = compute_regions(cells)
     assert not claim_allowed(cells, regions, 0, 2, "straight", 1, 1, B)
     assert claim_allowed(cells, regions, 0, 2, "straight", 1, 0, B)
-    assert place_card(cells, 0, 2, "straight", 1, 1, B) == "touches_opponent"
+    assert place_card(cells, 0, 2, "straight", 1, 1, B) == "claim_not_allowed"
     # Placing without a claim is fine and the unclaimed area joins A's territory.
     cells = placed(place_card(cells, 0, 2, "straight", 1, None, B))
     assert territory_scores(cells) == {A: 3}
 
 
-def test_tie_turns_gray_and_needs_lead_of_two() -> None:
-    cells = placed(place_card(start(), 0, 1, "straight", 1, 1, A))  # A: cross NE + (0,1)
-    cells = placed(place_card(cells, 0, -1, "straight", 1, 1, B))  # B: cross NW + (0,-1)
-    assert territory_scores(cells) == {A: 2, B: 2}
-    # A line ending above the cross joins NE and NW: 2 vs 2 -> gray.
-    cells = placed(place_card(cells, -1, 0, "end", 2, None, A))
-    region = compute_regions(cells).region_of((cell_key(0, 0), 0))
-    assert region.color == GRAY
-    assert territory_scores(cells) == {}
-    # Gray accepts anyone. 3 vs 2 is not enough to resolve an existing tie...
-    cells = placed(place_card(cells, 0, 2, "straight", 1, 1, A))
+def test_no_new_claim_when_the_move_grows_an_own_area() -> None:
+    cells = placed(place_card(start(), 0, 1, "straight", 1, 1, A))
+    regions = compute_regions(cells)
+    # (0, 2) extends A's north area, so A may claim nothing there (not even the south area).
+    assert grows_own_area(cells, regions, 0, 2, "straight", 1, A)
+    assert not any(claim_allowed(cells, regions, 0, 2, "straight", 1, i, A) for i in (0, 1))
+    assert place_card(cells, 0, 2, "straight", 1, 0, A) == "claim_not_allowed"
+    assert isinstance(place_card(cells, 0, 2, "straight", 1, None, A), Placement)
+    # (0, -1) only touches white areas: a new area may be claimed.
+    assert not grows_own_area(cells, regions, 0, -1, "straight", 1, A)
+    assert claim_allowed(cells, regions, 0, -1, "straight", 1, 1, A)
+
+
+def straight(owner_north: str | None = None) -> dict[str, Any]:
+    cell = make_cell("straight", 1)  # line west-east: area 0 = south, area 1 = north
+    cell["owners"][1] = owner_north
+    return cell
+
+
+def gray_board() -> dict[str, dict[str, Any]]:
+    """Cross NE + (0,1) belong to A, cross NW + (0,-1) to B, joined by a line end: gray."""
+    cells = start()
+    cells[cell_key(0, 0)]["owners"][0] = A
+    cells[cell_key(0, 0)]["owners"][3] = B
+    cells[cell_key(0, 1)] = straight(A)
+    cells[cell_key(0, -1)] = straight(B)
+    return placed(place_card(cells, -1, 0, "end", 2, None, A))
+
+
+def test_tie_turns_gray() -> None:
+    cells = gray_board()
     assert compute_regions(cells).region_of((cell_key(0, 0), 0)).color == GRAY
-    # ... 4 vs 2 is.
-    result = place_card(cells, 0, 3, "straight", 1, 1, A)
+    assert territory_scores(cells) == {}
+
+
+def test_gray_needs_lead_of_two() -> None:
+    # A one-card A area merged into the gray tie: 3 vs 2 stays gray.
+    cells = gray_board()
+    cells[cell_key(0, 3)] = straight(A)
+    cells = placed(place_card(cells, 0, 2, "straight", 1, None, B))
+    assert compute_regions(cells).region_of((cell_key(0, 0), 0)).color == GRAY
+    # A two-card A area: 4 vs 2 resolves it.
+    cells = gray_board()
+    cells[cell_key(0, 3)] = straight(A)
+    cells[cell_key(0, 4)] = straight(A)
+    result = place_card(cells, 0, 2, "straight", 1, None, B)
     assert isinstance(result, Placement)
     assert result.takeovers == [{"winner": A, "losers": [B]}]
-    region = compute_regions(result.cells).region_of((cell_key(0, 0), 0))
-    assert region.color == A
-    assert territory_scores(result.cells) == {A: 6}
+    assert compute_regions(result.cells).region_of((cell_key(0, 0), 0)).color == A
+    assert territory_scores(result.cells) == {A: 7}
 
 
 def test_fresh_merge_bigger_side_wins_by_one() -> None:
-    cells = placed(place_card(start(), 0, 1, "straight", 1, 1, A))
-    cells = placed(place_card(cells, 0, 2, "straight", 1, 1, A))  # A: 3 cards
-    cells = placed(place_card(cells, 0, -1, "straight", 1, 1, B))  # B: 2 cards
+    cells = start()
+    cells[cell_key(0, 0)]["owners"][0] = A
+    cells[cell_key(0, 0)]["owners"][3] = B
+    cells[cell_key(0, 1)] = straight(A)
+    cells[cell_key(0, 2)] = straight(A)  # A: 3 cards
+    cells[cell_key(0, -1)] = straight(B)  # B: 2 cards
     result = place_card(cells, -1, 0, "end", 2, None, B)
     assert isinstance(result, Placement)
     assert result.takeovers == [{"winner": A, "losers": [B]}]

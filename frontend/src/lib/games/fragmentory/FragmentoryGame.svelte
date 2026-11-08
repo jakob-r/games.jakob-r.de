@@ -22,6 +22,7 @@
 		claimAllowed,
 		computeRegions,
 		fits,
+		growsOwnArea,
 		frontier,
 		labelPoint,
 		parseKey,
@@ -72,7 +73,7 @@
 	const REASONS: Record<string, string> = {
 		not_your_turn: "It's not your turn.",
 		does_not_fit: "The card doesn't fit there.",
-		touches_opponent: 'That area would touch another player’s area.',
+		claim_not_allowed: 'You cannot occupy that area.',
 		invalid_area: 'That area does not exist.',
 		card_fits: 'Your card still fits somewhere.',
 		no_card: 'You have no card.',
@@ -129,6 +130,12 @@
 			claimAllowed(cells, regionsNow, p.row, p.col, card, rot, i, profile.playerId)
 		);
 	});
+
+	let growsMine = $derived(
+		isMyTurn && myCard !== null && pending !== null
+			? growsOwnArea(cells, regionsNow, pending.row, pending.col, myCard, rot, profile.playerId)
+			: false
+	);
 
 	let preview = $derived.by(() => {
 		if (!isMyTurn || !myCard || !pending) return null;
@@ -319,8 +326,8 @@
 						tabindex="0"
 						aria-label="Claim area {i + 1}"
 						aria-pressed={claim === i}
-						class="area-btn {claimOptions[i] ? 'cursor-pointer' : 'cursor-not-allowed'}"
-						fill={claim === i ? profile.primaryColor : claimOptions[i] ? '#fff' : '#ece8e0'}
+						class="area-btn {claimOptions[i] ? 'cursor-pointer' : ''}"
+						fill={claim === i ? profile.primaryColor : '#fff'}
 						fill-opacity={claim === i ? 0.75 : 1}
 						onclick={() => toggleClaim(i)}
 						onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleClaim(i)}
@@ -333,14 +340,33 @@
 			{/if}
 		</g>
 		{#if interactive && pending}
-			{#each CARD_SHAPES[type].areas as _, i (i)}
-				{@const [lx, ly] = labelPoint(type, r, i)}
-				{#if !claimOptions[i]}
-					<text x={lx} y={ly + 0.05} text-anchor="middle" font-size="0.16" fill="#b5523b" pointer-events="none">✕</text>
-				{/if}
-			{/each}
+			{@render claimMarks(type, r, 0.08)}
 		{/if}
 	</svg>
+{/snippet}
+
+<!-- Empty circles on the areas that may be occupied; the chosen one is filled in. -->
+{#snippet claimMarks(type: CardType, r: number, radius: number)}
+	{#each CARD_SHAPES[type].areas as _, i (i)}
+		{#if claimOptions[i]}
+			{@const [lx, ly] = labelPoint(type, r, i)}
+			<circle
+				cx={lx}
+				cy={ly}
+				r={radius}
+				role="button"
+				tabindex="-1"
+				aria-label="Occupy area {i + 1}"
+				aria-pressed={claim === i}
+				class="claim-mark cursor-pointer"
+				fill={claim === i ? profile.primaryColor : '#fff'}
+				stroke={INK}
+				stroke-width={radius * 0.3}
+				onclick={() => toggleClaim(i)}
+				onkeydown={() => {}}
+			/>
+		{/if}
+	{/each}
 {/snippet}
 
 <RoomShell {client} {roomId} title="Fragmentory" subtitleItems={isPlaying ? [`${cardsLeft} cards left`] : []}>
@@ -360,10 +386,13 @@
 		<div class="space-y-3 text-sm">
 			<p>
 				Take turns placing square cards. Rotate your card so every side matches its neighbours
-				(line to line, no line to no line) and optionally claim one of its areas in your colour.
+				(line to line, no line to no line), then optionally occupy one of its areas in your colour.
 			</p>
 			<ul class="list-disc space-y-1 pl-5 text-xs text-[#6e6a63]">
-				<li>An area you claim may not touch another player’s area.</li>
+				<li>
+					You may only occupy a new area if the move does not grow one of your areas, and it may
+					not touch another player’s area.
+				</li>
 				<li>Unclaimed areas take the colour of whatever they touch.</li>
 				<li>
 					When two colours meet, the bigger one takes over; a tie turns gray until one colour leads
@@ -524,6 +553,9 @@
 									<circle cx=".5" cy=".45" r=".05" fill={INK} pointer-events="none" />
 								{/if}
 							</g>
+							{#if isPending && myCard}
+								{@render claimMarks(myCard, rot, 0.09)}
+							{/if}
 							{#if cell.claimed !== null && cell.placed_by && !isPending}
 								<!-- Small mark where a player claimed an area; the pending claim shows as area fill only. -->
 								{@const [lx, ly] = labelPoint(cell.type, cell.rot, cell.claimed)}
@@ -618,8 +650,10 @@
 								Your {CARD_LABELS[myCard!]} fits nowhere — discard it.
 							{:else if !pending}
 								Your turn — tap a shaded spot on the board.
+							{:else if !claimOptions.some(Boolean)}
+								No new area here{growsMine ? ' — this move grows your area' : ''}. Place it?
 							{:else if claim === null}
-								Tap an area to claim it (optional), then place.
+								Tap a circle to occupy that area (optional), then place.
 							{:else}
 								Ready to place.
 							{/if}

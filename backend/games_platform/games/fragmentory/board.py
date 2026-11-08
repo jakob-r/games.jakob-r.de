@@ -244,9 +244,24 @@ def claim_allowed(
     area: int,
     player_id: str,
 ) -> bool:
-    """A claimed area may not touch an area of another player (white and gray are fine)."""
+    """A new area may only be claimed when the move does not grow one of the player's own
+    areas (no area of the card touches a region holding any of their cards), and the claimed
+    area may not touch an area of another player (white and gray are fine)."""
+    if grows_own_area(cells, regions, row, col, card_type, rot, player_id):
+        return False
     return all(
-        region.color in (None, GRAY, player_id)
+        region.color in (None, GRAY)
+        for region in touching_regions(cells, regions, row, col, card_type, rot, area)
+    )
+
+
+def grows_own_area(
+    cells: Cells, regions: RegionMap, row: int, col: int, card_type: str, rot: int, player_id: str
+) -> bool:
+    """True when placing the card (unclaimed) would join one of the player's regions."""
+    return any(
+        player_id in region.owner_cards
+        for area in range(len(CARD_TYPES[card_type]["areas"]))
         for region in touching_regions(cells, regions, row, col, card_type, rot, area)
     )
 
@@ -286,7 +301,7 @@ def place_card(
     if claim is not None and not claim_allowed(
         cells, before, row, col, card_type, rot, claim, player_id
     ):
-        return "touches_opponent"
+        return "claim_not_allowed"
 
     key = cell_key(row, col)
     new_cells: Cells = {k: {**v, "owners": list(v["owners"])} for k, v in cells.items()}
