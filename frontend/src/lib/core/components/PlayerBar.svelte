@@ -14,6 +14,7 @@
 		showTurnBadge = false,
 		showMultiplier = false,
 		statusText = '',
+		previewScores = null,
 		onRemovePlayer
 	}: {
 		players: PlayerInfo[];
@@ -25,6 +26,8 @@
 		showTurnBadge?: boolean;
 		showMultiplier?: boolean;
 		statusText?: string;
+		/** Scores the pending (not yet submitted) move would lead to; shown in italics. */
+		previewScores?: Record<string, number> | null;
 		onRemovePlayer?: (playerId: string) => Promise<unknown> | unknown;
 	} = $props();
 
@@ -99,9 +102,20 @@
 				{/if}
 
 				{#if scoringEnabled}
-					<span class="font-mono-num text-xs font-bold text-[#1a1917]">
-						{p.score}
-					</span>
+					{@const preview = previewScores?.[p.player_id]}
+					{#if preview !== undefined && preview !== p.score}
+						{@const diff = preview - p.score}
+						<span
+							class="font-mono-num text-xs font-bold text-[#6e6a63] italic"
+							title="After submit: {preview} ({diff > 0 ? '+' : ''}{diff}), now {p.score}"
+						>
+							{preview}
+						</span>
+					{:else}
+						<span class="font-mono-num text-xs font-bold text-[#1a1917]">
+							{p.score}
+						</span>
+					{/if}
 					{#if showMultiplier && liveMult > 1.001 && multRatio > 0}
 						<span
 							class="font-mono-num relative inline-flex h-4 items-center overflow-hidden rounded border border-[#1a1917]/50 bg-[#1a1917]/10 px-1.5 text-[10px] leading-none font-bold text-[#1a1917]"

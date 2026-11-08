@@ -139,6 +139,12 @@
 	let alreadyPlayed = $derived(
 		previewOk !== null && playedWords.some((entry) => entry.word === previewOk.main.word)
 	);
+	// Scores after submitting the pending word (shown in italics in the player bar).
+	let previewScores = $derived.by(() => {
+		if (!isMyTurn || !previewOk || alreadyPlayed) return null;
+		const me = players.find((p) => p.player_id === profile.playerId);
+		return me ? { [me.player_id]: me.score + previewOk.points } : null;
+	});
 
 	// --- Visible region: bounding box of everything plus a margin.
 	let region = $derived.by(() => {
@@ -619,6 +625,7 @@
 			showTurnBadge={isPlaying}
 			{currentPlayerId}
 			statusText={progressText}
+			{previewScores}
 			onRemovePlayer={(id) => client.removePlayer(id)}
 		/>
 

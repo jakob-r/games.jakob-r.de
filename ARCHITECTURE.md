@@ -53,7 +53,7 @@ To share components across games while allowing any game to be extracted and run
      - `color.ts`: Perceptual OKLCH similarity check and preset-palette `opponent_color(my_color, their_color)` resolver.
      - `ws.svelte.ts`: Auto-reconnecting typed WebSocket client.
      - `notifications.svelte.ts` + `static/sw.js`: Opt-in turn notifications combining the client `Notification` API, tab title `🔔` indicator, and Service Worker Web Push subscriptions.
-     - `components/`: `ScribblyBox.svelte`, `ScribblyButton.svelte`, `ProfileBadge.svelte`, `NamePromptModal.svelte`, `RemovePlayerModal.svelte`, `PlayerBar.svelte`, `TurnNotificationBell.svelte`, `RoomShell.svelte`, and shared `Lobby.svelte`.
+     - `components/`: `ScribblyBox.svelte`, `ScribblyButton.svelte`, `ProfileBadge.svelte`, `NamePromptModal.svelte`, `RemovePlayerModal.svelte`, `PlayerBar.svelte` (optional `previewScores` shows the scores a pending move would give, in italics; Spellsprawl and Silbenstreit compute them client-side while a word is being composed), `TurnNotificationBell.svelte`, `RoomShell.svelte`, and shared `Lobby.svelte`.
 2. **Self-Contained Game Modules (`games/<slug>`)**:
    - **Backend (`backend/games_platform/games/sudoku/`)**:
      - `generator.py`: 9x9 Sudoku generator with MRV uniqueness solver and cell difficulty classifier.

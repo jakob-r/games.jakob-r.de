@@ -112,6 +112,23 @@
 			playedWords.some((entry) => entry.word.toUpperCase() === composedWord.toUpperCase())
 	);
 
+	// Scores after submitting the composed word: selected tiles move to me, previous owners lose them.
+	let previewScores = $derived.by(() => {
+		if (!cfgScoring || !isMyTurn || selectedTiles.length < 2 || composedAlreadyPlayed) return null;
+		const me = profile.playerId;
+		const scores: Record<string, number> = Object.fromEntries(
+			players.map((p) => [p.player_id, p.score])
+		);
+		for (const { row, col } of selectedTiles) {
+			const owner = owners[row]?.[col] ?? null;
+			if (owner === me) continue;
+			const value = values[row]?.[col] ?? 0;
+			scores[me] = (scores[me] ?? 0) + value;
+			if (owner) scores[owner] = (scores[owner] ?? 0) - value;
+		}
+		return scores;
+	});
+
 	let selectedKeySet = $derived.by(() => {
 		const set = new Set<string>();
 		for (const pos of selectedTiles) {
@@ -430,6 +447,7 @@
 			showTurnBadge={room?.status === 'playing'}
 			{currentPlayerId}
 			statusText="{gameState.unowned_count ?? 0} open"
+			{previewScores}
 			onRemovePlayer={(id) => client.removePlayer(id)}
 		/>
 
