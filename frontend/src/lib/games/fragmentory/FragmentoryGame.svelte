@@ -117,7 +117,8 @@
 	let viewW = $state(0);
 	let viewH = $state(0);
 	let scrollEl = $state<HTMLDivElement | null>(null);
-	let barH = $state(0);
+	let panelH = $state(0);
+	let showRules = $state(false);
 
 	let spots = $derived.by(() => {
 		if (!isMyTurn || !myCard) return [] as { row: number; col: number; rots: number[] }[];
@@ -447,6 +448,42 @@
 	{/each}
 {/snippet}
 
+{#snippet rules()}
+	<div class="space-y-3 text-sm">
+		<p>
+			Take turns placing square cards. Rotate your card so every side matches its neighbours
+			(line to line, no line to no line), then optionally occupy one of its areas in your colour.
+		</p>
+		<ul class="list-disc space-y-1 pl-5 text-xs text-[#6e6a63]">
+			<li>
+				You may only occupy a new area if the move does not grow one of your areas, and it may
+				not touch another player’s area.
+			</li>
+			<li>Unclaimed areas take the colour of whatever they touch.</li>
+			<li>
+				When two colours meet, the bigger one takes over; a tie turns gray until one colour leads
+				by two cards.
+			</li>
+			<li>
+				Every card of your areas scores 1 point; single-card areas score nothing, areas fully
+				enclosed by lines score double.
+			</li>
+			<li>Growing the used rectangle costs 1 point per new unit.</li>
+			<li>The game ends when all 42 cards are played.</li>
+			<li>
+				Shading: pale = single-card area (no points), solid = 1 point per card, dark = enclosed
+				(2 points per card), gray = tie. The dashed frame is the used area.
+			</li>
+		</ul>
+	</div>
+{/snippet}
+
+<svelte:window
+	onkeydown={(e) => {
+		if (e.key === 'Escape') showDeck = showRules = false;
+	}}
+/>
+
 <RoomShell {client} {roomId} title="Fragmentory" subtitleItems={isPlaying ? [`${cardsLeft} cards left`] : []}>
 	{#snippet headerActions()}
 		<TurnNotificationBell
@@ -461,32 +498,10 @@
 	{/snippet}
 
 	{#snippet configSlot()}
-		<div class="space-y-3 text-sm">
-			<p>
-				Take turns placing square cards. Rotate your card so every side matches its neighbours
-				(line to line, no line to no line), then optionally occupy one of its areas in your colour.
-			</p>
-			<ul class="list-disc space-y-1 pl-5 text-xs text-[#6e6a63]">
-				<li>
-					You may only occupy a new area if the move does not grow one of your areas, and it may
-					not touch another player’s area.
-				</li>
-				<li>Unclaimed areas take the colour of whatever they touch.</li>
-				<li>
-					When two colours meet, the bigger one takes over; a tie turns gray until one colour leads
-					by two cards.
-				</li>
-				<li>
-					Every card of your areas scores 1 point; single-card areas score nothing, areas fully
-					enclosed by lines score double.
-				</li>
-				<li>Growing the used rectangle costs 1 point per new unit.</li>
-				<li>The game ends when all 42 cards are played.</li>
-			</ul>
-		</div>
+		{@render rules()}
 	{/snippet}
 
-	<div class="mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-3 pb-44">
+	<div class="mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-3 pb-6">
 		<PlayerBar
 			{players}
 			hostPlayerId={room?.host_player_id ?? ''}
@@ -538,13 +553,12 @@
 						</span>
 					{/if}
 				</span>
-				<button
-					type="button"
-					onclick={() => (showDeck = true)}
-					class="shrink-0 cursor-pointer rounded border-[1.5px] border-[#1a1917] px-2 py-0.5 text-xs font-semibold hover:bg-[#f2eee6]"
-				>
-					Deck · {deckSize}
-				</button>
+				<div class="flex shrink-0 gap-1.5">
+					<button type="button" onclick={() => (showDeck = true)} class="chip-btn">
+						Deck · {deckSize}
+					</button>
+					<button type="button" onclick={() => (showRules = true)} class="chip-btn">Rules</button>
+				</div>
 			</div>
 
 			<!-- The board -->
@@ -557,7 +571,7 @@
 				originY={view.minR}
 				minCell={MIN_CELL}
 				maxCell={MAX_CELL}
-				reserveBelow={isPlaying ? barH : 0}
+				reserveBelow={isPlaying && panelH ? panelH + 12 : 0}
 				ariaLabel="Fragmentory board"
 			>
 				<svg
@@ -696,56 +710,20 @@
 				</svg>
 			</ZoomBoard>
 
-			<!-- Everyone's cards are public -->
-			{#if (gameState.turn_order ?? []).length > 1}
-				<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-					{#each (gameState.turn_order ?? []).filter((id) => id !== profile.playerId) as pid (pid)}
-						<div class="flex items-center gap-1.5">
-							<span class="font-semibold" style="color: {playerColor(pid)}">{playerName(pid)}</span>
-							{#if hands[pid]}
-								<CardIcon type={hands[pid]} size={22} />
-								<span class="text-[#6e6a63]">{CARD_LABELS[hands[pid]]}</span>
-							{:else}
-								<span class="text-[#6e6a63]">no card</span>
-							{/if}
-						</div>
-					{/each}
-				</div>
-			{/if}
-
-			<p class="text-xs text-[#6e6a63]">
-				Pale: single-card area (no points) · solid: 1 point per card · dark: enclosed, 2 points per
-				card · gray: tie. The dashed frame is the used area — growing it costs points.
-			</p>
-
-			{#if isHost && isPlaying}
-				<div class="flex justify-center">
-					<button
-						type="button"
-						onclick={endGame}
-						class="cursor-pointer text-xs text-[#6e6a63] underline hover:text-[#1a1917]"
-					>
-						End game &amp; show scores
-					</button>
-				</div>
-			{/if}
-		{/if}
-	</div>
-
-	{#if isPlaying}
-		<!-- My card, sticky at the bottom -->
-		<div
-			bind:clientHeight={barH}
-			class="fixed inset-x-0 bottom-0 z-20 border-t-[2px] border-[#1a1917] bg-[#faf8f4]/95 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur"
-		>
-			<div class="mx-auto flex max-w-[720px] items-center gap-3">
+			{#if isPlaying}
+				<!-- My card -->
+				<div
+					bind:clientHeight={panelH}
+					class="border-[1.8px] border-[#1a1917] bg-[#faf8f4] px-3 py-2.5"
+				>
+			<div class="flex items-center gap-3">
 				<div class="shrink-0">
 					{#if myCard}
 						<div class="card-preview" style="--rot: {rot * 90}deg">
-							{@render cardSvg(myCard, rot, 92, isMyTurn)}
+							{@render cardSvg(myCard, rot, 84, isMyTurn)}
 						</div>
 					{:else}
-						<div class="flex h-[92px] w-[92px] items-center justify-center text-xs text-[#6e6a63]">
+						<div class="flex h-[84px] w-[84px] items-center justify-center text-xs text-[#6e6a63]">
 							no card
 						</div>
 					{/if}
@@ -798,6 +776,63 @@
 					</div>
 				</div>
 			</div>
+				</div>
+			{/if}
+
+			<!-- Everyone's cards are public -->
+			{#if (gameState.turn_order ?? []).length > 1}
+				<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+					{#each (gameState.turn_order ?? []).filter((id) => id !== profile.playerId) as pid (pid)}
+						<div class="flex items-center gap-1.5">
+							<span class="font-semibold" style="color: {playerColor(pid)}">{playerName(pid)}</span>
+							{#if hands[pid]}
+								<CardIcon type={hands[pid]} size={22} />
+								<span class="text-[#6e6a63]">{CARD_LABELS[hands[pid]]}</span>
+							{:else}
+								<span class="text-[#6e6a63]">no card</span>
+							{/if}
+						</div>
+					{/each}
+				</div>
+			{/if}
+
+			{#if isHost && isPlaying}
+				<div class="flex justify-center">
+					<button
+						type="button"
+						onclick={endGame}
+						class="cursor-pointer text-xs text-[#6e6a63] underline hover:text-[#1a1917]"
+					>
+						End game &amp; show scores
+					</button>
+				</div>
+			{/if}
+		{/if}
+	</div>
+
+	{#if showRules}
+		<div
+			class="fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4"
+			role="presentation"
+			onclick={(e) => e.target === e.currentTarget && (showRules = false)}
+		>
+			<div
+				class="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded border-[2px] border-[#1a1917] bg-[#faf8f4] p-4"
+				role="dialog"
+				aria-modal="true"
+				aria-label="Rules"
+			>
+				<div class="mb-3 flex items-center justify-between">
+					<h2 class="font-hand text-xl">Rules</h2>
+					<button
+						type="button"
+						class="cursor-pointer text-xl leading-none"
+						aria-label="Close"
+						onclick={() => (showRules = false)}>×</button
+					>
+				</div>
+				{@render rules()}
+			</div>
 		</div>
 	{/if}
 
@@ -832,6 +867,17 @@
 </RoomShell>
 
 <style>
+	.chip-btn {
+		cursor: pointer;
+		border-radius: 0.25rem;
+		border: 1.5px solid #1a1917;
+		padding: 0.125rem 0.5rem;
+		font-size: 0.75rem;
+		font-weight: 600;
+	}
+	.chip-btn:hover {
+		background: #f2eee6;
+	}
 	.action-btn {
 		cursor: pointer;
 		border-radius: 0.25rem;
