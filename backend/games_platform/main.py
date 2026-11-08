@@ -35,6 +35,7 @@ from games_platform.core.room_manager import RoomManager
 from games_platform.games.emoji_charades.game import emoji_charades_game
 from games_platform.games.kaesekaestchen.game import kaesekaestchen_game
 from games_platform.games.minesweeper.game import minesweeper_game
+from games_platform.games.north_south_sort.game import north_south_sort_game
 from games_platform.games.silbenstreit.game import silbenstreit_game
 from games_platform.games.spellsprawl.game import spellsprawl_game
 from games_platform.games.sudoku.game import sudoku_game
@@ -48,6 +49,7 @@ ALL_GAMES: dict[str, GameDefinition] = {
     silbenstreit_game.slug: silbenstreit_game,
     emoji_charades_game.slug: emoji_charades_game,
     spellsprawl_game.slug: spellsprawl_game,
+    north_south_sort_game.slug: north_south_sort_game,
 }
 
 

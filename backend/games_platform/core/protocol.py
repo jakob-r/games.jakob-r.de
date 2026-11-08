@@ -72,6 +72,10 @@ class GameDefinition(Protocol):
 #     Adjust game state after a player left or was removed mid-game (after the
 #     shared turn_order fix-up).
 #
+# def on_game_ended(self, state, config) -> dict[str, Any]
+#     Adjust game state when the host ends the game early with end_game (e.g. reveal
+#     hidden cards on the final screen).
+#
 # def get_bot_players(self, config) -> list[dict[str, str]]
 #     Server-side bot players ({player_id, name, color}; ids start with BOT_ID_PREFIX)
 #     the room should have for this config. They get a room_players row (score, player

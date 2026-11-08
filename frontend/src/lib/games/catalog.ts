@@ -6,7 +6,8 @@ export type GameSlug =
 	| 'minesweeper'
 	| 'silbenstreit'
 	| 'emoji-charades'
-	| 'spellsprawl';
+	| 'spellsprawl'
+	| 'north-south-sort';
 
 export interface GameInfo {
 	slug: GameSlug;
@@ -105,6 +106,25 @@ export const GAMES: GameInfo[] = [
 		boxSeed: 51,
 		defaultConfig: { language: 'de', end_condition: 'words', end_target: 50 },
 		createLabel: 'New Spellsprawl →'
+	},
+	{
+		slug: 'north-south-sort',
+		title: 'North South Sort',
+		tagline: 'Is it further north or south? Sort cities, sights and history on one axis.',
+		description:
+			'A 1–8 player geography game. Take turns placing cities (1 point), landmarks (2 points) and historical events (3 points) north or south of the locations already on a shared axis. Wrong guesses cost points and vanish until the end. Play the whole world or a single continent, with an optional speed bonus.',
+		playersLabel: '1–8',
+		playersAria: '1 to 8 players',
+		boxSeed: 57,
+		defaultConfig: {
+			language: 'de',
+			continent: 'world',
+			categories: ['city', 'landmark', 'event'],
+			timed: false,
+			end_condition: 'rounds',
+			end_target: 10
+		},
+		createLabel: 'New North South Sort →'
 	}
 ];
 

@@ -141,6 +141,22 @@ export type ServerEvent =
 			explainer_id: string;
 	  }
 	| {
+			type: 'location_placed';
+			player_id: string;
+			correct: boolean;
+			points: number;
+			factor: number;
+			card: { id: string; name: string; category: string; points: number };
+			slot: number | null;
+	  }
+	| {
+			type: 'turn_skipped';
+			player_id: string;
+	  }
+	| {
+			type: 'game_over';
+	  }
+	| {
 			type: 'action_rejected';
 			player_id: string;
 			reason: string;

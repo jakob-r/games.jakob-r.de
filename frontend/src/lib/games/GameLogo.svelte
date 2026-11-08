@@ -219,6 +219,48 @@
 			opacity="0.75"
 		>?</text>
 	</svg>
+{:else if slug === 'north-south-sort'}
+	<svg
+		class={className}
+		viewBox="0 0 48 48"
+		fill="none"
+		role="img"
+		aria-hidden={titleAttr ? undefined : true}
+		aria-label={titleAttr}
+	>
+		{#if titleAttr}<title>{titleAttr}</title>{/if}
+		<!-- North–south axis with an arrow and pinned cards along it -->
+		<path
+			d="M18 41V9M13.5 13.5 18 7l4.5 6.5"
+			stroke="#1a1917"
+			stroke-width="1.8"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			filter="url(#scribble-filter)"
+		/>
+		<text x="14.6" y="47" font-family="Architects Daughter, cursive" font-size="7" fill="#1a1917"
+			>S</text
+		>
+		{#each [[14, 0], [24, 1], [33, 0]] as [y, filled] (y)}
+			<circle cx="18" {y} r="2.2" fill="#1a1917" />
+			<rect
+				x="24"
+				y={Number(y) - 4}
+				width="18"
+				height="8"
+				rx="1"
+				stroke="#1a1917"
+				stroke-width="1.3"
+				fill="#1a1917"
+				fill-opacity={filled ? 0.16 : 0}
+				filter="url(#scribble-filter)"
+			/>
+			<path d="M20.5 {y}H24" stroke="#1a1917" stroke-width="1.1" stroke-dasharray="1.5 1.2" />
+		{/each}
+		<text x="15.2" y="5.8" font-family="Architects Daughter, cursive" font-size="7" fill="#1a1917"
+			>N</text
+		>
+	</svg>
 {:else}
 	<svg
 		class={className}

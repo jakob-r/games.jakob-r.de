@@ -776,7 +776,16 @@ class RoomManager:
                         return
                     if room["status"] != "playing":
                         return
-                    await self.db.update_room(room_id, status="finished")
+                    game = self.get_game(room["game_slug"])
+                    on_game_ended = getattr(game, "on_game_ended", None)
+                    if on_game_ended is not None:
+                        await self.db.update_room(
+                            room_id,
+                            status="finished",
+                            state=on_game_ended(room["state"], room["config"]),
+                        )
+                    else:
+                        await self.db.update_room(room_id, status="finished")
                     await self.db.record_game_finished(room_id, room["game_slug"])
                     await self.broadcast_room_state(room_id)
 

@@ -34,6 +34,7 @@
 			mode?: string;
 			end_condition?: string;
 			end_target?: number;
+			continent?: string;
 		};
 		score: number;
 		player_count: number;
@@ -216,6 +217,17 @@
 						? `grid ${target}`
 						: `${target} words`;
 			return `${lang} • ${end}`;
+		}
+		if (item.game_slug === 'north-south-sort') {
+			const continent = String(item.config?.continent ?? 'world').replace('_', ' ');
+			const target = item.config?.end_target ?? 10;
+			const end =
+				item.config?.end_condition === 'points'
+					? `${target} pts`
+					: item.config?.end_condition === 'failed_round'
+						? 'until all miss'
+						: `${target} rounds`;
+			return `${continent} • ${end}`;
 		}
 		if (item.game_slug === 'emoji-charades') {
 			const mode = item.config?.mode === 'remote' ? 'Remote' : 'In person';
