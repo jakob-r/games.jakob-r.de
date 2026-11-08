@@ -80,6 +80,21 @@ def compute_board_scores(
     return totals
 
 
+def find_blocking_word(word: str, played_words: list[dict[str, Any]]) -> str | None:
+    """
+    Return the played word that blocks `word`, or None.
+
+    A word is blocked if it was already played or is contained in a played word
+    (e.g. after "RUNNER", neither "RUNNER" nor "RUN" can be played).
+    An exact match is preferred so the rejection reason is precise.
+    """
+    word = word.upper()
+    played = [str(entry.get("word", "")).upper() for entry in played_words]
+    if word in played:
+        return word
+    return next((p for p in played if word in p), None)
+
+
 def count_unowned_tiles(size: int, owners: list[list[str | None]]) -> int:
     return sum(1 for r in range(size) for c in range(size) if owners[r][c] is None)
 
@@ -306,10 +321,8 @@ class SilbenstreitGame:
 
                 word = "".join(word_chars).upper()
                 played_words: list[dict[str, Any]] = list(next_state.get("played_words") or [])
-                already_used = any(
-                    str(entry.get("word", "")).upper() == word for entry in played_words
-                )
-                if already_used:
+                blocking_word = find_blocking_word(word, played_words)
+                if blocking_word is not None:
                     return ActionOutcome(
                         state=next_state,
                         events=[
@@ -317,7 +330,10 @@ class SilbenstreitGame:
                                 "type": "word_rejected",
                                 "player_id": player_id,
                                 "word": word,
-                                "reason": "already_played",
+                                "reason": (
+                                    "already_played" if blocking_word == word else "part_of_played"
+                                ),
+                                "blocking_word": blocking_word,
                             }
                         ],
                     )

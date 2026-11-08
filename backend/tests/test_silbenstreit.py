@@ -18,6 +18,7 @@ from games_platform.games.silbenstreit.dictionary import (
 from games_platform.games.silbenstreit.game import (
     SilbenstreitGame,
     compute_protected_grid,
+    find_blocking_word,
 )
 from games_platform.main import create_app
 
@@ -325,3 +326,13 @@ def test_full_multiplayer_silbenstreit_websocket_lifecycle() -> None:
             state_after = ws1.receive_json()
             _ = ws2.receive_json()
             assert state_after["state"]["current_player_id"] == "peer_s2"
+
+
+def test_sub_words_of_played_words_are_blocked() -> None:
+    played = [{"word": "RUNNER"}, {"word": "INTERNATIONALIZATION"}]
+    assert find_blocking_word("runner", played) == "RUNNER"
+    assert find_blocking_word("RUN", played) == "RUNNER"
+    assert find_blocking_word("INTERNATIONAL", played) == "INTERNATIONALIZATION"
+    assert find_blocking_word("NATIONAL", played) == "INTERNATIONALIZATION"
+    assert find_blocking_word("RUNNERS", played) is None
+    assert find_blocking_word("NATIONS", played) is None

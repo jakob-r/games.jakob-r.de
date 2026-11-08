@@ -107,7 +107,7 @@ Each game is reachable at its own URL (e.g. `/sudoku`) for SEO and deep links. T
 - In a turn a player can select "owned" and unowned letters but not "protected" letters.
 - The game ends when there are no more unowned letters.
 - Words must follow classic Scrabble-style rules.
-- A played word cannot be reused.
+- A played word cannot be reused, nor can any word contained in a played word (after "RUNNER", "RUN" is blocked for everyone).
 - Players can see the list of all played words.
 
 ### Emoji Concept

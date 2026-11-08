@@ -112,6 +112,7 @@ export type ServerEvent =
 			player_id: string;
 			word: string;
 			reason: string;
+			blocking_word?: string;
 	  }
 	| {
 			type: 'turn_passed';

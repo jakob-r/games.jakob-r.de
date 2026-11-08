@@ -107,10 +107,15 @@
 	let composedPoints = $derived(
 		selectedTiles.reduce((sum, pos) => sum + (values[pos.row]?.[pos.col] ?? 0), 0)
 	);
-	let composedAlreadyPlayed = $derived(
-		composedWord.length >= 2 &&
-			playedWords.some((entry) => entry.word.toUpperCase() === composedWord.toUpperCase())
-	);
+	// A word is blocked if it was already played or is part of a played word ("RUN" after "RUNNER").
+	let composedBlockingWord = $derived.by(() => {
+		if (composedWord.length < 2) return null;
+		const word = composedWord.toUpperCase();
+		const played = playedWords.map((entry) => entry.word.toUpperCase());
+		if (played.includes(word)) return word;
+		return played.find((p) => p.includes(word)) ?? null;
+	});
+	let composedAlreadyPlayed = $derived(composedBlockingWord !== null);
 
 	// Scores after submitting the composed word: selected tiles move to me, previous owners lose them.
 	let previewScores = $derived.by(() => {
@@ -148,10 +153,14 @@
 		return LANGUAGES.find((l) => l.code === code)?.label ?? code.toUpperCase();
 	}
 
-	function formatRejectionReason(reason: string, word: string): string {
+	function formatRejectionReason(reason: string, word: string, blockingWord?: string): string {
 		if (reason === 'too_short') return 'Word must have at least 2 letters.';
 		if (reason === 'protected_tile') return "Opponent's protected tiles cannot be selected.";
 		if (reason === 'already_played') return `"${word}" has already been played.`;
+		if (reason === 'part_of_played')
+			return blockingWord
+				? `"${word}" is part of the played word "${blockingWord}".`
+				: `"${word}" is part of an already played word.`;
 		if (reason === 'not_in_dictionary')
 			return `"${word}" is not in the ${formatLanguageLabel(boardLang)} dictionary.`;
 		if (reason === 'not_your_turn') return 'Wait for your turn.';
@@ -326,7 +335,7 @@
 				selectedTiles = [];
 				rejectReason = null;
 			} else if (ev.type === 'word_rejected' && ev.player_id === profile.playerId) {
-				rejectReason = formatRejectionReason(ev.reason, ev.word);
+				rejectReason = formatRejectionReason(ev.reason, ev.word, ev.blocking_word);
 				rejectShake = true;
 				setTimeout(() => {
 					rejectShake = false;
@@ -585,7 +594,11 @@
 
 				{#if composedAlreadyPlayed}
 					<p class="mt-1 text-xs font-medium text-[#dc2626]">
-						"{composedWord}" was already played.
+						{#if composedBlockingWord === composedWord.toUpperCase()}
+							"{composedWord}" was already played.
+						{:else}
+							"{composedWord}" is part of the played word "{composedBlockingWord}".
+						{/if}
 					</p>
 				{/if}
 
