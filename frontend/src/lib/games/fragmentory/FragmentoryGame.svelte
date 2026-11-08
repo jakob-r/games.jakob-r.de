@@ -718,8 +718,8 @@
 	.spot {
 		transition: fill-opacity 0.15s;
 	}
-	.area-btn,
-	.spot {
+	/* Chrome draws focus rings of SVG paths around the full arc circle; use fill feedback instead. */
+	svg [role='button'] {
 		outline: none;
 	}
 	.area-btn:focus-visible,
