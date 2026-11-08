@@ -541,7 +541,7 @@
 			<div class="relative border-[2px] border-[#1a1917] bg-[#faf8f4]">
 				<div class="font-hand absolute top-1 left-2 text-sm text-[#6e6a63]">N ↑</div>
 				<div class="font-hand absolute bottom-1 left-2 text-sm text-[#6e6a63]">S ↓</div>
-				<ol class="relative max-h-[min(62vh,620px)] overflow-y-auto px-3 py-6" aria-label="North–south axis">
+				<ol class="relative px-3 py-6" aria-label="North–south axis">
 					{#each rows as row (row.kind === 'slot' ? `s${row.slot}` : row.kind === 'miss' ? `m${row.key}` : `c${row.card.id}`)}
 						{#if row.kind === 'slot'}
 							<li class="relative flex justify-center">
@@ -564,7 +564,7 @@
 						{:else if row.kind === 'miss'}
 							<li
 								use:scrollIntoViewAction
-								class="miss-card relative flex items-center gap-2 rounded border-2 border-[#b5523b] bg-[#fbe9e4] px-2.5 py-1.5 text-[#7a2e1e]"
+								class="miss-card relative flex scroll-mt-4 scroll-mb-44 items-center gap-2 rounded border-2 border-[#b5523b] bg-[#fbe9e4] px-2.5 py-1.5 text-[#7a2e1e]"
 								aria-label="{row.card.name} was misplaced"
 							>
 								<span class="text-lg leading-none font-bold">✗</span>
