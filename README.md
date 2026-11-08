@@ -26,6 +26,8 @@
 - **Silbenstreit** — claim letter tiles with words, steal, and surround
 - **Emoji Charades** — explain words, movies, and quotes with emojis; play in person or remotely
 - **Spellsprawl** — spell words on an endless grid where only reused letters score
+- **North South Sort** — place cities, sights and historical events on a north–south axis
+- **Fragmentory** — place line cards, claim areas, and grow the biggest territory
 
 ## Use it
 

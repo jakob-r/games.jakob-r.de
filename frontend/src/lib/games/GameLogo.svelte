@@ -261,6 +261,38 @@
 			>N</text
 		>
 	</svg>
+{:else if slug === 'fragmentory'}
+	<svg
+		class={className}
+		viewBox="0 0 48 48"
+		fill="none"
+		role="img"
+		aria-hidden={titleAttr ? undefined : true}
+		aria-label={titleAttr}
+	>
+		{#if titleAttr}<title>{titleAttr}</title>{/if}
+		<!-- Four line cards; the curves close a claimed circle in the middle -->
+		<path
+			d="M24 24H6V6h18zM42 24H24V6h18zM24 42H6V24h18zM42 42H24V24h18z"
+			fill="#1a1917"
+			fill-opacity="0"
+		/>
+		<path d="M24 15a9 9 0 0 1 9 9 9 9 0 0 1-9 9 9 9 0 0 1-9-9 9 9 0 0 1 9-9z" fill="#1a1917" fill-opacity="0.18" />
+		<path
+			d="M6 6h36v36H6zM24 6v36M6 24h36"
+			stroke="#1a1917"
+			stroke-width="1"
+			stroke-opacity="0.35"
+			filter="url(#scribble-filter)"
+		/>
+		<path
+			d="M15 24a9 9 0 0 1 9-9M24 15a9 9 0 0 1 9 9M33 24a9 9 0 0 1-9 9M24 33a9 9 0 0 1-9-9"
+			stroke="#1a1917"
+			stroke-width="1.8"
+			stroke-linecap="round"
+			filter="url(#scribble-filter)"
+		/>
+	</svg>
 {:else}
 	<svg
 		class={className}

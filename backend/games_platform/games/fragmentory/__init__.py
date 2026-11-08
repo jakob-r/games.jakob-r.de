@@ -1,0 +1,1 @@
+"""Fragmentory game module."""

@@ -244,6 +244,12 @@ Scoring:
 - For each card that has an occupied area the player gets one point, except for areas with just one card - this should be indicated by a lighter color.
 - Occupied areas that are fully enclosed by lines get double points, indicated by a slightly darker color.
 
+Clarifications:
+- The starting cross is an extra card; the deck keeps all 38 cards.
+- Claiming an area is optional. A card that fits nowhere is discarded.
+- Unclaimed (white) areas can be placed next to anything and merge immediately. Gray areas are open to every player; a tie resolves once one colour leads by two cards.
+- When the deck is empty, the remaining hand cards are still played; the game ends when no cards are left.
+
 
 
 

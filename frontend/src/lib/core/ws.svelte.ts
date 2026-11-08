@@ -156,6 +156,13 @@ export type ServerEvent =
 			player_id: string;
 	  }
 	| {
+			type: 'card_placed' | 'card_discarded';
+			player_id: string;
+			card: string;
+			score_deltas: Record<string, number>;
+			next_player_id: string | null;
+	  }
+	| {
 			type: 'game_over';
 	  }
 	| {

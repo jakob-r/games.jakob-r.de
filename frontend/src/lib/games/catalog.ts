@@ -7,7 +7,8 @@ export type GameSlug =
 	| 'silbenstreit'
 	| 'emoji-charades'
 	| 'spellsprawl'
-	| 'north-south-sort';
+	| 'north-south-sort'
+	| 'fragmentory';
 
 export interface GameInfo {
 	slug: GameSlug;
@@ -126,6 +127,18 @@ export const GAMES: GameInfo[] = [
 			end_target: 10
 		},
 		createLabel: 'New North South Sort →'
+	},
+	{
+		slug: 'fragmentory',
+		title: 'Fragmentory',
+		tagline: 'Place line cards, claim areas, and grow the biggest territory.',
+		description:
+			'A turn-based territory game for 1–8 players. Rotate square cards with straight, curved, crossing and T-shaped lines so every edge matches, claim an area in your color, and let neighbouring areas merge into big territories. Bigger colors swallow smaller ones, ties turn gray, enclosed areas score double — but every row or column the board grows costs points.',
+		playersLabel: '1–8',
+		playersAria: '1 to 8 players',
+		boxSeed: 63,
+		defaultConfig: {},
+		createLabel: 'New Fragmentory →'
 	}
 ];
 
