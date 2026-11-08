@@ -501,7 +501,7 @@
 		{@render rules()}
 	{/snippet}
 
-	<div class="mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-3 pb-6">
+	<div class="mx-auto flex w-full max-w-[720px] flex-1 flex-col gap-3 pb-3">
 		<PlayerBar
 			{players}
 			hostPlayerId={room?.host_player_id ?? ''}
@@ -713,100 +713,92 @@
 			{#if isPlaying}
 				<!-- My card -->
 				<div
-					bind:clientHeight={panelH}
+					bind:offsetHeight={panelH}
 					class="border-[1.8px] border-[#1a1917] bg-[#faf8f4] px-3 py-2.5"
 				>
-			<div class="flex items-center gap-3">
-				<div class="shrink-0">
-					{#if myCard}
-						<div class="card-preview" style="--rot: {rot * 90}deg">
-							{@render cardSvg(myCard, rot, 84, isMyTurn)}
+					<div class="flex items-center gap-3">
+						<div class="shrink-0">
+							{#if myCard}
+								<div class="card-preview" style="--rot: {rot * 90}deg">
+									{@render cardSvg(myCard, rot, 84, isMyTurn)}
+								</div>
+							{:else}
+								<div class="flex h-[84px] w-[84px] items-center justify-center text-xs text-[#6e6a63]">
+									no card
+								</div>
+							{/if}
 						</div>
-					{:else}
-						<div class="flex h-[84px] w-[84px] items-center justify-center text-xs text-[#6e6a63]">
-							no card
+						<div class="flex min-w-0 flex-1 flex-col gap-2">
+							<div class="text-xs font-semibold">
+								{#if isMyTurn}
+									{#if canDiscard}
+										Your {CARD_LABELS[myCard!]} fits nowhere — discard it.
+									{:else if !pending}
+										Your turn — tap a shaded spot on the board.
+									{:else if !claimOptions.some(Boolean)}
+										No new area here{growsMine ? ' — this move grows your area' : ''}. Place it?
+									{:else if claim === null}
+										Tap the card to rotate, a circle to occupy that area (optional), then place.
+									{:else}
+										Ready to place.
+									{/if}
+								{:else if currentPlayerId}
+									{playerName(currentPlayerId)}'s turn{myCard ? ` · your card: ${CARD_LABELS[myCard]}` : ''}
+								{/if}
+							</div>
+							<div class="flex flex-wrap gap-2">
+								<button
+									type="button"
+									disabled={!isMyTurn || canDiscard}
+									onclick={rotate}
+									class="action-btn"
+									aria-label="Rotate card"
+								>
+									↻ Rotate
+								</button>
+								{#if canDiscard}
+									<button type="button" onclick={discard} class="action-btn action-primary">Discard</button>
+								{:else}
+									<button
+										type="button"
+										disabled={!isMyTurn || !preview}
+										onclick={place}
+										class="action-btn action-primary"
+									>
+										Place{#if previewScores?.[profile.playerId] !== undefined}
+											{@const me = players.find((p) => p.player_id === profile.playerId)}
+											<span class="font-mono-num ml-1 font-normal opacity-80">
+												{formatPoints((previewScores[profile.playerId] ?? 0) - (me?.score ?? 0))}
+											</span>
+										{/if}
+									</button>
+								{/if}
+								{#if isHost}
+									<button type="button" onclick={endGame} class="action-btn ml-auto">End game</button>
+								{/if}
+							</div>
+						</div>
+					</div>
+
+					<!-- Everyone's cards are public -->
+					{#if (gameState.turn_order ?? []).length > 1}
+						<div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-[#1a1917]/15 pt-2 text-xs">
+							{#each (gameState.turn_order ?? []).filter((id) => id !== profile.playerId) as pid (pid)}
+								<div class="flex items-center gap-1.5">
+									<span class="font-semibold" style="color: {playerColor(pid)}">{playerName(pid)}</span>
+									{#if hands[pid]}
+										<CardIcon type={hands[pid]} size={22} />
+										<span class="text-[#6e6a63]">{CARD_LABELS[hands[pid]]}</span>
+									{:else}
+										<span class="text-[#6e6a63]">no card</span>
+									{/if}
+								</div>
+							{/each}
 						</div>
 					{/if}
 				</div>
-				<div class="flex min-w-0 flex-1 flex-col gap-2">
-					<div class="text-xs font-semibold">
-						{#if isMyTurn}
-							{#if canDiscard}
-								Your {CARD_LABELS[myCard!]} fits nowhere — discard it.
-							{:else if !pending}
-								Your turn — tap a shaded spot on the board.
-							{:else if !claimOptions.some(Boolean)}
-								No new area here{growsMine ? ' — this move grows your area' : ''}. Place it?
-							{:else if claim === null}
-								Tap the card to rotate, a circle to occupy that area (optional), then place.
-							{:else}
-								Ready to place.
-							{/if}
-						{:else if currentPlayerId}
-							{playerName(currentPlayerId)}'s turn{myCard ? ` · your card: ${CARD_LABELS[myCard]}` : ''}
-						{/if}
-					</div>
-					<div class="flex flex-wrap gap-2">
-						<button
-							type="button"
-							disabled={!isMyTurn || canDiscard}
-							onclick={rotate}
-							class="action-btn"
-							aria-label="Rotate card"
-						>
-							↻ Rotate
-						</button>
-						{#if canDiscard}
-							<button type="button" onclick={discard} class="action-btn action-primary">Discard</button>
-						{:else}
-							<button
-								type="button"
-								disabled={!isMyTurn || !preview}
-								onclick={place}
-								class="action-btn action-primary"
-							>
-								Place{#if previewScores?.[profile.playerId] !== undefined}
-									{@const me = players.find((p) => p.player_id === profile.playerId)}
-									<span class="font-mono-num ml-1 font-normal opacity-80">
-										{formatPoints((previewScores[profile.playerId] ?? 0) - (me?.score ?? 0))}
-									</span>
-								{/if}
-							</button>
-						{/if}
-					</div>
-				</div>
-			</div>
-				</div>
 			{/if}
 
-			<!-- Everyone's cards are public -->
-			{#if (gameState.turn_order ?? []).length > 1}
-				<div class="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-					{#each (gameState.turn_order ?? []).filter((id) => id !== profile.playerId) as pid (pid)}
-						<div class="flex items-center gap-1.5">
-							<span class="font-semibold" style="color: {playerColor(pid)}">{playerName(pid)}</span>
-							{#if hands[pid]}
-								<CardIcon type={hands[pid]} size={22} />
-								<span class="text-[#6e6a63]">{CARD_LABELS[hands[pid]]}</span>
-							{:else}
-								<span class="text-[#6e6a63]">no card</span>
-							{/if}
-						</div>
-					{/each}
-				</div>
-			{/if}
-
-			{#if isHost && isPlaying}
-				<div class="flex justify-center">
-					<button
-						type="button"
-						onclick={endGame}
-						class="cursor-pointer text-xs text-[#6e6a63] underline hover:text-[#1a1917]"
-					>
-						End game &amp; show scores
-					</button>
-				</div>
-			{/if}
 		{/if}
 	</div>
 

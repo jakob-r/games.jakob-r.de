@@ -719,7 +719,7 @@
 		<!-- Composer -->
 		{#if isPlaying}
 			<div
-				bind:clientHeight={composerH}
+				bind:offsetHeight={composerH}
 				class="border-[1.8px] border-[#1a1917] bg-[#faf8f4] px-3 py-2.5 {rejectShake
 					? 'animate-mistake-shake'
 					: ''}"

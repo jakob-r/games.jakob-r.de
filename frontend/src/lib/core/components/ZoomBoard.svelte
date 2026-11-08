@@ -6,7 +6,8 @@
 	 *   midpoint, Ctrl/⌘ + wheel (trackpad pinch) zooms around the pointer, +/− buttons zoom
 	 *   around the centre. Zoom changes `cellSize`; the content sizes itself from it.
 	 * - The canvas is as tall as the screen allows: from its top down to the bottom of the
-	 *   window minus `reserveBelow` (e.g. a sticky action bar), but at least `minHeight`.
+	 *   window minus `reserveBelow` (e.g. an action panel below it, including the gap) and the
+ *   bottom padding of the surrounding containers, but at least `minHeight`.
 	 */
 	import { onMount, tick, type Snippet } from 'svelte';
 
@@ -69,7 +70,18 @@
 	function measure() {
 		if (!outer) return;
 		const top = outer.getBoundingClientRect().top + window.scrollY;
-		const next = Math.max(minHeight, Math.floor(window.innerHeight - top - reserveBelow - 12));
+		// The board's own border.
+		const frame = outer.offsetHeight - (el?.offsetHeight ?? outer.offsetHeight);
+		// Bottom padding/borders of the containers around the board also take screen space.
+		let trailing = 0;
+		for (let node = outer.parentElement; node && node !== document.body; node = node.parentElement) {
+			const cs = getComputedStyle(node);
+			trailing += parseFloat(cs.paddingBottom) + parseFloat(cs.borderBottomWidth);
+		}
+		const next = Math.max(
+			minHeight,
+			Math.floor(window.innerHeight - top - reserveBelow - trailing - frame)
+		);
 		if (Math.abs(next - height) > 1) height = next;
 	}
 
