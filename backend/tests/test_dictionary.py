@@ -6,7 +6,7 @@ from games_platform.core.dictionary import is_valid_word
 
 
 @pytest.mark.parametrize(
-    "word", ["BETOEREN", "BETOREN", "BETOERT", "HAEUSER", "QUIRLIG", "JA", "ZU"]
+    "word", ["BETOEREN", "BETOREN", "BETOERT", "HAEUSER", "QUIRLIG", "JA", "ZU", "OEL", "OL"]
 )
 def test_german_dictionary_knows_rare_and_inflected_words(word: str) -> None:
     assert is_valid_word(word, "de")
