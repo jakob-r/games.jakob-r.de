@@ -521,7 +521,7 @@
 			<div class="relative border-[2px] border-[#1a1917] bg-[#faf8f4]">
 				<div class="font-hand absolute top-1 left-2 text-sm text-[#6e6a63]">N ↑</div>
 				<div class="font-hand absolute bottom-1 left-2 text-sm text-[#6e6a63]">S ↓</div>
-				<ol class="axis-list relative max-h-[min(62vh,620px)] overflow-y-auto px-3 py-6" aria-label="North–south axis">
+				<ol class="relative max-h-[min(62vh,620px)] overflow-y-auto px-3 py-6" aria-label="North–south axis">
 					{#each rows as row (row.kind === 'slot' ? `s${row.slot}` : `c${row.card.id}`)}
 						{#if row.kind === 'slot'}
 							<li class="relative flex justify-center">
@@ -541,11 +541,11 @@
 						{:else}
 							{@const card = row.card}
 							<li
-								class="axis-card relative ml-6 flex items-start gap-2 rounded border-[1.5px] border-[#1a1917] bg-white/70 px-2.5 py-1.5
+								class="axis-card relative flex items-start gap-2 rounded border-[1.5px] border-[#1a1917] bg-white/70 px-2.5 py-1.5
 								{lastPlacedId === card.id ? 'last-placed' : ''}"
 							>
 								<span
-									class="absolute top-1/2 -left-[22px] h-3 w-3 -translate-y-1/2 rounded-full border-[1.5px] border-[#1a1917]"
+									class="mt-1.5 h-3 w-3 shrink-0 rounded-full border-[1.5px] border-[#1a1917]"
 									style="background: {card.player_id ? playerColor(card.player_id) : '#faf8f4'}"
 								></span>
 								<div class="min-w-0 flex-1">
@@ -711,15 +711,6 @@
 	}
 	.cfg-off:not(:disabled):hover {
 		background: #f2eee6;
-	}
-	.axis-list::before {
-		content: '';
-		position: absolute;
-		top: 1.5rem;
-		bottom: 1.5rem;
-		left: 1.6rem;
-		border-left: 2px solid #1a1917;
-		opacity: 0.25;
 	}
 	.last-placed {
 		animation: pop 0.9s ease-out;
