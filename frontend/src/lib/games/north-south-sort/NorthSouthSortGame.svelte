@@ -8,6 +8,7 @@
 	import TurnNotificationBell from '$lib/core/components/TurnNotificationBell.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 	import { RoomSocketClient, type PlayerInfo, type ServerEvent } from '$lib/core/ws.svelte';
+	import FinalMap from './FinalMap.svelte';
 
 	let { roomId }: { roomId: string } = $props();
 
@@ -489,38 +490,16 @@
 				{/if}
 			</ScribblyBox>
 
-			{#if (gameState.discarded ?? []).length > 0}
-				<ScribblyBox seed={67} class="bg-[#faf8f4] p-3">
-					<div class="font-hand mb-2 text-lg">Misplaced cards</div>
-					<ul class="space-y-2">
-						{#each gameState.discarded ?? [] as card (card.id)}
-							<li class="flex items-start gap-2 text-sm">
-								<span
-									class="mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full"
-									style="background: {playerColor(card.player_id ?? '')}"
-								></span>
-								<div class="min-w-0 flex-1">
-									<div class="font-semibold">
-										{card.name}
-										<span class="font-mono-num text-xs font-normal text-[#6e6a63]">
-											{formatLat(card.lat)}
-										</span>
-									</div>
-									<div class="text-xs text-[#6e6a63]">
-										{card.country ? `${card.country} · ` : ''}{card.description}
-										{#if card.wikipedia}
-											<a href={card.wikipedia} target="_blank" rel="noopener" class="underline">Wiki</a>
-										{/if}
-									</div>
-								</div>
-							</li>
-						{/each}
-					</ul>
-				</ScribblyBox>
-			{/if}
+			<FinalMap
+				placed={axis}
+				missed={gameState.discarded ?? []}
+				{playerColor}
+				{playerName}
+				categoryLabel={(c) => CATEGORY_INFO[c]}
+			/>
 		{/if}
 
-		{#if isPlaying || room?.status === 'finished'}
+		{#if isPlaying}
 			<div class="min-h-[1.5rem] text-center text-sm" aria-live="polite">
 				{#if message}
 					<span class="text-[#b5523b]">{message}</span>
