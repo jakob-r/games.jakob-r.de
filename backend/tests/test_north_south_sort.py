@@ -12,7 +12,12 @@ from fastapi.testclient import TestClient
 
 from games_platform.core.db import Database
 from games_platform.games.north_south_sort import game as game_module
-from games_platform.games.north_south_sort.game import NorthSouthSortGame, speed_factor
+from games_platform.games.north_south_sort.game import (
+    NorthSouthSortGame,
+    base_score,
+    gap_degrees,
+    speed_factor,
+)
 from games_platform.games.north_south_sort.locations import Location, load_locations
 from games_platform.main import create_app
 
@@ -136,6 +141,41 @@ def test_correct_placement_scores_value_inserts_and_refills() -> None:
     assert out.events[0]["type"] == "location_placed" and out.events[0]["correct"]
     assert out.events[0]["card"]["lat"] == 55.0
     assert out.state["player_scores"][A] == 2
+
+
+@pytest.mark.parametrize(
+    ("gap", "base"),
+    [(40, 1), (10, 1), (5, 2), (4, 3), (2, 5), (1, 10), (0.5, 20), (0.1, 20), (0, 20)],
+)
+def test_base_score(gap: float, base: int) -> None:
+    assert base_score(gap) == base
+
+
+def test_gap_degrees_runs_to_the_poles() -> None:
+    c1 = loc("X", "city", 50.0)
+    c2 = loc("Y", "city", 40.0)
+    assert gap_degrees(c2, c1) == 10
+    assert gap_degrees(c1, None) == 40
+    assert gap_degrees(None, c2) == 130
+
+
+def test_narrow_gap_scores_base_times_category(monkeypatch: pytest.MonkeyPatch) -> None:
+    game, state = new_state()
+    between = loc("L9", "landmark", 51.0)
+    by_id = {**game_module.locations_by_id(), "L9": between}
+    monkeypatch.setattr(game_module, "locations_by_id", lambda: by_id)
+    setup_board(state, ["C1", "E1"], {A: {"landmark": "L9"}, B: {"landmark": "L1"}})
+    out = act(game, state, A, {"type": "place", "location_id": "L9", "slot": 1})
+    # Gap 50°–52° = 2° → base 5, landmark ×2.
+    assert out.points_delta == 10
+    assert out.events[0]["base"] == 5 and out.events[0]["multiplier"] == 2
+
+
+def test_wrong_in_narrow_gap_costs_category_value(monkeypatch: pytest.MonkeyPatch) -> None:
+    game, state = new_state()
+    setup_board(state, ["C1", "E1"], {A: {"event": "E3"}, B: {"event": "E2"}})
+    out = act(game, state, A, {"type": "place", "location_id": "E3", "slot": 1})
+    assert out.points_delta == -3
 
 
 def test_overlapping_bounds_count_as_correct(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -270,11 +310,11 @@ def test_rounds_counter_advances() -> None:
 
 
 def test_end_on_points() -> None:
-    game, state = new_state({"end_condition": "points", "end_target": 5})
+    game, state = new_state({"end_condition": "points", "end_target": 20})
     setup_board(state, ["C1"], {A: {"event": "E3"}, B: {"event": "E2"}})
-    state["player_scores"][A] = 3
+    state["player_scores"][A] = 18
     out = act(game, state, A, {"type": "place", "location_id": "E3", "slot": 1})
-    assert out.is_finished and out.state["player_scores"][A] == 6
+    assert out.is_finished and out.state["player_scores"][A] == 21
 
 
 def test_end_on_failed_round() -> None:
@@ -330,7 +370,7 @@ def test_validate_config() -> None:
         "categories": ["event"],
         "timed": True,
         "end_condition": "points",
-        "end_target": 200,
+        "end_target": 1000,
     }
     assert game.validate_config({"categories": []})["categories"] == ["city", "landmark", "event"]
     assert game.validate_config({"end_condition": "failed_round"})["end_target"] == 0

@@ -112,7 +112,7 @@ export const GAMES: GameInfo[] = [
 		title: 'North South Sort',
 		tagline: 'Is it further north or south? Sort cities, sights and history on one axis.',
 		description:
-			'A 1–8 player geography game. Take turns placing cities (1 point), landmarks (2 points) and historical events (3 points) north or south of the locations already on a shared axis. Wrong guesses cost points and vanish until the end. Play the whole world or a single continent, with an optional speed bonus.',
+			'A 1–8 player geography game. Take turns placing cities, landmarks and historical events north or south of the locations already on a shared axis. The tighter the gap you squeeze a card into, the more it scores — landmarks count double, events triple. Wrong guesses cost points and vanish until the end. Play the whole world or a single continent, with an optional speed bonus.',
 		playersLabel: '1–8',
 		playersAria: '1 to 8 players',
 		boxSeed: 57,

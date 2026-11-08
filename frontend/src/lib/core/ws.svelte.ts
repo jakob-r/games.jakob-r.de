@@ -146,6 +146,8 @@ export type ServerEvent =
 			correct: boolean;
 			points: number;
 			factor: number;
+			base?: number;
+			multiplier?: number;
 			card: { id: string; name: string; category: string; points: number };
 			slot: number;
 	  }

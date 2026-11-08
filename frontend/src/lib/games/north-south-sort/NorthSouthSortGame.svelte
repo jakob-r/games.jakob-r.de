@@ -34,6 +34,8 @@
 		correct: boolean;
 		points: number;
 		factor: number;
+		base?: number;
+		multiplier?: number;
 		card: Card;
 		slot: number;
 	}
@@ -86,7 +88,7 @@
 	const END_CONDITIONS: { code: EndCondition; label: string; hint: string; targets: number[] }[] =
 		[
 			{ code: 'rounds', label: 'Rounds', hint: 'Ends after this many rounds.', targets: [5, 10, 20] },
-			{ code: 'points', label: 'Points', hint: 'First player to reach this score wins.', targets: [10, 20, 50] },
+			{ code: 'points', label: 'Points', hint: 'First player to reach this score wins.', targets: [50, 100, 250] },
 			{
 				code: 'failed_round',
 				label: 'All miss',
@@ -163,6 +165,15 @@
 		return out;
 	});
 
+	// Mirrors base_score in game.py: 10 / gap (degrees, to the pole at the ends), 1–20.
+	function slotBase(slot: number): number {
+		const south = slot > 0 ? (axis[slot - 1]?.lat ?? -90) : -90;
+		const north = slot < axis.length ? (axis[slot]?.lat ?? 90) : 90;
+		const gap = Math.abs(north - south);
+		if (gap <= 0) return 20;
+		return Math.max(1, Math.min(20, Math.floor(10 / gap + 0.5)));
+	}
+
 	function showMiss(card: Card, slot: number, points: number) {
 		if (missTimer) clearTimeout(missTimer);
 		miss = { card, slot, points, key: Date.now() };
@@ -230,7 +241,10 @@
 	function describeMove(move: PlacedMove | SkippedMove): string {
 		const who = playerName(move.player_id);
 		if (move.type === 'turn_skipped') return `${who} skipped and swapped cards.`;
-		const bonus = move.correct && move.factor > 1 ? ` (×${move.factor})` : '';
+		const parts = [move.base, move.multiplier, move.factor > 1 ? move.factor : null].filter(
+			(x): x is number => typeof x === 'number'
+		);
+		const bonus = move.correct && parts.length > 1 ? ` (${parts.join(' × ')})` : '';
 		return `${who}: ${move.card.name} ${move.correct ? '✓' : '✗'} ${formatPoints(move.points)}${bonus}`;
 	}
 
@@ -451,8 +465,10 @@
 
 			<p class="border-t border-[#1a1917]/15 pt-3 text-xs text-[#6e6a63]">
 				On your turn, pick one of your cards and place it north or south of the locations on the
-				axis. Right: score its value{cfgTimed ? ' (×2 within 10 s, ×1.5 within 20 s)' : ''}. Wrong:
-				lose its value, and the card stays hidden until the end. Skipping swaps all your cards.
+				axis. The narrower the gap you put it in, the more it scores (10 ÷ gap in degrees, 1–20),
+				times the card's value{cfgTimed ? ' and the speed bonus (×2 within 10 s, ×1.5 within 20 s)' : ''}.
+				Wrong: lose the card's value, and the card stays hidden until the end. Skipping swaps all
+				your cards.
 			</p>
 		</div>
 	{/snippet}
@@ -533,9 +549,12 @@
 										type="button"
 										onclick={() => place(row.slot)}
 										class="slot-btn my-1 w-full cursor-pointer rounded border-[1.5px] border-dashed border-[#1a1917]/60 py-1.5 text-xs font-semibold text-[#1a1917] transition hover:bg-[#1a1917] hover:text-[#faf8f4]"
-										aria-label="Place {selectedCard?.name} here"
+										aria-label="Place {selectedCard?.name} here for {slotBase(row.slot) * (selectedCard?.points ?? 1)} points"
 									>
 										place here
+										<span class="font-mono-num ml-1 font-normal opacity-70">
+											{slotBase(row.slot) * (selectedCard?.points ?? 1)} pts
+										</span>
 									</button>
 								{:else}
 									<div class="h-2"></div>

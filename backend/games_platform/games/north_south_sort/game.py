@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import math
 import random
 from collections import defaultdict
 from datetime import UTC, datetime
@@ -40,12 +41,18 @@ DEFAULT_END_CONDITION: EndCondition = "rounds"
 END_TARGETS: dict[str, tuple[int, int, int]] = {
     # condition: (default, min, max); failed_round has no target
     "rounds": (10, 1, 50),
-    "points": (20, 5, 200),
+    "points": (100, 20, 1000),
     "failed_round": (0, 0, 0),
 }
 
 # Timed mode: (seconds since turn start, multiplier) for correct placements.
 SPEED_STEPS: tuple[tuple[float, float], ...] = ((10.0, 2.0), (20.0, 1.5))
+
+# Base score of a correct placement = GAP_SCORE_DEGREES / gap, clamped to the range below.
+# The gap is the latitude between the two neighbours (to the pole at either end).
+GAP_SCORE_DEGREES = 10.0
+MIN_BASE_SCORE = 1
+MAX_BASE_SCORE = 20
 
 
 def _now() -> datetime:
@@ -97,6 +104,21 @@ def _pools() -> dict[tuple[str, str], tuple[str, ...]]:
 
 def pool(continent: str, category: str) -> tuple[str, ...]:
     return _pools().get((continent, category), ())
+
+
+def gap_degrees(south: Location | None, north: Location | None) -> float:
+    south_lat = south.lat if south is not None else -90.0
+    north_lat = north.lat if north is not None else 90.0
+    return abs(north_lat - south_lat)
+
+
+def base_score(gap: float) -> int:
+    """Narrow gaps score more: 10° or more → 1, 2° → 5, 1° → 10, ≤ 0.5° → 20."""
+    if gap <= 0:
+        return MAX_BASE_SCORE
+    # Round half up (not Python's half-to-even) so the client preview matches Math.round.
+    raw = math.floor(GAP_SCORE_DEGREES / gap + 0.5)
+    return max(MIN_BASE_SCORE, min(MAX_BASE_SCORE, raw))
 
 
 def is_correct_slot(card: Location, south: Location | None, north: Location | None) -> bool:
@@ -389,13 +411,16 @@ class NorthSouthSortGame:
         north = locs[axis[action.slot]["id"]] if action.slot < len(axis) else None
         correct = is_correct_slot(card, south, north)
         value = CATEGORY_POINTS[card.category]
+        gap = gap_degrees(south, north)
+        base = base_score(gap)
 
         if correct:
             factor = 1.0
             if state.get("timed"):
                 started = datetime.fromisoformat(state["turn_started_at"])
                 factor = speed_factor((_now() - started).total_seconds())
-            points = round(value * factor, 2)
+            # Category value and speed bonus both multiply the gap-based base score.
+            points = round(base * value * factor, 2)
             axis.insert(action.slot, {"id": card.id, "player_id": player_id})
         else:
             factor = 1.0
@@ -414,6 +439,8 @@ class NorthSouthSortGame:
             "correct": correct,
             "points": points,
             "factor": factor,
+            "base": base,
+            "multiplier": value,
             # A wrong card stays hidden: name only, no position.
             "card": self._card(card.id, language, reveal=correct),
             # The attempted slot (not the true position), so clients can show the miss.
