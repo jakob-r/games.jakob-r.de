@@ -528,6 +528,8 @@ def test_player_stats_split_best_score_single_and_multi() -> None:
         assert sudoku["best_score_single"] == 40
         assert sudoku["best_score_multi"] == 25
         assert data["server"]["points_scored"] >= 40 + 10 + 25 + 99
+        assert data["server"]["top_score"] >= 99
+        assert data["server"]["top_score_game"] is not None
 
         b = client.get("/api/players/split_b/stats").json()["by_game"][0]
         assert b["best_score_single"] is None

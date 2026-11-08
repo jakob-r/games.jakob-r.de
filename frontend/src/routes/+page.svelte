@@ -48,6 +48,8 @@
 	interface ServerTotals {
 		games_finished: number;
 		points_scored: number;
+		top_score: number;
+		top_score_game: string | null;
 	}
 
 	interface GameStats {
@@ -548,7 +550,7 @@
 			{/if}
 			{#if serverTotals}
 				<div class="mt-5 border-t border-[#1a1917]/15 pt-4">
-					<h3 class="font-hand mb-2 text-lg">Everyone on this site</h3>
+					<h3 class="font-hand mb-2 text-lg">Server stats</h3>
 					<ul class="ml-5 list-disc space-y-0.5 text-sm text-[#6e6a63] marker:text-[#1a1917]/40">
 						<li>
 							<span class="font-mono-num text-[#1a1917]"
@@ -560,6 +562,14 @@
 								>{serverTotals.points_scored.toLocaleString('en')}</span
 							> points scored
 						</li>
+						{#if serverTotals.top_score_game}
+							<li>
+								<span class="font-mono-num text-[#1a1917]"
+									>{serverTotals.top_score.toLocaleString('en')}</span
+								>
+								highest score in one game ({formatGameTitle(serverTotals.top_score_game)})
+							</li>
+						{/if}
 					</ul>
 				</div>
 			{/if}

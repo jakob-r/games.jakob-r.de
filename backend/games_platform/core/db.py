@@ -538,15 +538,19 @@ class Database:
             rows = await cur.fetchall()
             return {r["game_slug"]: int(r["n"]) for r in rows}
 
-    async def get_server_totals(self) -> dict[str, float]:
-        """A few site-wide fun numbers (finished rooms, points scored)."""
+    async def get_server_totals(self) -> dict[str, Any]:
+        """A few site-wide fun numbers (finished rooms, points scored, best single result)."""
         pool = self._require_pool()
         async with pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
                 SELECT
                     (SELECT COUNT(*) FROM rooms WHERE status = 'finished') AS games_finished,
-                    COALESCE(SUM(total_score), 0) AS points_scored
+                    COALESCE(SUM(total_score), 0) AS points_scored,
+                    COALESCE(MAX(best_score), 0) AS top_score,
+                    (
+                        SELECT game_slug FROM player_stats ORDER BY best_score DESC LIMIT 1
+                    ) AS top_score_game
                 FROM player_stats
                 """
             )
