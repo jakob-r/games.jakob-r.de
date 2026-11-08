@@ -6,6 +6,7 @@
 	import ScribblyBox from '$lib/core/components/ScribblyBox.svelte';
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
 	import TurnNotificationBell from '$lib/core/components/TurnNotificationBell.svelte';
+	import ZoomBoard from '$lib/core/components/ZoomBoard.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 	import { RoomSocketClient, type PlayerInfo, type ServerEvent } from '$lib/core/ws.svelte';
 	import {
@@ -109,6 +110,7 @@
 	let cellSize = $state(40);
 	let viewW = $state(0);
 	let viewH = $state(0);
+	let composerH = $state(0);
 
 	let inputEl = $state<HTMLInputElement | null>(null);
 	let scrollEl = $state<HTMLDivElement | null>(null);
@@ -436,21 +438,6 @@
 		tapCell(row, col);
 	}
 
-	function zoom(delta: number) {
-		const el = scrollEl;
-		const before = cellSize;
-		cellSize = Math.max(MIN_CELL, Math.min(MAX_CELL, cellSize + delta));
-		if (el && before !== cellSize) {
-			const ratio = cellSize / before;
-			const cx = el.scrollLeft + el.clientWidth / 2;
-			const cy = el.scrollTop + el.clientHeight / 2;
-			tick().then(() => {
-				el.scrollLeft = cx * ratio - el.clientWidth / 2;
-				el.scrollTop = cy * ratio - el.clientHeight / 2;
-			});
-		}
-	}
-
 	function scrollToCells(coords: Coord[], smooth: boolean) {
 		const el = scrollEl;
 		if (!el || coords.length === 0) return;
@@ -653,79 +640,69 @@
 		{/if}
 
 		<!-- Board -->
-		<div class="relative border-[2px] border-[#1a1917] bg-[#faf8f4]">
+		<ZoomBoard
+			bind:cellSize
+			bind:el={scrollEl}
+			bind:viewW
+			bind:viewH
+			originX={region.minCol}
+			originY={region.minRow}
+			minCell={MIN_CELL}
+			maxCell={MAX_CELL}
+			reserveBelow={composerH ? composerH + 12 : 0}
+			ariaLabel="Spellsprawl grid"
+		>
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
-				bind:this={scrollEl}
-				bind:clientWidth={viewW}
-				bind:clientHeight={viewH}
-				class="sprawl-scroll h-[min(62vh,560px)] overflow-auto"
-				aria-label="Spellsprawl grid"
+				class="sprawl-board relative select-none {isMyTurn ? 'cursor-pointer' : 'cursor-default'}"
+				style="width: {region.cols * cellSize}px; height: {region.rows * cellSize}px; --cs: {cellSize}px;"
+				onclick={onBoardClick}
 			>
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
-				<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<div
-					class="sprawl-board relative select-none {isMyTurn ? 'cursor-pointer' : 'cursor-default'}"
-					style="width: {region.cols * cellSize}px; height: {region.rows * cellSize}px; --cs: {cellSize}px;"
-					onclick={onBoardClick}
-				>
-					{#each Object.entries(cells) as [key, cell] (key)}
-						{@const [r, c] = parseKey(key)}
-						{@const color = cellColor(cell.player_id)}
-						<div
-							class="sprawl-cell absolute flex items-center justify-center
-							{lastPlacedKeys.has(key) ? 'border-2 border-[#1a1917]' : 'border border-[#1a1917]/30'}"
-							style="left: {(c - region.minCol) * cellSize}px; top: {(r - region.minRow) * cellSize}px; background-color: color-mix(in oklab, {color} 28%, #faf8f4);"
-						>
-							<span class="sprawl-letter">{cell.letter}</span>
-							<span class="sprawl-value font-mono-num">{letterScores[cell.letter] ?? 1}</span>
-						</div>
-					{/each}
+				{#each Object.entries(cells) as [key, cell] (key)}
+					{@const [r, c] = parseKey(key)}
+					{@const color = cellColor(cell.player_id)}
+					<div
+						class="sprawl-cell absolute flex items-center justify-center
+						{lastPlacedKeys.has(key) ? 'border-2 border-[#1a1917]' : 'border border-[#1a1917]/30'}"
+						style="left: {(c - region.minCol) * cellSize}px; top: {(r - region.minRow) * cellSize}px; background-color: color-mix(in oklab, {color} 28%, #faf8f4);"
+					>
+						<span class="sprawl-letter">{cell.letter}</span>
+						<span class="sprawl-value font-mono-num">{letterScores[cell.letter] ?? 1}</span>
+					</div>
+				{/each}
 
-					{#each [...pendingMap] as [key, letter] (key)}
-						{@const [r, c] = parseKey(key)}
-						<div
-							class="sprawl-cell absolute flex items-center justify-center border-2 border-dashed bg-white"
-							style="left: {(c - region.minCol) * cellSize}px; top: {(r - region.minRow) * cellSize}px; border-color: {profile.primaryColor};"
-						>
-							<span class="sprawl-letter font-semibold">{letter}</span>
-							<span class="sprawl-value font-mono-num">{letterScores[letter] ?? 1}</span>
-						</div>
-					{/each}
+				{#each [...pendingMap] as [key, letter] (key)}
+					{@const [r, c] = parseKey(key)}
+					<div
+						class="sprawl-cell absolute flex items-center justify-center border-2 border-dashed bg-white"
+						style="left: {(c - region.minCol) * cellSize}px; top: {(r - region.minRow) * cellSize}px; border-color: {profile.primaryColor};"
+					>
+						<span class="sprawl-letter font-semibold">{letter}</span>
+						<span class="sprawl-value font-mono-num">{letterScores[letter] ?? 1}</span>
+					</div>
+				{/each}
 
-					{#if cursorKey && isMyTurn}
-						{@const [r, c] = parseKey(cursorKey)}
-						<div
-							class="sprawl-cursor pointer-events-none absolute"
-							style="left: {(c - region.minCol) * cellSize}px; top: {(r - region.minRow) * cellSize}px; width: {cellSize}px; height: {cellSize}px; --accent: {profile.primaryColor};"
-						>
-							<span class="sprawl-arrow">{direction === 'right' ? '▸' : '▾'}</span>
-						</div>
-					{/if}
-				</div>
+				{#if cursorKey && isMyTurn}
+					{@const [r, c] = parseKey(cursorKey)}
+					<div
+						class="sprawl-cursor pointer-events-none absolute"
+						style="left: {(c - region.minCol) * cellSize}px; top: {(r - region.minRow) * cellSize}px; width: {cellSize}px; height: {cellSize}px; --accent: {profile.primaryColor};"
+					>
+						<span class="sprawl-arrow">{direction === 'right' ? '▸' : '▾'}</span>
+					</div>
+				{/if}
 			</div>
-
-			<div class="absolute right-1.5 bottom-1.5 flex gap-1">
-				<button
-					type="button"
-					onclick={() => zoom(-6)}
-					class="h-8 w-8 cursor-pointer border border-[#1a1917] bg-[#faf8f4] text-lg leading-none"
-					aria-label="Zoom out">−</button
-				>
-				<button
-					type="button"
-					onclick={() => zoom(6)}
-					class="h-8 w-8 cursor-pointer border border-[#1a1917] bg-[#faf8f4] text-lg leading-none"
-					aria-label="Zoom in">+</button
-				>
-			</div>
-			{#if gridDims.w > 0}
-				<div
-					class="font-mono-num pointer-events-none absolute top-1.5 left-1.5 bg-[#faf8f4]/85 px-1.5 text-[11px] text-[#6e6a63]"
-				>
-					{gridDims.w}×{gridDims.h} = {gridDims.w * gridDims.h}
-				</div>
-			{/if}
-		</div>
+			{#snippet overlay()}
+				{#if gridDims.w > 0}
+					<div
+						class="font-mono-num pointer-events-none absolute top-1.5 left-1.5 bg-[#faf8f4]/85 px-1.5 text-[11px] text-[#6e6a63]"
+					>
+						{gridDims.w}×{gridDims.h} = {gridDims.w * gridDims.h}
+					</div>
+				{/if}
+			{/snippet}
+		</ZoomBoard>
 
 		<input
 			bind:this={inputEl}
@@ -742,6 +719,7 @@
 		<!-- Composer -->
 		{#if isPlaying}
 			<div
+				bind:clientHeight={composerH}
 				class="border-[1.8px] border-[#1a1917] bg-[#faf8f4] px-3 py-2.5 {rejectShake
 					? 'animate-mistake-shake'
 					: ''}"
@@ -861,11 +839,6 @@
 </RoomShell>
 
 <style>
-	.sprawl-scroll {
-		touch-action: pan-x pan-y;
-		overscroll-behavior: contain;
-	}
-
 	.sprawl-board {
 		background-image:
 			linear-gradient(to right, rgb(26 25 23 / 0.12) 1px, transparent 1px),

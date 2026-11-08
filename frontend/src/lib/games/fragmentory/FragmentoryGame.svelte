@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { resolvePlayerColor } from '$lib/core/color';
 	import PlayerBar from '$lib/core/components/PlayerBar.svelte';
 	import RoomShell from '$lib/core/components/RoomShell.svelte';
 	import ScribblyBox from '$lib/core/components/ScribblyBox.svelte';
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
 	import TurnNotificationBell from '$lib/core/components/TurnNotificationBell.svelte';
+	import ZoomBoard from '$lib/core/components/ZoomBoard.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 	import { RoomSocketClient, type PlayerInfo, type ServerEvent } from '$lib/core/ws.svelte';
 	import CardIcon from './CardIcon.svelte';
@@ -109,7 +110,14 @@
 	let claim = $state<number | null>(null);
 	let message = $state<string | null>(null);
 	let showDeck = $state(false);
-	let boardWidth = $state(360);
+	const MIN_CELL = 28;
+	const MAX_CELL = 140;
+	const MARGIN = 2;
+	let cellSize = $state(64);
+	let viewW = $state(0);
+	let viewH = $state(0);
+	let scrollEl = $state<HTMLDivElement | null>(null);
+	let barH = $state(0);
 
 	let spots = $derived.by(() => {
 		if (!isMyTurn || !myCard) return [] as { row: number; col: number; rots: number[] }[];
@@ -186,13 +194,53 @@
 	// Based on the real cards so a pending card (always in the outer ring) does not shift the view.
 	let box = $derived(boundingBox(Object.keys(cells)) ?? { minR: 0, maxR: 0, minC: 0, maxC: 0 });
 	let usedBox = $derived(boundingBox(Object.keys(shownCells)));
-	let view = $derived({
-		minR: box.minR - 1,
-		minC: box.minC - 1,
-		rows: box.maxR - box.minR + 3,
-		cols: box.maxC - box.minC + 3
+	// Visible region: the cards plus a margin, padded so the board fills the whole canvas.
+	let view = $derived.by(() => {
+		let minR = box.minR - MARGIN;
+		let minC = box.minC - MARGIN;
+		let rows = box.maxR - box.minR + 1 + 2 * MARGIN;
+		let cols = box.maxC - box.minC + 1 + 2 * MARGIN;
+		const needRows = Math.ceil(viewH / cellSize);
+		const needCols = Math.ceil(viewW / cellSize);
+		if (rows < needRows) {
+			minR -= Math.floor((needRows - rows) / 2);
+			rows = needRows;
+		}
+		if (cols < needCols) {
+			minC -= Math.floor((needCols - cols) / 2);
+			cols = needCols;
+		}
+		return { minR, minC, rows, cols };
 	});
-	let cellPx = $derived(Math.max(40, Math.min(84, Math.floor(boardWidth / view.cols))));
+
+	function scrollToCells(coords: [number, number][], smooth: boolean) {
+		const el = scrollEl;
+		if (!el || coords.length === 0) return;
+		const rows = coords.map(([r]) => r);
+		const cols = coords.map(([, c]) => c);
+		const midRow = (Math.min(...rows) + Math.max(...rows) + 1) / 2;
+		const midCol = (Math.min(...cols) + Math.max(...cols) + 1) / 2;
+		el.scrollTo({
+			left: (midCol - view.minC) * cellSize - el.clientWidth / 2,
+			top: (midRow - view.minR) * cellSize - el.clientHeight / 2,
+			behavior: smooth ? 'smooth' : 'auto'
+		});
+	}
+
+	// Center the board when the game shows up, and follow each new card.
+	let centeredFor = $state<string | null>(null);
+	$effect(() => {
+		const marker = `${room?.status}:${gameState.move_count ?? 0}`;
+		if (!scrollEl || (!isPlaying && !isFinished)) return;
+		if (marker === centeredFor) return;
+		const first = centeredFor === null;
+		centeredFor = marker;
+		const target: [number, number][] =
+			!first && lastMove?.type === 'card_placed'
+				? [[lastMove.row, lastMove.col]]
+				: Object.keys(cells).map(parseKey);
+		tick().then(() => scrollToCells(target.length ? target : [[0, 0]], !first));
+	});
 
 	function playerColor(id: string): string {
 		return resolvePlayerColor(id, profile.playerId, profile.primaryColor, players);
@@ -500,15 +548,23 @@
 			</div>
 
 			<!-- The board -->
-			<div
-				class="board-wrap overflow-auto border-[2px] border-[#1a1917] bg-[#faf8f4]"
-				bind:clientWidth={boardWidth}
+			<ZoomBoard
+				bind:cellSize
+				bind:el={scrollEl}
+				bind:viewW
+				bind:viewH
+				originX={view.minC}
+				originY={view.minR}
+				minCell={MIN_CELL}
+				maxCell={MAX_CELL}
+				reserveBelow={isPlaying ? barH : 0}
+				ariaLabel="Fragmentory board"
 			>
 				<svg
 					viewBox="{view.minC} {view.minR} {view.cols} {view.rows}"
-					width={view.cols * cellPx}
-					height={view.rows * cellPx}
-					class="mx-auto block"
+					width={view.cols * cellSize}
+					height={view.rows * cellSize}
+					class="block select-none"
 					role="group"
 					aria-label="Board"
 				>
@@ -638,7 +694,7 @@
 						<rect x={pending.col} y={pending.row} width="1" height="1" fill="none" stroke="#b5523b" stroke-width="0.05" />
 					{/if}
 				</svg>
-			</div>
+			</ZoomBoard>
 
 			<!-- Everyone's cards are public -->
 			{#if (gameState.turn_order ?? []).length > 1}
@@ -679,6 +735,7 @@
 	{#if isPlaying}
 		<!-- My card, sticky at the bottom -->
 		<div
+			bind:clientHeight={barH}
 			class="fixed inset-x-0 bottom-0 z-20 border-t-[2px] border-[#1a1917] bg-[#faf8f4]/95 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur"
 		>
 			<div class="mx-auto flex max-w-[720px] items-center gap-3">
@@ -798,9 +855,6 @@
 	}
 	.action-primary:not(:disabled):hover {
 		background: #33312d;
-	}
-	.board-wrap {
-		max-height: 62vh;
 	}
 	.spot {
 		transition: fill-opacity 0.15s;
