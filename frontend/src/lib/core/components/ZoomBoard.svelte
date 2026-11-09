@@ -101,51 +101,132 @@
 		};
 	});
 
+	/**
+	 * Live gesture zoom. Re-laying out the board (and writing integer-rounded scroll offsets)
+	 * on every pinch/wheel event makes the canvas wiggle, so while a gesture runs the content is
+	 * only scaled with a CSS transform around the anchor; the real `cellSize` + scroll position
+	 * are committed once when the gesture ends.
+	 */
+	let live: {
+		size: number; // committed cellSize when the gesture started
+		scale: number; // current visual scale relative to `size`
+		gx: number; // anchored grid point
+		gy: number;
+		px: number; // where that point should sit in the viewport
+		py: number;
+	} | null = null;
+
+	function anchorAt(px: number, py: number) {
+		const box = el!;
+		return {
+			size: cellSize,
+			scale: 1,
+			gx: (box.scrollLeft + px) / cellSize + originX,
+			gy: (box.scrollTop + py) / cellSize + originY,
+			px,
+			py
+		};
+	}
+
+	function applyLive() {
+		const box = el;
+		if (!box || !content || !live) return;
+		content.style.transition = 'none';
+		const { size, scale, gx, gy, px, py } = live;
+		const tx = px + box.scrollLeft - (gx - originX) * size * scale;
+		const ty = py + box.scrollTop - (gy - originY) * size * scale;
+		content.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+	}
+
+	function commitLive() {
+		const box = el;
+		const g = live;
+		live = null;
+		if (!box || !g) return;
+		const size = clamp(g.size * g.scale);
+		cellSize = size;
+		tick().then(() => {
+			box.scrollLeft = (g.gx - originX) * size - g.px;
+			box.scrollTop = (g.gy - originY) * size - g.py;
+			if (!content || live) return;
+			// Scroll can't always reach the anchor (board edges, re-padding a small board), so
+			// glide from where the gesture left the content to where it actually settled.
+			const dx = g.px - ((g.gx - originX) * size - box.scrollLeft);
+			const dy = g.py - ((g.gy - originY) * size - box.scrollTop);
+			const c = content;
+			c.style.transition = 'none';
+			c.style.transform = Math.hypot(dx, dy) > 1 ? `translate(${dx}px, ${dy}px)` : '';
+			if (!c.style.transform) return;
+			void c.offsetWidth;
+			c.style.transition = 'transform 180ms ease-out';
+			c.style.transform = '';
+		});
+	}
+
+	let content = $state<HTMLDivElement | null>(null);
+
 	// Pinch and Ctrl+wheel need non-passive listeners to stop the browser from zooming the page.
 	$effect(() => {
 		const box = el;
 		if (!box) return;
-		let pinch: { dist: number; size: number; cx: number; cy: number } | null = null;
+		let pinchDist = 0;
+		let wheelTimer: ReturnType<typeof setTimeout> | undefined;
+		let frame = 0;
+		const schedule = () => {
+			if (!frame) frame = requestAnimationFrame(() => ((frame = 0), applyLive()));
+		};
 
 		const local = (t1: Touch, t2: Touch) => {
 			const rect = box.getBoundingClientRect();
 			return {
 				x: (t1.clientX + t2.clientX) / 2 - rect.left,
 				y: (t1.clientY + t2.clientY) / 2 - rect.top,
-				dist: Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY)
+				dist: Math.max(1, Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY))
 			};
 		};
 
 		const onTouchStart = (e: TouchEvent) => {
 			if (e.touches.length !== 2) return;
+			if (live) commitLive();
 			const m = local(e.touches[0], e.touches[1]);
-			pinch = {
-				dist: Math.max(1, m.dist),
-				size: cellSize,
-				cx: (box.scrollLeft + m.x) / cellSize + originX,
-				cy: (box.scrollTop + m.y) / cellSize + originY
-			};
+			pinchDist = m.dist;
+			live = anchorAt(m.x, m.y);
 		};
 		const onTouchMove = (e: TouchEvent) => {
-			if (!pinch || e.touches.length !== 2) return;
+			if (!live || !pinchDist || e.touches.length !== 2) return;
 			e.preventDefault();
 			const m = local(e.touches[0], e.touches[1]);
-			const size = clamp((pinch.size * m.dist) / pinch.dist);
-			const anchor = pinch;
-			cellSize = size;
-			tick().then(() => {
-				box.scrollLeft = (anchor.cx - originX) * size - m.x;
-				box.scrollTop = (anchor.cy - originY) * size - m.y;
-			});
+			live.scale = clamp((live.size * m.dist) / pinchDist) / live.size;
+			live.px = m.x;
+			live.py = m.y;
+			schedule();
 		};
 		const onTouchEnd = (e: TouchEvent) => {
-			if (e.touches.length < 2) pinch = null;
+			if (e.touches.length >= 2 || !pinchDist) return;
+			pinchDist = 0;
+			commitLive();
 		};
 		const onWheel = (e: WheelEvent) => {
 			if (!e.ctrlKey && !e.metaKey) return;
 			e.preventDefault();
 			const rect = box.getBoundingClientRect();
-			zoomAt(cellSize * Math.exp(-e.deltaY * 0.01), e.clientX - rect.left, e.clientY - rect.top);
+			const px = e.clientX - rect.left;
+			const py = e.clientY - rect.top;
+			if (!live) live = anchorAt(px, py);
+			live.scale = clamp(live.size * live.scale * Math.exp(-e.deltaY * 0.01)) / live.size;
+			// Re-anchor under the pointer if it moved mid-gesture.
+			if (px !== live.px || py !== live.py) {
+				const s = live.size * live.scale;
+				const tx = live.px - (live.gx - originX) * s;
+				const ty = live.py - (live.gy - originY) * s;
+				live.gx = (px - tx) / s + originX;
+				live.gy = (py - ty) / s + originY;
+				live.px = px;
+				live.py = py;
+			}
+			schedule();
+			clearTimeout(wheelTimer);
+			wheelTimer = setTimeout(commitLive, 120);
 		};
 
 		box.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -154,6 +235,8 @@
 		box.addEventListener('touchcancel', onTouchEnd, { passive: true });
 		box.addEventListener('wheel', onWheel, { passive: false });
 		return () => {
+			clearTimeout(wheelTimer);
+			cancelAnimationFrame(frame);
 			box.removeEventListener('touchstart', onTouchStart);
 			box.removeEventListener('touchmove', onTouchMove);
 			box.removeEventListener('touchend', onTouchEnd);
@@ -172,7 +255,9 @@
 		style="height: {height}px"
 		aria-label={ariaLabel}
 	>
-		{@render children()}
+		<div bind:this={content} class="zoom-content">
+			{@render children()}
+		</div>
 	</div>
 
 	{#if overlay}
@@ -203,6 +288,11 @@
 		overscroll-behavior: contain;
 		scrollbar-width: none;
 		-webkit-overflow-scrolling: touch;
+	}
+	.zoom-content {
+		width: max-content;
+		transform-origin: 0 0;
+		will-change: transform;
 	}
 	.zoom-board::-webkit-scrollbar {
 		display: none;
