@@ -7,6 +7,7 @@
 
 	type PwaInstallElement = HTMLElement & {
 		showDialog: (forced?: boolean) => void;
+		hideDialog: () => void;
 		externalPromptEvent: Event | null;
 	};
 
@@ -26,6 +27,14 @@
 		let cancelled = false;
 		void import('@khmyznikov/pwa-install').then(() => {
 			if (cancelled) return;
+			// The element starts visible unless this flag says hidden (opening it once stores
+			// "false"), and it pops up as soon as the browser reports the app installable.
+			// Start hidden on every load; only showDialog() from the button un-hides it.
+			try {
+				sessionStorage.setItem('pwa-hide-install', 'true');
+			} catch {
+				// storage blocked: hideDialog() below still hides it for this page
+			}
 			const el = document.createElement('pwa-install') as PwaInstallElement;
 			el.setAttribute('manifest-url', '/manifest.json');
 			el.setAttribute('manual-apple', '');
@@ -37,6 +46,7 @@
 			if (early) el.externalPromptEvent = early;
 			el.addEventListener('pwa-install-success-event', () => (visible = false));
 			document.body.appendChild(el);
+			el.hideDialog();
 			dialog = el;
 		});
 		return () => {
