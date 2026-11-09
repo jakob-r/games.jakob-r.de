@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 import secrets
 from datetime import UTC, datetime
 from typing import Any
@@ -731,6 +732,7 @@ class RoomManager:
                     player_ids = [
                         p["player_id"] for p in players_rows if not is_bot_id(p["player_id"])
                     ]
+                    player_ids = await self._order_for_next_game(room_id, player_ids)
                     initial_state = game.create_initial_state(
                         room["config"],
                         player_ids=player_ids,
@@ -808,6 +810,20 @@ class RoomManager:
                     if room["status"] != "playing":
                         return
                     await self._handle_game_action(room, game, conn.player_id, msg.action)
+
+    async def _order_for_next_game(self, room_id: str, player_ids: list[str]) -> list[str]:
+        """Rotate the join order so the right player opens the game.
+
+        The loser of the room's previous game starts; the first game (or when the
+        loser has left) starts with a random player. Games take ``turn_order[0]``.
+        """
+        if len(player_ids) < 2:
+            return player_ids
+        starter = await self.db.get_next_starter_id(room_id)
+        if starter not in player_ids:
+            starter = random.choice(player_ids)
+        idx = player_ids.index(starter)
+        return player_ids[idx:] + player_ids[:idx]
 
     async def _handle_game_action(
         self,

@@ -5,6 +5,7 @@ from __future__ import annotations
 import random
 from collections import Counter
 
+import pytest
 from fastapi.testclient import TestClient
 
 from games_platform.core.db import Database
@@ -277,7 +278,9 @@ def test_four_player_turn_rotation_and_multi_steal() -> None:
     }
 
 
-def test_full_multiplayer_silbenstreit_websocket_lifecycle() -> None:
+def test_full_multiplayer_silbenstreit_websocket_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
+    # First game of a room opens with a random player; pin it to the host.
+    monkeypatch.setattr("games_platform.core.room_manager.random.choice", lambda seq: seq[0])
     test_db = Database()
     app = create_app(database=test_db)
 

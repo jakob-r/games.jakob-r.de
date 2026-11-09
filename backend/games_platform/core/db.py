@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 from datetime import datetime
 from typing import Any
 
@@ -101,6 +102,9 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
 -- Added after launch: best score split by solo (1 player in room) vs. multiplayer (2+, bots count).
 ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS best_score_single DOUBLE PRECISION;
 ALTER TABLE player_stats ADD COLUMN IF NOT EXISTS best_score_multi DOUBLE PRECISION;
+
+-- Added after launch: the player who opens the room's next game (the loser of the last one).
+ALTER TABLE rooms ADD COLUMN IF NOT EXISTS next_starter_id TEXT;
 
 -- Added after launch: the account's ink colour ('' = not set yet).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS color TEXT NOT NULL DEFAULT '';
@@ -470,6 +474,14 @@ class Database:
                 (room_id,),
             )
 
+    async def get_next_starter_id(self, room_id: str) -> str | None:
+        """The player who should open the room's next game, set when the last one finished."""
+        pool = self._require_pool()
+        async with pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute("SELECT next_starter_id FROM rooms WHERE id = %s", (room_id,))
+            row = await cur.fetchone()
+        return row["next_starter_id"] if row else None
+
     async def record_game_finished(
         self,
         room_id: str,
@@ -508,7 +520,19 @@ class Database:
                     """,
                     (p["player_id"], game_slug, won, score, score, single, multi),
                 )
-            human_points = sum(float(p["score"]) for p in players if not is_bot_id(p["player_id"]))
+            humans = [p for p in players if not is_bot_id(p["player_id"])]
+            # The loser (lowest score, random among ties) opens the next game in this room.
+            next_starter_id: str | None = None
+            if humans:
+                min_score = min(float(p["score"]) for p in humans)
+                next_starter_id = random.choice(
+                    [p["player_id"] for p in humans if float(p["score"]) <= min_score]
+                )
+            await cur.execute(
+                "UPDATE rooms SET next_starter_id = %s WHERE id = %s",
+                (next_starter_id, room_id),
+            )
+            human_points = sum(float(p["score"]) for p in humans)
             await cur.execute(
                 """
                 UPDATE app_settings

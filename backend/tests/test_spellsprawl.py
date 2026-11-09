@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from games_platform.core import room_manager as room_manager_module
 from games_platform.core.db import Database
 from games_platform.core.dictionary import get_letter_score
 from games_platform.games.spellsprawl import game as game_module
@@ -222,7 +223,9 @@ def test_bounding_area() -> None:
     assert bounding_area(cells) == 3 * 4
 
 
-def test_spellsprawl_websocket_lifecycle() -> None:
+def test_spellsprawl_websocket_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
+    # First game of a room opens with a random player; pin it to the host.
+    monkeypatch.setattr(room_manager_module.random, "choice", lambda seq: seq[0])
     app = create_app(database=Database())
     with TestClient(app) as client:
         assert any(g["slug"] == "spellsprawl" for g in client.get("/api/games").json())

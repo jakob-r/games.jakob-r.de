@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from games_platform.core.db import Database
@@ -115,7 +116,11 @@ def test_kaesekaestchen_double_square_closure_and_custom_shape() -> None:
     assert outcome.state["current_player_id"] == "p1"
 
 
-def test_full_multiplayer_kaesekaestchen_websocket_lifecycle() -> None:
+def test_full_multiplayer_kaesekaestchen_websocket_lifecycle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # First game of a room opens with a random player; pin it to the host.
+    monkeypatch.setattr("games_platform.core.room_manager.random.choice", lambda seq: seq[0])
     test_db = Database()
     app = create_app(database=test_db)
 

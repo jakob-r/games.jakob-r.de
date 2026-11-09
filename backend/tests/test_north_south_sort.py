@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from games_platform.core import room_manager as room_manager_module
 from games_platform.core.db import Database
 from games_platform.games.north_south_sort import game as game_module
 from games_platform.games.north_south_sort.game import (
@@ -425,7 +426,9 @@ def test_real_dataset_pools_cover_every_continent(monkeypatch: pytest.MonkeyPatc
             assert len(easy) >= 8, (continent, category)
 
 
-def test_north_south_sort_websocket_lifecycle() -> None:
+def test_north_south_sort_websocket_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
+    # First game of a room opens with a random player; pin it to the host.
+    monkeypatch.setattr(room_manager_module.random, "choice", lambda seq: seq[0])
     app = create_app(database=Database())
     slug = "north-south-sort"
     with TestClient(app) as client:

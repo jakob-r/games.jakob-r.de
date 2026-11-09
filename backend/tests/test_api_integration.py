@@ -300,6 +300,8 @@ def test_room_expiration_cleanup() -> None:
 
 
 def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
+    # First game of a room opens with a random player; pin it to the host.
+    monkeypatch.setattr("games_platform.core.room_manager.random.choice", lambda seq: seq[0])
     test_db = Database()
     app = create_app(database=test_db)
     dispatched: list[dict[str, object]] = []
@@ -516,6 +518,9 @@ def test_player_stats_split_best_score_single_and_multi() -> None:
                         (score, room_id),
                     )
                     await test_db.record_game_finished(room_id, "sudoku")
+                    if room_id == multi:
+                        # split_a (25) lost to split_b (99) and opens the next game.
+                        assert await test_db.get_next_starter_id(room_id) == "split_a"
                     await cur.execute("DELETE FROM rooms WHERE id = %s", (room_id,))
 
         assert client.portal is not None
