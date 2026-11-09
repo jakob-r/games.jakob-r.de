@@ -46,7 +46,7 @@
 	}
 
 	interface ServerTotals {
-		games_finished: number;
+		rounds_played: number;
 		points_scored: number;
 	}
 
@@ -552,8 +552,8 @@
 					<ul class="ml-5 list-disc space-y-0.5 text-sm text-[#6e6a63] marker:text-[#1a1917]/40">
 						<li>
 							<span class="font-mono-num text-[#1a1917]"
-								>{serverTotals.games_finished.toLocaleString('en')}</span
-							> games finished
+								>{serverTotals.rounds_played.toLocaleString('en')}</span
+							> rounds played
 						</li>
 						<li>
 							<span class="font-mono-num text-[#1a1917]"

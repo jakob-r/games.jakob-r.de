@@ -127,6 +127,9 @@ CREATE INDEX IF NOT EXISTS idx_oauth_accounts_user ON oauth_accounts(user_id);
 """
 
 
+SERVER_TOTALS_KEY = "server_totals"
+
+
 class Database:
     """Async PostgreSQL wrapper backed by Psycopg 3 AsyncConnectionPool."""
 
@@ -203,6 +206,19 @@ class Database:
                     WHERE ps.player_id = b.player_id AND ps.game_slug = b.game_slug
                     """
                 )
+            # Site-wide running totals; only ever incremented, so deleting rooms or stats
+            # doesn't lower them. Seeded once from what the database still holds.
+            await cur.execute(
+                """
+                INSERT INTO app_settings (key, value)
+                SELECT %s, jsonb_build_object(
+                    'rounds_played', (SELECT COUNT(*) FROM rooms WHERE status = 'finished'),
+                    'points_scored', (SELECT COALESCE(SUM(total_score), 0) FROM player_stats)
+                )
+                ON CONFLICT (key) DO NOTHING
+                """,
+                (SERVER_TOTALS_KEY,),
+            )
 
     async def create_room(
         self,
@@ -492,6 +508,19 @@ class Database:
                     """,
                     (p["player_id"], game_slug, won, score, score, single, multi),
                 )
+            human_points = sum(float(p["score"]) for p in players if not is_bot_id(p["player_id"]))
+            await cur.execute(
+                """
+                UPDATE app_settings
+                SET value = jsonb_build_object(
+                        'rounds_played', COALESCE((value->>'rounds_played')::bigint, 0) + 1,
+                        'points_scored', COALESCE((value->>'points_scored')::float8, 0) + %s
+                    ),
+                    updated_at = NOW()
+                WHERE key = %s
+                """,
+                (human_points, SERVER_TOTALS_KEY),
+            )
 
     async def get_recent_rooms_for_player(
         self,
@@ -538,20 +567,9 @@ class Database:
             rows = await cur.fetchall()
             return {r["game_slug"]: int(r["n"]) for r in rows}
 
-    async def get_server_totals(self) -> dict[str, float]:
-        """A few site-wide fun numbers (finished rooms, points scored)."""
-        pool = self._require_pool()
-        async with pool.connection() as conn, conn.cursor() as cur:
-            await cur.execute(
-                """
-                SELECT
-                    (SELECT COUNT(*) FROM rooms WHERE status = 'finished') AS games_finished,
-                    COALESCE(SUM(total_score), 0) AS points_scored
-                FROM player_stats
-                """
-            )
-            row = await cur.fetchone()
-            return dict(row) if row else {}
+    async def get_server_totals(self) -> dict[str, Any]:
+        """Site-wide running totals (rounds played, points scored); never decrease."""
+        return await self.get_app_setting(SERVER_TOTALS_KEY) or {}
 
     async def get_player_stats(self, player_id: str) -> list[dict[str, Any]]:
         pool = self._require_pool()

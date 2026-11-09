@@ -519,6 +519,7 @@ def test_player_stats_split_best_score_single_and_multi() -> None:
                     await cur.execute("DELETE FROM rooms WHERE id = %s", (room_id,))
 
         assert client.portal is not None
+        before = client.get("/api/players/split_a/stats").json()["server"]
         client.portal.call(_finish)
 
         data = client.get("/api/players/split_a/stats").json()
@@ -527,7 +528,9 @@ def test_player_stats_split_best_score_single_and_multi() -> None:
         assert sudoku["games_played"] == 3
         assert sudoku["best_score_single"] == 40
         assert sudoku["best_score_multi"] == 25
-        assert data["server"]["points_scored"] >= 40 + 10 + 25 + 99
+        # Rooms were deleted after finishing, yet the running totals still went up.
+        assert data["server"]["rounds_played"] == before["rounds_played"] + 3
+        assert data["server"]["points_scored"] == before["points_scored"] + 40 + 10 + 25 + 99
 
         b = client.get("/api/players/split_b/stats").json()["by_game"][0]
         assert b["best_score_single"] is None
