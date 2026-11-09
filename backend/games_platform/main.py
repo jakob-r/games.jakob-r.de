@@ -11,13 +11,13 @@ from pathlib import Path
 from typing import Any
 
 import anyio
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import Cookie, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from psycopg import Error as PsycopgError
 
-from games_platform.core.auth import AuthService, public_base_url
+from games_platform.core.auth import SESSION_COOKIE, AuthService, public_base_url
 from games_platform.core.auth_api import create_auth_router
 from games_platform.core.db import Database, db
 from games_platform.core.friends import FriendService, create_friends_router
@@ -266,11 +266,21 @@ def create_app(
         return {"player_id": player_id, "subscribed": subscribed, "count": len(subs)}
 
     @app.post("/api/notifications/subscribe")
-    async def subscribe_notifications(req: PushSubscribeRequest) -> dict[str, Any]:
+    async def subscribe_notifications(
+        req: PushSubscribeRequest,
+        session: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+    ) -> dict[str, Any]:
         try:
             endpoint = validate_push_endpoint(req.endpoint)
         except PushEndpointError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
+        # An account's notifications (they include friends' names) only go to its own devices.
+        if await auth_service.player_id_has_account(req.player_id):
+            user = await auth_service.user_for_session(session)
+            if user is None or user["player_id"] != req.player_id:
+                raise HTTPException(
+                    status_code=403, detail="Sign in to get this account's notifications"
+                )
         existing = await active_db.get_push_subscriptions(req.player_id)
         already_stored = any(str(sub["endpoint"]) == endpoint for sub in existing)
         if not already_stored and len(existing) >= MAX_PUSH_SUBSCRIPTIONS_PER_PLAYER:

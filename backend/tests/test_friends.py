@@ -174,3 +174,20 @@ def test_friend_labels_number_duplicates_by_when_added() -> None:
     friends = [{"name": "Anna"}, {"name": "Ben"}, {"name": "anna "}, {"name": "Jakob"}]
     assert friend_labels("Jakob", friends) == ["Anna", "Ben", "anna (2)", "Jakob (2)"]
     assert friend_labels("Ben", [{"name": ""}]) == ["Player"]
+
+
+def test_push_subscription_for_account_needs_its_session(client: TestClient) -> None:
+    acc = Accounts(client)
+    alice = acc.register("alice", "Alice")
+    acc.register("bob", "Bob")
+    body = {
+        "player_id": alice["player_id"],
+        "endpoint": f"https://fcm.googleapis.com/fcm/send/{uuid.uuid4().hex}",
+        "keys": {"p256dh": "k", "auth": "a"},
+    }
+    assert acc.act_as(None).post("/api/notifications/subscribe", json=body).status_code == 403
+    assert acc.act_as("bob").post("/api/notifications/subscribe", json=body).status_code == 403
+    assert acc.act_as("alice").post("/api/notifications/subscribe", json=body).status_code == 200
+    # Anonymous ids need no session.
+    anon = {**body, "player_id": f"anon-{uuid.uuid4().hex[:8]}"}
+    assert acc.act_as(None).post("/api/notifications/subscribe", json=anon).status_code == 200

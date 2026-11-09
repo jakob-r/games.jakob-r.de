@@ -114,6 +114,11 @@ class AuthService:
             await cur.execute("SELECT * FROM users WHERE email = %s", (email.strip().lower(),))
             return await cur.fetchone()
 
+    async def player_id_has_account(self, player_id: str) -> bool:
+        async with self.db.connection() as conn, conn.cursor() as cur:
+            await cur.execute("SELECT 1 FROM users WHERE player_id = %s", (player_id,))
+            return await cur.fetchone() is not None
+
     async def get_user(self, user_id: int) -> dict[str, Any] | None:
         async with self.db.connection() as conn, conn.cursor() as cur:
             await cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
