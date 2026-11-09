@@ -40,7 +40,9 @@ def _send_smtp(message: EmailMessage) -> None:
         server.send_message(message)
 
 
-async def send_email(*, to: str, subject: str, body: str) -> None:
+async def send_email(
+    *, to: str, subject: str, body: str, headers: dict[str, str] | None = None
+) -> None:
     """Send a plain-text email. `AUTH_MAIL_BACKEND=console` (default) only logs it."""
     if os.getenv("AUTH_MAIL_BACKEND", "console") != "smtp":
         logger.info("Email to %s | %s\n%s", to, subject, body)
@@ -55,6 +57,8 @@ async def send_email(*, to: str, subject: str, body: str) -> None:
     message["Message-ID"] = make_msgid(
         domain=addr.rsplit("@", 1)[-1] if "@" in addr else "localhost"
     )
+    for key, value in (headers or {}).items():
+        message[key] = value
     message.set_content(body)
     try:
         await asyncio.to_thread(_send_smtp, message)

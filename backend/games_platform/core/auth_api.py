@@ -74,6 +74,11 @@ class ProfileBody(BaseModel):
     color: str | None = Field(default=None, pattern=r"^#[0-9a-fA-F]{6}$")
 
 
+class MailPrefsBody(BaseModel):
+    mail_turn: bool | None = None
+    mail_invite: bool | None = None
+
+
 class PasswordBody(BaseModel):
     current_password: str | None = Field(default=None, max_length=256)
     new_password: str = Field(max_length=256)
@@ -267,6 +272,15 @@ def create_auth_router(service: AuthService) -> APIRouter:
         name = body.name if body.name and body.name.strip() else None
         color = body.color.lower() if body.color else None
         return public_user(await service.update_profile(user["id"], name=name, color=color))
+
+    @router.post("/account/notifications")
+    async def change_mail_prefs(
+        body: MailPrefsBody, user: Annotated[dict[str, Any], Depends(require_user)]
+    ) -> dict[str, Any]:
+        row = await service.update_mail_prefs(
+            user["id"], turn=body.mail_turn, invite=body.mail_invite
+        )
+        return public_user(row)
 
     @router.post("/account/password")
     async def change_password(

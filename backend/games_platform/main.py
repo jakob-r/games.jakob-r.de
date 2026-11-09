@@ -21,6 +21,7 @@ from games_platform.core.auth import SESSION_COOKIE, AuthService, public_base_ur
 from games_platform.core.auth_api import create_auth_router
 from games_platform.core.db import Database, db
 from games_platform.core.friends import FriendService, create_friends_router
+from games_platform.core.notify_mail import NotificationMailer
 from games_platform.core.protocol import (
     CreateRoomRequest,
     GameDefinition,
@@ -131,7 +132,19 @@ def create_app(
     def _game_title(slug: str) -> str:
         return manager.games[slug].title if slug in manager.games else slug
 
-    friend_service = FriendService(active_db, push=manager.push, game_title=_game_title)
+    mailer = NotificationMailer(active_db, auth_service, game_title=_game_title)
+    manager.mailer = mailer
+    friend_service = FriendService(
+        active_db, push=manager.push, game_title=_game_title, mailer=mailer
+    )
+
+    async def _turn_mail_loop() -> None:
+        while True:
+            await asyncio.sleep(60)
+            try:
+                await mailer.send_due_turns(manager.is_connected)
+            except (PsycopgError, OSError, RuntimeError) as e:
+                logger.error("Error sending turn mails: %s", repr(e))
 
     async def _periodic_cleanup() -> None:
         while True:
@@ -148,12 +161,16 @@ def create_app(
         await active_db.connect()
         await auth_service.load_secret()
         cleanup_task = asyncio.create_task(_periodic_cleanup())
+        turn_mail_task = asyncio.create_task(_turn_mail_loop())
         try:
             yield
         finally:
+            turn_mail_task.cancel()
             cleanup_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await cleanup_task
+            with contextlib.suppress(asyncio.CancelledError):
+                await turn_mail_task
             await active_db.close()
 
     app = FastAPI(
@@ -176,6 +193,7 @@ def create_app(
     app.state.auth = auth_service
     app.state.room_manager = manager
     app.state.friends = friend_service
+    app.state.mailer = mailer
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:
@@ -258,6 +276,16 @@ def create_app(
     async def get_vapid_public_key() -> dict[str, str]:
         public_key = await manager.push.get_public_key()
         return {"public_key": public_key}
+
+    @app.post("/api/mail/unsubscribe")
+    async def unsubscribe_mail(
+        token: str = Query(..., min_length=1, max_length=200),
+    ) -> dict[str, str]:
+        """One-click unsubscribe (also used by the /unsubscribe page); no login needed."""
+        kind = await auth_service.unsubscribe(token)
+        if kind is None:
+            raise HTTPException(status_code=400, detail="This unsubscribe link is not valid.")
+        return {"status": "unsubscribed", "kind": kind}
 
     @app.get("/api/notifications/status")
     async def get_notification_status(

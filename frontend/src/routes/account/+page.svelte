@@ -3,7 +3,7 @@
 	import AuthShell from '$lib/core/components/AuthShell.svelte';
 	import ProfileBadge from '$lib/core/components/ProfileBadge.svelte';
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
-	import { auth, authRequest } from '$lib/core/auth.svelte';
+	import { auth, authRequest, type AccountUser } from '$lib/core/auth.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 	import { pushNotifications } from '$lib/core/notifications.svelte';
 	import { friends, type FriendsOverview } from '$lib/core/friends.svelte';
@@ -35,6 +35,16 @@
 		if (!res.ok) friendError = res.error;
 		removingFriend = null;
 		await loadFriends();
+	}
+
+	let mailMessage = $state('');
+
+	async function toggleMail(kind: 'mail_turn' | 'mail_invite', input: HTMLInputElement) {
+		mailMessage = '';
+		const res = await authRequest<AccountUser>('/account/notifications', { [kind]: input.checked });
+		if (res.ok && res.data) auth.user = res.data;
+		else mailMessage = res.error;
+		input.checked = Boolean(auth.user?.[kind]);
 	}
 
 	async function togglePush(input: HTMLInputElement) {
@@ -223,6 +233,35 @@
 			</p>
 			{#if pushMessage}
 				<p class="text-xs font-medium" role="status">{pushMessage}</p>
+			{/if}
+
+			<label class="flex cursor-pointer items-start gap-2 pt-2 text-sm">
+				<input
+					type="checkbox"
+					class="mt-0.5 h-4 w-4 cursor-pointer accent-[#1a1917]"
+					checked={auth.user.mail_turn}
+					onchange={(e) => toggleMail('mail_turn', e.currentTarget)}
+				/>
+				<span>Email me when it's my turn and I've been away for 15 minutes</span>
+			</label>
+			<label class="flex cursor-pointer items-start gap-2 text-sm">
+				<input
+					type="checkbox"
+					class="mt-0.5 h-4 w-4 cursor-pointer accent-[#1a1917]"
+					checked={auth.user.mail_invite}
+					onchange={(e) => toggleMail('mail_invite', e.currentTarget)}
+				/>
+				<span>Email me when a friend invites me</span>
+			</label>
+			<p class="text-xs text-[#6e6a63]">
+				{#if !auth.user.email_verified}
+					Emails are only sent once your address is confirmed.
+				{:else}
+					At most one email per game until you've played, and one per friend per day for invites.
+				{/if}
+			</p>
+			{#if mailMessage}
+				<p class="text-xs font-medium text-[#dc2626]" role="alert">{mailMessage}</p>
 			{/if}
 		</section>
 

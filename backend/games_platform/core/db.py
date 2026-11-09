@@ -108,6 +108,9 @@ ALTER TABLE rooms ADD COLUMN IF NOT EXISTS next_starter_id TEXT;
 
 -- Added after launch: the account's ink colour ('' = not set yet).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS color TEXT NOT NULL DEFAULT '';
+-- Opt-in emails (only sent to verified addresses).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_mail_turn BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS notify_mail_invite BOOLEAN NOT NULL DEFAULT FALSE;
 
 CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id);
 
@@ -161,6 +164,16 @@ CREATE TABLE IF NOT EXISTS room_invites (
 
 CREATE INDEX IF NOT EXISTS idx_room_invites_to ON room_invites(to_user_id);
 CREATE INDEX IF NOT EXISTS idx_room_invites_from ON room_invites(from_user_id, created_at);
+
+-- "Your turn" mails wait here; sent when still due and the player is away.
+CREATE TABLE IF NOT EXISTS turn_mail_queue (
+    player_id TEXT NOT NULL,
+    room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    due_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY (player_id, room_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_turn_mail_queue_due ON turn_mail_queue(due_at);
 """
 
 

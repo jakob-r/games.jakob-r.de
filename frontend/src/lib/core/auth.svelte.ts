@@ -9,6 +9,9 @@ export interface AccountUser {
 	player_id: string;
 	email_verified: boolean;
 	has_password: boolean;
+	/** Opt-in emails (sent to verified addresses only). */
+	mail_turn: boolean;
+	mail_invite: boolean;
 }
 
 export interface ApiResult<T> {

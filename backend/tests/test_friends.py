@@ -315,3 +315,132 @@ def test_friends_lobbies_only_lists_friends_rooms_in_lobby(client: TestClient) -
 
     client.delete(f"/api/rooms/{met}?player_id={alice['player_id']}")
     client.delete(f"/api/rooms/{stranger_room}?player_id={acc.users['carol']['player_id']}")
+
+
+def _verify(client: TestClient, user_id: int) -> None:
+    async def run() -> None:
+        async with client.app.state.db.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "UPDATE users SET email_verified_at = NOW() WHERE id = %s", (user_id,)
+            )
+
+    assert client.portal is not None
+    client.portal.call(run)
+
+
+@pytest.fixture
+def mails(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
+    outbox: list[dict] = []
+
+    async def fake_send(*, to: str, subject: str, body: str, headers=None) -> None:
+        outbox.append({"to": to, "subject": subject, "body": body, "headers": headers or {}})
+
+    monkeypatch.setattr("games_platform.core.notify_mail.send_email", fake_send)
+    return outbox
+
+
+def test_mail_prefs_and_unsubscribe_link(client: TestClient) -> None:
+    acc = Accounts(client)
+    alice = acc.register("alice", "Alice")
+    assert alice["mail_turn"] is False and alice["mail_invite"] is False
+    c = acc.act_as("alice")
+    res = c.post("/api/auth/account/notifications", json={"mail_turn": True, "mail_invite": True})
+    assert res.json()["mail_turn"] is True and res.json()["mail_invite"] is True
+
+    token = client.app.state.auth.unsubscribe_token(alice["id"], "turn")
+    assert acc.act_as(None).post(f"/api/mail/unsubscribe?token={token}").json() == {
+        "status": "unsubscribed",
+        "kind": "turn",
+    }
+    me = acc.act_as("alice").get("/api/auth/me").json()["user"]
+    assert me["mail_turn"] is False and me["mail_invite"] is True
+
+    forged = f"{alice['id']}.invite.{'0' * 32}"
+    assert client.post(f"/api/mail/unsubscribe?token={forged}").status_code == 400
+    assert client.post("/api/mail/unsubscribe?token=garbage").status_code == 400
+
+
+def test_invite_mail_only_when_opted_in_and_once_a_day(
+    client: TestClient, mails: list[dict]
+) -> None:
+    acc = Accounts(client)
+    alice = acc.register("alice", "Alice")
+    bob = acc.register("bob", "Bob")
+    met = _room_with(client, alice["player_id"], bob["player_id"])
+    _befriend(acc, "alice", "bob", met)
+    friends_service = client.app.state.friends
+
+    def invite_to_new_room() -> str:
+        room_id = _room_with(client, alice["player_id"])
+        acc.act_as("alice").post(
+            "/api/friends/invites", json={"room_id": room_id, "user_ids": [bob["id"]]}
+        )
+        client.portal.call(friends_service.flush)
+        return room_id
+
+    first = invite_to_new_room()  # not opted in
+    acc.act_as("bob").post("/api/auth/account/notifications", json={"mail_invite": True})
+    second = invite_to_new_room()  # opted in, but not verified
+    _verify(client, bob["id"])
+    third = invite_to_new_room()
+    fourth = invite_to_new_room()  # same inviter within a day
+    assert len(mails) == 1
+    assert mails[0]["subject"] == "Alice invites you to Multiplayer Sudoku"
+    assert f"/sudoku/{third}" in mails[0]["body"] and "/unsubscribe?token=" in mails[0]["body"]
+    assert mails[0]["headers"]["List-Unsubscribe-Post"] == "List-Unsubscribe=One-Click"
+
+    for rid in (met, first, second, third, fourth):
+        client.delete(f"/api/rooms/{rid}?player_id={alice['player_id']}")
+
+
+def test_turn_mail_waits_and_is_sent_once(client: TestClient, mails: list[dict]) -> None:
+    acc = Accounts(client)
+    bob = acc.register("bob", "Bob")
+    pid = bob["player_id"]
+    room_id = _room_with(client, pid)
+    db = client.app.state.db
+    mailer = client.app.state.mailer
+    call = client.portal.call
+
+    async def make_due() -> None:
+        async with db.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "UPDATE turn_mail_queue SET due_at = NOW() - INTERVAL '1 second' WHERE room_id = %s",
+                (room_id,),
+            )
+
+    async def set_turn(player_id: str) -> None:
+        await db.update_room(room_id, status="playing", state={"current_player_id": player_id})
+
+    call(set_turn, pid)
+    away = lambda _room, _player: False
+    here = lambda _room, _player: True
+
+    # Not opted in: nothing is queued.
+    call(mailer.queue_turn, pid, room_id)
+    call(make_due)
+    assert call(mailer.send_due_turns, away) == 0
+
+    acc.act_as("bob").post("/api/auth/account/notifications", json={"mail_turn": True})
+    _verify(client, bob["id"])
+
+    call(mailer.queue_turn, pid, room_id)
+    assert call(mailer.send_due_turns, away) == 0  # not due yet
+    call(make_due)
+    assert call(mailer.send_due_turns, here) == 0  # connected: no mail, and it's used up
+    assert call(mailer.send_due_turns, away) == 0
+
+    call(mailer.queue_turn, pid, room_id)
+    call(make_due)
+    call(set_turn, "someone-else")
+    assert call(mailer.send_due_turns, away) == 0  # turn moved on
+
+    call(set_turn, pid)
+    call(mailer.queue_turn, pid, room_id)
+    call(make_due)
+    assert call(mailer.send_due_turns, away) == 1
+    assert call(mailer.send_due_turns, away) == 0
+    assert mails[-1]["subject"] == "Your turn in Multiplayer Sudoku"
+    assert f"/sudoku/{room_id}" in mails[-1]["body"]
+
+    client.delete(f"/api/rooms/{room_id}?player_id={pid}")

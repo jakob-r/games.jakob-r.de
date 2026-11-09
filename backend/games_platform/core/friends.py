@@ -64,9 +64,11 @@ class FriendService:
         *,
         push: WebPushService | None = None,
         game_title: Callable[[str], str] = lambda slug: slug,
+        mailer: Any = None,
     ) -> None:
         self.db = database
         self.push = push
+        self.mailer = mailer
         self.game_title = game_title
         self._tasks: set[asyncio.Task[Any]] = set()
 
@@ -282,23 +284,35 @@ class FriendService:
                 targets.append((recipient, inviter))
         game_slug = str(room["game_slug"])
         for recipient, inviter in targets:
-            self._background(self._notify_invite(recipient, inviter, game_slug, room_id))
+            self._background(self._notify_invite(uid, recipient, inviter, game_slug, room_id))
         return invited
 
     async def _notify_invite(
-        self, recipient: dict[str, Any], inviter: str, game_slug: str, room_id: str
+        self,
+        from_user_id: int,
+        recipient: dict[str, Any],
+        inviter: str,
+        game_slug: str,
+        room_id: str,
     ) -> None:
-        if self.push is None:
-            return
-        payload = format_invite_notification(
-            game_slug=game_slug,
-            game_title=self.game_title(game_slug),
-            room_id=room_id,
-            inviter=inviter,
-        )
-        await self.push.send_to_player(
-            room_id=room_id, player_id=str(recipient["player_id"]), payload=payload
-        )
+        if self.push is not None:
+            payload = format_invite_notification(
+                game_slug=game_slug,
+                game_title=self.game_title(game_slug),
+                room_id=room_id,
+                inviter=inviter,
+            )
+            await self.push.send_to_player(
+                room_id=room_id, player_id=str(recipient["player_id"]), payload=payload
+            )
+        if self.mailer is not None:
+            await self.mailer.send_invite(
+                to_user_id=int(recipient["id"]),
+                from_user_id=from_user_id,
+                inviter=inviter,
+                game_slug=game_slug,
+                room_id=room_id,
+            )
 
     async def inbox(self, user: dict[str, Any]) -> list[dict[str, Any]]:
         """Open invites to rooms you haven't joined (no timestamps)."""

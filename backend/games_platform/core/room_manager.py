@@ -78,6 +78,8 @@ class RoomManager:
         self.midgame_inactive_players: dict[str, set[str]] = {}
         self.locks: dict[str, asyncio.Lock] = {}
         self._push_tasks: set[asyncio.Task[Any]] = set()
+        # Optional NotificationMailer: queues "your turn" mails alongside the push.
+        self.mailer: Any = None
         # Bot players: pending debounce timer per room, rooms with a bot run in progress,
         # rooms that changed during that run, and strong refs to all bot tasks.
         self._bot_timers: dict[str, asyncio.Task[Any]] = {}
@@ -120,6 +122,13 @@ class RoomManager:
         )
         self._push_tasks.add(task)
         task.add_done_callback(self._on_push_done)
+        if self.mailer is not None:
+            mail_task = asyncio.create_task(self.mailer.queue_turn(target_player_id, room_id))
+            self._push_tasks.add(mail_task)
+            mail_task.add_done_callback(self._on_push_done)
+
+    def is_connected(self, room_id: str, player_id: str) -> bool:
+        return player_id in self._connected_player_ids(room_id)
 
     def _on_push_done(self, task: asyncio.Task[Any]) -> None:
         self._push_tasks.discard(task)

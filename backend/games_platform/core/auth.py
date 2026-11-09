@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import logging
 import os
 import secrets
@@ -85,7 +86,12 @@ def public_user(row: dict[str, Any]) -> dict[str, Any]:
         "player_id": row["player_id"],
         "email_verified": row["email_verified_at"] is not None,
         "has_password": row["password_hash"] is not None,
+        "mail_turn": bool(row.get("notify_mail_turn")),
+        "mail_invite": bool(row.get("notify_mail_invite")),
     }
+
+
+MAIL_KINDS = ("turn", "invite")
 
 
 class AuthService:
@@ -227,6 +233,49 @@ class AuthService:
             row = await cur.fetchone()
             assert row is not None
             return row
+
+    async def update_mail_prefs(
+        self, user_id: int, *, turn: bool | None = None, invite: bool | None = None
+    ) -> dict[str, Any]:
+        async with self.db.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                UPDATE users SET
+                    notify_mail_turn = COALESCE(%s, notify_mail_turn),
+                    notify_mail_invite = COALESCE(%s, notify_mail_invite)
+                WHERE id = %s RETURNING *
+                """,
+                (turn, invite, user_id),
+            )
+            row = await cur.fetchone()
+            assert row is not None
+            return row
+
+    # --- unsubscribe links (no login needed) -------------------------------
+
+    def _mail_signature(self, user_id: int, kind: str) -> str:
+        digest = hmac.new(self.secret, f"unsubscribe:{user_id}:{kind}".encode(), hashlib.sha256)
+        return digest.hexdigest()[:32]
+
+    def unsubscribe_token(self, user_id: int, kind: str) -> str:
+        """Token for turning off one kind of email ("turn" or "invite")."""
+        return f"{user_id}.{kind}.{self._mail_signature(user_id, kind)}"
+
+    async def unsubscribe(self, token: str) -> str | None:
+        """Turn off the email kind the token is for. Returns that kind, or None if invalid."""
+        try:
+            raw_id, kind, signature = token.split(".")
+            user_id = int(raw_id)
+        except ValueError:
+            return None
+        if kind not in MAIL_KINDS or not hmac.compare_digest(
+            signature, self._mail_signature(user_id, kind)
+        ):
+            return None
+        column = "notify_mail_turn" if kind == "turn" else "notify_mail_invite"
+        async with self.db.connection() as conn, conn.cursor() as cur:
+            await cur.execute(f"UPDATE users SET {column} = FALSE WHERE id = %s", (user_id,))
+        return kind
 
     async def update_name(self, user_id: int, name: str) -> dict[str, Any]:
         async with self.db.connection() as conn, conn.cursor() as cur:
