@@ -336,6 +336,47 @@ class FriendService:
             if int(r["from_user_id"]) in labels
         ]
 
+    async def lobbies(self, user: dict[str, Any]) -> list[dict[str, Any]]:
+        """Rooms friends host that are still in the lobby (no timestamps)."""
+        async with self.db.connection() as conn, conn.cursor() as cur:
+            labels = await self._labels(cur, user["id"], user["display_name"])
+            await cur.execute(
+                """
+                SELECT r.id AS room_id, r.game_slug, u.id AS host_id, u.color,
+                       (SELECT COUNT(*) FROM room_players rp WHERE rp.room_id = r.id) AS players,
+                       EXISTS (
+                           SELECT 1 FROM room_players rp
+                           WHERE rp.room_id = r.id AND rp.player_id = %(pid)s
+                       ) AS joined
+                FROM rooms r
+                JOIN users u ON u.player_id = r.host_player_id
+                JOIN friendships f ON f.user_id = %(me)s AND f.friend_id = u.id
+                WHERE r.status = 'lobby'
+                """,
+                {"me": user["id"], "pid": user["player_id"]},
+            )
+            rows = await cur.fetchall()
+        lobbies = [
+            {
+                "room_id": r["room_id"],
+                "game_slug": r["game_slug"],
+                "host": {
+                    "user_id": int(r["host_id"]),
+                    "label": labels[int(r["host_id"])],
+                    "color": r["color"] or "",
+                },
+                "players": int(r["players"]),
+                "joined": bool(r["joined"]),
+            }
+            for r in rows
+            if int(r["host_id"]) in labels
+        ]
+        # Stable order without any notion of recency.
+        lobbies.sort(
+            key=lambda lb: (lb["game_slug"], lb["host"]["label"].casefold(), lb["room_id"])
+        )
+        return lobbies
+
     async def dismiss_invite(self, user: dict[str, Any], room_id: str) -> None:
         async with self.db.connection() as conn, conn.cursor() as cur:
             await cur.execute(
@@ -489,6 +530,10 @@ def create_friends_router(auth: AuthService, friends: FriendService) -> APIRoute
     @router.get("/inbox")
     async def inbox(user: User) -> dict[str, Any]:
         return {"invites": await friends.inbox(user)}
+
+    @router.get("/lobbies")
+    async def lobbies(user: User) -> dict[str, Any]:
+        return {"lobbies": await friends.lobbies(user)}
 
     @router.delete("/invites/{room_id}")
     async def dismiss_invite(room_id: str, user: User) -> dict[str, Any]:

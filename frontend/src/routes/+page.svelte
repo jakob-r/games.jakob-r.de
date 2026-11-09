@@ -18,6 +18,7 @@
 		type GameSlug
 	} from '$lib/games/catalog';
 	import GameLogo from '$lib/games/GameLogo.svelte';
+	import { friends } from '$lib/core/friends.svelte';
 
 	interface RecentRoom {
 		room_id: string;
@@ -62,6 +63,15 @@
 	let roomPendingDelete = $state<string | null>(null);
 	let leavingRoomId = $state<string | null>(null);
 	let recentRooms = $state<RecentRoom[]>([]);
+	let inviteCount = $state(0);
+
+	$effect(() => {
+		if (!auth.user) {
+			inviteCount = 0;
+			return;
+		}
+		void friends.inbox().then((res) => (inviteCount = res.data?.invites.length ?? 0));
+	});
 	let stats = $state<PlayerStatsSummary | null>(null);
 	let statsByGame = $state<GameStats[]>([]);
 	let serverTotals = $state<ServerTotals | null>(null);
@@ -318,6 +328,24 @@
 				class="font-mono-num w-32 rounded-md border-[1.6px] border-[#1a1917] bg-white px-2.5 py-1.5 text-xs focus:outline-none"
 			/>
 			<ScribblyButton type="submit">Join Room</ScribblyButton>
+			{#if auth.user}
+				<ScribblyButton
+					onclick={() => goto('/friends')}
+					title={inviteCount ? `Friends — ${inviteCount} open invite${inviteCount === 1 ? '' : 's'}` : "Friends' lobbies and invites"}
+					class="relative !px-2.5"
+				>
+					<span class="sr-only">Friends</span>
+					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+						<circle cx="9" cy="8" r="3.5" />
+						<path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" />
+						<circle cx="17" cy="9" r="2.5" />
+						<path d="M17 14c2.6 0 4.5 1.9 4.5 4.5" />
+					</svg>
+					{#if inviteCount}
+						<span class="font-mono-num absolute -top-1.5 -right-1.5 min-w-4 rounded-full border border-[#1a1917] bg-[#fef3c7] px-1 text-[10px] leading-4 font-bold">{inviteCount}</span>
+					{/if}
+				</ScribblyButton>
+			{/if}
 			<ScribblyButton
 				onclick={() => goto(auth.user ? '/account' : '/login')}
 				title={auth.user ? 'Account settings' : 'Sign in or create account'}

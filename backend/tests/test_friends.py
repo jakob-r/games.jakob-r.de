@@ -281,3 +281,37 @@ def test_invite_friend_to_room_with_push_and_inbox(
 
     for rid in (met, room_id, other):
         client.delete(f"/api/rooms/{rid}?player_id={alice['player_id']}")
+
+
+def test_friends_lobbies_only_lists_friends_rooms_in_lobby(client: TestClient) -> None:
+    acc = Accounts(client)
+    alice = acc.register("alice", "Alice")
+    bob = acc.register("bob", "Bob")
+    acc.register("carol", "Carol")
+    met = _room_with(client, alice["player_id"], bob["player_id"])
+    _befriend(acc, "alice", "bob", met)
+    stranger_room = _room_with(client, acc.users["carol"]["player_id"])
+
+    lobbies = acc.act_as("bob").get("/api/friends/lobbies").json()["lobbies"]
+    assert lobbies == [
+        {
+            "room_id": met,
+            "game_slug": "sudoku",
+            "host": {"user_id": alice["id"], "label": "Alice", "color": alice["color"]},
+            "players": 2,
+            "joined": True,
+        }
+    ]
+    assert "created_at" not in lobbies[0]
+
+    # Once the game runs it is no longer listed.
+    with client.websocket_connect(
+        f"/ws/sudoku/{met}?player_id={alice['player_id']}&name=Alice&color=%232563eb"
+    ) as ws:
+        ws.receive_json()
+        ws.send_json({"type": "start_game"})
+        ws.receive_json()
+    assert acc.act_as("bob").get("/api/friends/lobbies").json()["lobbies"] == []
+
+    client.delete(f"/api/rooms/{met}?player_id={alice['player_id']}")
+    client.delete(f"/api/rooms/{stranger_room}?player_id={acc.users['carol']['player_id']}")

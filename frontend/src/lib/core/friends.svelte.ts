@@ -21,6 +21,15 @@ export interface RoomInvite {
 	from: { user_id: number; label: string; color: string };
 }
 
+export interface FriendLobby {
+	room_id: string;
+	game_slug: string;
+	host: { user_id: number; label: string; color: string };
+	players: number;
+	/** You are already a player there. */
+	joined: boolean;
+}
+
 export interface FriendsOverview {
 	friends: Friend[];
 	incoming: FriendPerson[];
@@ -105,6 +114,10 @@ class FriendsStore {
 
 	inbox(): Promise<ApiResult<{ invites: RoomInvite[] }>> {
 		return friendsRequest<{ invites: RoomInvite[] }>('/inbox');
+	}
+
+	lobbies(): Promise<ApiResult<{ lobbies: FriendLobby[] }>> {
+		return friendsRequest<{ lobbies: FriendLobby[] }>('/lobbies');
 	}
 
 	dismissInvite(roomId: string): Promise<ApiResult<unknown>> {

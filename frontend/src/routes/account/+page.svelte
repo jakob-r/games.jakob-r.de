@@ -125,6 +125,7 @@
 			<p class="text-xs text-[#6e6a63]">
 				Add friends by tapping their name in a game you play together (both need an account).
 				Friends never see whether you're online.
+				<a href="/friends" class="underline">Invites and friends' lobbies →</a>
 			</p>
 			{#if friendError}
 				<p class="text-xs font-medium text-[#dc2626]" role="alert">{friendError}</p>
