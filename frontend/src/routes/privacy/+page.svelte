@@ -107,7 +107,9 @@
 			Signed-in players can add other signed-in players from a game they share as friends. I store who is
 			friends with whom and open friend requests (a request expires after 30 days). Friends see your name and
 			colour; they never see whether you are online, when you were last active, your email address or your
-			other friends. Declining a request or removing a friend is not shown to the other person.
+			other friends. Declining a request or removing a friend is not shown to the other person. You can
+			invite friends to a room; the invite (who invited whom to which room) is stored until the room is
+			deleted. Friends see the rooms you created that are still waiting in the lobby, without any times.
 		</p>
 		<p>
 			The legal basis is Art. 6(1)(b) GDPR. You can delete your account at any time on the account page; this
@@ -124,7 +126,7 @@
 			TDDDG).
 		</p>
 
-		<h2>7. Push notifications (optional)</h2>
+		<h2>7. Notifications (optional)</h2>
 		<p>
 			If you explicitly enable it, the site can notify you when it is your turn. Your browser then creates a
 			push subscription for this device, which is stored on my server together with your player ID and used
@@ -140,6 +142,14 @@
 			notification bell in a game (or the switch on your account page) or by revoking the permission in your
 			browser. The subscription is deleted when you turn notifications off, when the push service reports it as
 			expired, when you delete your account, or after one year without a visit from that device.
+		</p>
+
+		<p>
+			If you have an account, you can also opt in to emails when it has been your turn for 15 minutes while
+			you are away, or when a friend invites you. They are only sent to a confirmed address, through the mail
+			server of Linevast (see section 5). Pending "your turn" emails are kept for at most 15 minutes. The legal
+			basis is your consent (Art. 6(1)(a) GDPR); every email contains a link to turn it off, and you can do so
+			on your account page at any time.
 		</p>
 
 		<h2>8. External links</h2>
