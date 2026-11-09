@@ -121,7 +121,8 @@
 		<h2>7. Push notifications (optional)</h2>
 		<p>
 			If you explicitly enable it, the site can notify you when it is your turn. Your browser then creates a
-			push subscription, which is stored on my server together with the game room and your player ID. To
+			push subscription for this device, which is stored on my server together with your player ID and used
+			for all your games. To
 			deliver notifications, my server sends them to the push service of your browser's vendor, e.g. Google
 			(Chrome), Mozilla (Firefox), Apple (Safari) or Microsoft (Edge). The content of the notifications is
 			end-to-end encrypted; the push service only sees technical data such as the subscription address and the
@@ -130,9 +131,9 @@
 		</p>
 		<p>
 			The legal basis is your consent (Art. 6(1)(a) GDPR). You can withdraw it at any time by turning off the
-			notification bell in the game or by revoking the permission in your browser. The subscription is deleted
-			when you turn notifications off, when the push service reports it as expired, or when the game room is
-			deleted.
+			notification bell in a game (or the switch on your account page) or by revoking the permission in your
+			browser. The subscription is deleted when you turn notifications off, when the push service reports it as
+			expired, when you delete your account, or after one year without a visit from that device.
 		</p>
 
 		<h2>8. External links</h2>

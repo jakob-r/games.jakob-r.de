@@ -348,7 +348,6 @@
 	{#snippet headerActions()}
 		<TurnNotificationBell
 			{roomId}
-			playerId={profile.playerId}
 			gameSlug="emoji-charades"
 			gameTitle="Emoji Charades"
 			{isMyTurn}

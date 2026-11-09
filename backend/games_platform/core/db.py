@@ -66,20 +66,20 @@ CREATE TABLE IF NOT EXISTS app_settings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- One row per browser/device (endpoint). It belongs to whichever player uses that
+-- browser right now; signing in or out moves it to the new player id.
 CREATE TABLE IF NOT EXISTS push_subscriptions (
     id BIGSERIAL PRIMARY KEY,
-    room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
     player_id TEXT NOT NULL,
-    endpoint TEXT NOT NULL,
+    endpoint TEXT NOT NULL UNIQUE,
     p256dh TEXT NOT NULL,
     auth TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (room_id, player_id, endpoint)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_push_subscriptions_room_player
-    ON push_subscriptions(room_id, player_id);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_player
+    ON push_subscriptions(player_id);
 
 CREATE TABLE IF NOT EXISTS users (
     id BIGSERIAL PRIMARY KEY,
@@ -188,7 +188,34 @@ class Database:
                 """
             )
             needs_split_backfill = await cur.fetchone() is None
+            await cur.execute(
+                """
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'push_subscriptions' AND column_name = 'room_id'
+                """
+            )
+            has_room_push_subscriptions = await cur.fetchone() is not None
+            if has_room_push_subscriptions:
+                await cur.execute(
+                    "ALTER TABLE push_subscriptions RENAME TO push_subscriptions_per_room"
+                )
+                await cur.execute("DROP INDEX IF EXISTS idx_push_subscriptions_room_player")
             await cur.execute(SCHEMA_SQL)
+            if has_room_push_subscriptions:
+                # One-off: push used to be switched on per room. Keep each device once,
+                # for the player who used it most recently, now for all of their rooms.
+                await cur.execute(
+                    """
+                    INSERT INTO push_subscriptions
+                        (player_id, endpoint, p256dh, auth, created_at, updated_at)
+                    SELECT DISTINCT ON (endpoint)
+                        player_id, endpoint, p256dh, auth, created_at, updated_at
+                    FROM push_subscriptions_per_room
+                    ORDER BY endpoint, updated_at DESC
+                    ON CONFLICT (endpoint) DO NOTHING
+                    """
+                )
+                await cur.execute("DROP TABLE push_subscriptions_per_room")
             if needs_split_backfill:
                 # One-off: derive the solo/multiplayer best from finished rooms still kept.
                 await cur.execute(
@@ -358,13 +385,6 @@ class Database:
         async with pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                DELETE FROM push_subscriptions
-                WHERE room_id = %s AND player_id = %s
-                """,
-                (room_id, player_id),
-            )
-            await cur.execute(
-                """
                 DELETE FROM room_players
                 WHERE room_id = %s AND player_id = %s
                 RETURNING player_id
@@ -410,6 +430,10 @@ class Database:
             rows = await cur.fetchall()
             await cur.execute(
                 "DELETE FROM player_stats WHERE updated_at < NOW() - INTERVAL '1 year'"
+            )
+            # Devices that never synced again (each visit with notifications on does).
+            await cur.execute(
+                "DELETE FROM push_subscriptions WHERE updated_at < NOW() - INTERVAL '1 year'"
             )
             await cur.execute("DELETE FROM auth_sessions WHERE expires_at < NOW()")
             await cur.execute(
@@ -648,72 +672,51 @@ class Database:
     async def upsert_push_subscription(
         self,
         *,
-        room_id: str,
         player_id: str,
         endpoint: str,
         p256dh: str,
         auth: str,
     ) -> dict[str, Any]:
+        """Store a device's subscription; an endpoint seen before moves to ``player_id``."""
         pool = self._require_pool()
         async with pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                INSERT INTO push_subscriptions (room_id, player_id, endpoint, p256dh, auth, updated_at)
-                VALUES (%s, %s, %s, %s, %s, NOW())
-                ON CONFLICT (room_id, player_id, endpoint) DO UPDATE
-                SET p256dh = EXCLUDED.p256dh,
+                INSERT INTO push_subscriptions (player_id, endpoint, p256dh, auth, updated_at)
+                VALUES (%s, %s, %s, %s, NOW())
+                ON CONFLICT (endpoint) DO UPDATE
+                SET player_id = EXCLUDED.player_id,
+                    p256dh = EXCLUDED.p256dh,
                     auth = EXCLUDED.auth,
                     updated_at = NOW()
-                RETURNING id, room_id, player_id, endpoint, p256dh, auth, created_at, updated_at
+                RETURNING id, player_id, endpoint, p256dh, auth, created_at, updated_at
                 """,
-                (room_id, player_id, endpoint, p256dh, auth),
+                (player_id, endpoint, p256dh, auth),
             )
             row = await cur.fetchone()
             assert row is not None
             return dict(row)
 
-    async def delete_push_subscriptions(
-        self,
-        *,
-        room_id: str,
-        player_id: str,
-        endpoint: str | None = None,
-    ) -> int:
+    async def delete_push_subscription(self, *, player_id: str, endpoint: str) -> int:
         pool = self._require_pool()
         async with pool.connection() as conn, conn.cursor() as cur:
-            if endpoint:
-                await cur.execute(
-                    """
-                    DELETE FROM push_subscriptions
-                    WHERE room_id = %s AND player_id = %s AND endpoint = %s
-                    """,
-                    (room_id, player_id, endpoint),
-                )
-            else:
-                await cur.execute(
-                    """
-                    DELETE FROM push_subscriptions
-                    WHERE room_id = %s AND player_id = %s
-                    """,
-                    (room_id, player_id),
-                )
+            await cur.execute(
+                "DELETE FROM push_subscriptions WHERE player_id = %s AND endpoint = %s",
+                (player_id, endpoint),
+            )
             return cur.rowcount or 0
 
-    async def get_push_subscriptions(
-        self,
-        room_id: str,
-        player_id: str,
-    ) -> list[dict[str, Any]]:
+    async def get_push_subscriptions(self, player_id: str) -> list[dict[str, Any]]:
         pool = self._require_pool()
         async with pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                SELECT id, room_id, player_id, endpoint, p256dh, auth, created_at, updated_at
+                SELECT id, player_id, endpoint, p256dh, auth, created_at, updated_at
                 FROM push_subscriptions
-                WHERE room_id = %s AND player_id = %s
+                WHERE player_id = %s
                 ORDER BY updated_at DESC
                 """,
-                (room_id, player_id),
+                (player_id,),
             )
             rows = await cur.fetchall()
             return [dict(r) for r in rows]

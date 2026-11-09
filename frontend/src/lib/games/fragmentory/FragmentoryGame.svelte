@@ -488,7 +488,6 @@
 	{#snippet headerActions()}
 		<TurnNotificationBell
 			{roomId}
-			playerId={profile.playerId}
 			gameSlug="fragmentory"
 			gameTitle="Fragmentory"
 			{isMyTurn}

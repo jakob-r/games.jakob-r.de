@@ -185,8 +185,8 @@ class WebPushService:
         player_id: str,
         payload: dict[str, Any],
     ) -> int:
-        """Send a Web Push notification to all active endpoints for a player in a room."""
-        subscriptions = await self.db.get_push_subscriptions(room_id, player_id)
+        """Send a Web Push notification to every device of a player (room sets the Topic)."""
+        subscriptions = await self.db.get_push_subscriptions(player_id)
         if not subscriptions:
             return 0
 
@@ -223,8 +223,7 @@ class WebPushService:
                         room_id,
                         repr(e),
                     )
-                    await self.db.delete_push_subscriptions(
-                        room_id=room_id,
+                    await self.db.delete_push_subscription(
                         player_id=player_id,
                         endpoint=endpoint,
                     )

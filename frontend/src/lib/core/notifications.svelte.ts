@@ -1,4 +1,9 @@
-const STORAGE_KEY = 'games_turn_notifications_v1';
+import { profile } from '$lib/core/profile.svelte';
+
+/** One switch per browser/device: on means pushes for every room where it's your turn. */
+const STORAGE_KEY = 'games_push_notifications_v2';
+/** Before v2, notifications were switched on per room ({ [roomId]: true }). */
+const LEGACY_ROOMS_KEY = 'games_turn_notifications_v1';
 
 /** Page title owned by the turn bell. Route heads fall back when this is null. */
 export const roomDocumentTitle = $state<{ text: string | null }>({ text: null });
@@ -25,160 +30,134 @@ function applicationServerKeysMatch(existing: ArrayBuffer | null, publicKey: str
 	return true;
 }
 
-function readStoredRooms(): Record<string, boolean> {
-	if (typeof window === 'undefined') return {};
+function readStoredEnabled(): boolean {
 	try {
-		const raw = localStorage.getItem(STORAGE_KEY);
-		if (!raw) return {};
-		const parsed = JSON.parse(raw);
-		if (parsed && typeof parsed === 'object') {
-			return parsed as Record<string, boolean>;
-		}
+		const stored = localStorage.getItem(STORAGE_KEY);
+		if (stored !== null) return stored === '1';
+		// Anyone who had the bell on in some room keeps notifications on.
+		const legacy = JSON.parse(localStorage.getItem(LEGACY_ROOMS_KEY) ?? '{}');
+		const enabled =
+			!!legacy && typeof legacy === 'object' && Object.values(legacy).some((v) => v === true);
+		localStorage.setItem(STORAGE_KEY, enabled ? '1' : '0');
+		localStorage.removeItem(LEGACY_ROOMS_KEY);
+		return enabled;
 	} catch {
-		// ignore corrupt storage
-	}
-	return {};
-}
-
-function writeStoredRoom(roomId: string, active: boolean): void {
-	if (typeof window === 'undefined') return;
-	try {
-		const map = readStoredRooms();
-		if (active) {
-			map[roomId] = true;
-		} else {
-			delete map[roomId];
-		}
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-	} catch {
-		// ignore storage quota errors
+		return false;
 	}
 }
 
-export class TurnNotificationController {
+function writeStoredEnabled(enabled: boolean): void {
+	try {
+		localStorage.setItem(STORAGE_KEY, enabled ? '1' : '0');
+	} catch {
+		// ignore storage errors
+	}
+}
+
+function pushSupported(): boolean {
+	return (
+		typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window
+	);
+}
+
+async function currentEndpoint(): Promise<string | null> {
+	if (!pushSupported()) return null;
+	try {
+		const registration = await navigator.serviceWorker.getRegistration('/');
+		const sub = await registration?.pushManager.getSubscription();
+		return sub?.endpoint ?? null;
+	} catch {
+		return null;
+	}
+}
+
+class PushNotificationStore {
 	enabled = $state<boolean>(false);
 	permission = $state<NotificationPermission | 'unsupported'>('default');
 	pushSubscribed = $state<boolean>(false);
 	busy = $state<boolean>(false);
-	toastMessage = $state<string | null>(null);
 
-	private roomId = '';
-	private playerId = '';
-	private gameSlug = '';
-	private gameTitle = '';
-	private toastTimer: ReturnType<typeof setTimeout> | null = null;
+	private initialized = false;
+	/** Player id the device is registered for on the server. */
+	private syncedPlayerId = '';
 
-	private showToast(msg: string, durationMs = 2800): void {
-		this.toastMessage = msg;
-		if (this.toastTimer) clearTimeout(this.toastTimer);
-		this.toastTimer = setTimeout(() => {
-			this.toastMessage = null;
-		}, durationMs);
-	}
-
-	async init(params: {
-		roomId: string;
-		playerId: string;
-		gameSlug: string;
-		gameTitle: string;
-	}): Promise<void> {
-		this.roomId = params.roomId;
-		this.playerId = params.playerId;
-		this.gameSlug = params.gameSlug;
-		this.gameTitle = params.gameTitle;
-
-		if (typeof window === 'undefined' || !('Notification' in window)) {
+	/** Read the stored switch and register this device for the current player. */
+	init(): void {
+		if (this.initialized || typeof window === 'undefined') return;
+		this.initialized = true;
+		if (!('Notification' in window)) {
 			this.permission = 'unsupported';
-			this.enabled = false;
 			return;
 		}
-
 		this.permission = Notification.permission;
-		const stored = readStoredRooms()[this.roomId] === true;
-
+		const stored = readStoredEnabled();
 		if (stored && this.permission === 'granted') {
 			this.enabled = true;
-			await this.syncWebPushSubscription();
-		} else {
-			this.enabled = false;
-			if (stored && this.permission !== 'granted') {
-				writeStoredRoom(this.roomId, false);
-			}
+		} else if (stored) {
+			writeStoredEnabled(false);
 		}
 	}
 
-	async toggle(): Promise<void> {
-		if (this.busy) return;
-		if (typeof window === 'undefined' || !('Notification' in window)) {
-			this.permission = 'unsupported';
-			this.showToast('Browser notifications are not supported on this device.');
-			return;
-		}
+	/**
+	 * Keep the server registration on the current player id. Called whenever the
+	 * player id changes (sign in/out); the server moves the device to the new id.
+	 */
+	async syncPlayer(playerId: string): Promise<void> {
+		if (!this.enabled || !playerId || playerId === this.syncedPlayerId) return;
+		await this.subscribe(playerId);
+	}
 
+	/** Switch notifications on/off for this device. Returns a short message for the UI. */
+	async setEnabled(on: boolean, opts: { roomId?: string } = {}): Promise<string> {
+		this.init();
+		if (this.permission === 'unsupported') {
+			return 'Browser notifications are not supported on this device.';
+		}
+		if (this.busy) return '';
 		this.busy = true;
 		try {
-			if (this.enabled) {
+			if (!on) {
 				this.enabled = false;
-				writeStoredRoom(this.roomId, false);
-				await this.unsubscribeWebPush();
-				this.showToast('Turn notifications muted.');
-				return;
+				writeStoredEnabled(false);
+				await this.unsubscribe();
+				return 'Notifications off on this device.';
 			}
 
-			let currentPerm = Notification.permission;
-			if (currentPerm === 'default') {
-				currentPerm = await Notification.requestPermission();
+			let perm = Notification.permission;
+			if (perm === 'default') {
+				perm = await Notification.requestPermission();
 			}
-			this.permission = currentPerm;
-
-			if (currentPerm !== 'granted') {
+			this.permission = perm;
+			if (perm !== 'granted') {
 				this.enabled = false;
-				writeStoredRoom(this.roomId, false);
-				this.showToast('Notifications blocked — allow them in browser site settings.');
-				return;
+				writeStoredEnabled(false);
+				return 'Notifications blocked — allow them in the browser site settings.';
 			}
 
 			this.enabled = true;
-			writeStoredRoom(this.roomId, true);
-			const pushOk = await this.syncWebPushSubscription();
-			if (pushOk) {
-				this.showToast(
-					"Turn notifications on. You'll be notified when this tab is in the background."
-				);
-			} else {
-				this.showToast('Turn notifications on while this tab stays open.');
-			}
+			writeStoredEnabled(true);
+			const pushOk = await this.subscribe(profile.playerId, opts.roomId);
+			return pushOk
+				? "Notifications on. You'll be notified when it's your turn in any game."
+				: 'Notifications on while a game tab stays open.';
 		} finally {
 			this.busy = false;
 		}
 	}
 
-	private async syncWebPushSubscription(): Promise<boolean> {
-		if (
-			typeof window === 'undefined' ||
-			!('serviceWorker' in navigator) ||
-			!('PushManager' in window) ||
-			!this.roomId ||
-			!this.playerId
-		) {
+	private async subscribe(playerId: string, roomId?: string): Promise<boolean> {
+		if (!pushSupported() || !playerId) {
 			this.pushSubscribed = false;
 			return false;
 		}
-
 		try {
 			const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
 			await navigator.serviceWorker.ready;
 
 			const keyRes = await fetch('/api/notifications/vapid-public-key');
-			if (!keyRes.ok) {
-				this.pushSubscribed = false;
-				return false;
-			}
+			if (!keyRes.ok) throw new Error('no key');
 			const { public_key: publicKey } = (await keyRes.json()) as { public_key: string };
-			if (!publicKey) {
-				this.pushSubscribed = false;
-				return false;
-			}
+			if (!publicKey) throw new Error('no key');
 
 			let sub = await registration.pushManager.getSubscription();
 			if (sub && !applicationServerKeysMatch(sub.options.applicationServerKey, publicKey)) {
@@ -197,51 +176,37 @@ export class TurnNotificationController {
 			const endpoint = subJson.endpoint ?? '';
 			const p256dh = subJson.keys?.p256dh ?? '';
 			const auth = subJson.keys?.auth ?? '';
-			if (!endpoint || !p256dh || !auth) {
-				this.pushSubscribed = false;
-				return false;
-			}
+			if (!endpoint || !p256dh || !auth) throw new Error('incomplete subscription');
 
-			const subRes = await fetch(
-				`/api/rooms/${encodeURIComponent(this.roomId)}/notifications/subscribe`,
-				{
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						player_id: this.playerId,
-						endpoint,
-						keys: { p256dh, auth }
-					})
-				}
-			);
-			this.pushSubscribed = subRes.ok;
-			return subRes.ok;
+			const res = await fetch('/api/notifications/subscribe', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					player_id: playerId,
+					endpoint,
+					keys: { p256dh, auth },
+					...(roomId ? { room_id: roomId } : {})
+				})
+			});
+			this.pushSubscribed = res.ok;
+			this.syncedPlayerId = res.ok ? playerId : '';
+			return res.ok;
 		} catch {
 			this.pushSubscribed = false;
+			this.syncedPlayerId = '';
 			return false;
 		}
 	}
 
-	private async unsubscribeWebPush(): Promise<void> {
+	private async unsubscribe(): Promise<void> {
+		const playerId = this.syncedPlayerId || profile.playerId;
 		this.pushSubscribed = false;
-		if (!this.roomId || !this.playerId) return;
-
-		let endpointParam = '';
-		try {
-			if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-				const registration = await navigator.serviceWorker.getRegistration('/');
-				const sub = await registration?.pushManager.getSubscription();
-				if (sub?.endpoint) {
-					endpointParam = `&endpoint=${encodeURIComponent(sub.endpoint)}`;
-				}
-			}
-		} catch {
-			// ignore
-		}
-
+		this.syncedPlayerId = '';
+		const endpoint = await currentEndpoint();
+		if (!endpoint || !playerId) return;
 		try {
 			await fetch(
-				`/api/rooms/${encodeURIComponent(this.roomId)}/notifications/subscribe?player_id=${encodeURIComponent(this.playerId)}${endpointParam}`,
+				`/api/notifications/subscribe?player_id=${encodeURIComponent(playerId)}&endpoint=${encodeURIComponent(endpoint)}`,
 				{ method: 'DELETE' }
 			);
 		} catch {
@@ -249,40 +214,30 @@ export class TurnNotificationController {
 		}
 	}
 
-	async notifyTurnIfNeeded(body?: string): Promise<void> {
-		if (!this.enabled || typeof window === 'undefined' || !('Notification' in window)) {
-			return;
-		}
-		if (Notification.permission !== 'granted') {
-			return;
-		}
+	/** In-tab fallback when Web Push isn't available but notifications are allowed. */
+	async notifyTurnIfNeeded(params: {
+		roomId: string;
+		gameSlug: string;
+		gameTitle: string;
+		body?: string;
+	}): Promise<void> {
+		if (!this.enabled || typeof window === 'undefined' || !('Notification' in window)) return;
+		if (Notification.permission !== 'granted') return;
 		// The service worker shows the Web Push unless this room's tab is focused.
-		if (this.pushSubscribed) {
-			return;
-		}
+		if (this.pushSubscribed) return;
+		if (document.visibilityState !== 'hidden' && document.hasFocus()) return;
 
-		// Only show an OS notification if the tab is in the background or window is unfocused
-		const isHiddenOrUnfocused =
-			document.visibilityState === 'hidden' || !document.hasFocus();
-		if (!isHiddenOrUnfocused) {
-			return;
-		}
-
-		const title = `${this.gameTitle} — It's your turn!`;
-		const messageBody =
-			body || `Your opponent finished their move in #${this.roomId}. Your turn!`;
-		const tag = `turn-${this.roomId}`;
-		const url = `/${this.gameSlug}/${this.roomId}`;
+		const title = `${params.gameTitle} — It's your turn!`;
+		const body =
+			params.body || `Your opponent finished their move in #${params.roomId}. Your turn!`;
+		const tag = `turn-${params.roomId}`;
+		const url = `/${params.gameSlug}/${params.roomId}`;
 
 		try {
 			if ('serviceWorker' in navigator) {
 				const registration = await navigator.serviceWorker.getRegistration('/');
 				if (registration && 'showNotification' in registration) {
-					await registration.showNotification(title, {
-						body: messageBody,
-						tag,
-						data: { url }
-					});
+					await registration.showNotification(title, { body, tag, data: { url } });
 					return;
 				}
 			}
@@ -291,23 +246,15 @@ export class TurnNotificationController {
 		}
 
 		try {
-			const n = new Notification(title, {
-				body: messageBody,
-				tag
-			});
+			const n = new Notification(title, { body, tag });
 			n.onclick = () => {
 				window.focus();
 				n.close();
 			};
 		} catch {
-			// Ignore on environments where direct Notification constructor is restricted
-		}
-	}
-
-	destroy(): void {
-		if (this.toastTimer) {
-			clearTimeout(this.toastTimer);
-			this.toastTimer = null;
+			// Ignore environments where the Notification constructor is restricted
 		}
 	}
 }
+
+export const pushNotifications = new PushNotificationStore();

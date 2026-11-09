@@ -175,6 +175,8 @@ class PushSubscribeRequest(BaseModel):
     player_id: str = Field(min_length=1)
     endpoint: str = Field(min_length=1)
     keys: PushSubscriptionKeys
+    # Set when switched on from inside a room: counts as activity there.
+    room_id: str | None = None
 
 
 class PlayerPublicInfo(BaseModel):

@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { roomDocumentTitle, TurnNotificationController } from '$lib/core/notifications.svelte';
+	import { pushNotifications, roomDocumentTitle } from '$lib/core/notifications.svelte';
 
 	let {
 		roomId,
-		playerId,
 		gameSlug,
 		gameTitle,
 		isMyTurn = false,
@@ -12,7 +11,6 @@
 		turnHint = ''
 	}: {
 		roomId: string;
-		playerId: string;
 		gameSlug: string;
 		gameTitle: string;
 		isMyTurn?: boolean;
@@ -20,11 +18,14 @@
 		turnHint?: string;
 	} = $props();
 
-	const notifier = new TurnNotificationController();
+	// The bell is a shortcut to the one per-device switch (also on the account page).
+	const notifier = pushNotifications;
 
 	let initializedTurnTracking = false;
 	let previousIsMyTurn = false;
 	let ringing = $state<boolean>(false);
+	let toastMessage = $state<string | null>(null);
+	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
 	let buttonTitle = $derived.by(() => {
 		if (notifier.permission === 'unsupported') {
@@ -34,16 +35,23 @@
 			return 'Notifications blocked in browser settings';
 		}
 		if (notifier.enabled) {
-			return notifier.pushSubscribed
-				? 'Turn notifications active (including when this tab is in the background) — click to mute'
-				: 'Turn notifications active — click to mute';
+			return "Notifications on for all your games on this device — click to turn off";
 		}
-		return "Notify me when it's my turn";
+		return "Notify me when it's my turn (all games)";
 	});
+
+	function showToast(msg: string) {
+		if (!msg) return;
+		toastMessage = msg;
+		if (toastTimer) clearTimeout(toastTimer);
+		toastTimer = setTimeout(() => {
+			toastMessage = null;
+		}, 2800);
+	}
 
 	async function handleBellClick() {
 		const wasEnabled = notifier.enabled;
-		await notifier.toggle();
+		showToast(await notifier.setEnabled(!wasEnabled, { roomId }));
 		if (!wasEnabled && notifier.enabled) {
 			ringing = true;
 			setTimeout(() => {
@@ -68,21 +76,15 @@
 		}
 
 		if (activeTurn && !previousIsMyTurn) {
-			void notifier.notifyTurnIfNeeded(hint || undefined);
+			void notifier.notifyTurnIfNeeded({ roomId, gameSlug, gameTitle, body: hint || undefined });
 		}
 		previousIsMyTurn = activeTurn;
 	});
 
 	onMount(() => {
-		void notifier.init({
-			roomId,
-			playerId,
-			gameSlug,
-			gameTitle
-		});
-
+		notifier.init();
 		return () => {
-			notifier.destroy();
+			if (toastTimer) clearTimeout(toastTimer);
 			roomDocumentTitle.text = null;
 		};
 	});
@@ -131,12 +133,12 @@
 		{/if}
 	</button>
 
-	{#if notifier.toastMessage}
+	{#if toastMessage}
 		<div
 			role="status"
 			class="pointer-events-none absolute top-full right-0 z-40 mt-1.5 w-56 rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] px-2.5 py-1.5 text-[11px] leading-snug font-medium text-[#1a1917] shadow-[2px_2px_0px_#1a1917]"
 		>
-			{notifier.toastMessage}
+			{toastMessage}
 		</div>
 	{/if}
 </div>

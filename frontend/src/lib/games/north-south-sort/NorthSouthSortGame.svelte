@@ -357,7 +357,6 @@
 	{#snippet headerActions()}
 		<TurnNotificationBell
 			{roomId}
-			playerId={profile.playerId}
 			gameSlug="north-south-sort"
 			gameTitle="North South Sort"
 			{isMyTurn}

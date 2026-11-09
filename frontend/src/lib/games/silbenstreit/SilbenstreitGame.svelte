@@ -365,7 +365,6 @@
 	{#snippet headerActions()}
 		<TurnNotificationBell
 			{roomId}
-			playerId={profile.playerId}
 			gameSlug="silbenstreit"
 			gameTitle="Silbenstreit"
 			{isMyTurn}

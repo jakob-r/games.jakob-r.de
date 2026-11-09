@@ -5,6 +5,7 @@
 	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
 	import { auth, authRequest } from '$lib/core/auth.svelte';
 	import { profile } from '$lib/core/profile.svelte';
+	import { pushNotifications } from '$lib/core/notifications.svelte';
 
 	let currentPassword = $state('');
 	let newPassword = $state('');
@@ -12,6 +13,13 @@
 	let confirmingDelete = $state(false);
 	let notice = $state('');
 	let error = $state('');
+	let pushMessage = $state('');
+
+	async function togglePush(input: HTMLInputElement) {
+		pushMessage = await pushNotifications.setEnabled(input.checked);
+		// Permission may have been refused: show the real state.
+		input.checked = pushNotifications.enabled;
+	}
 
 	$effect(() => {
 		if (auth.loaded && !auth.user) void goto('/login?next=/account', { replaceState: true });
@@ -88,6 +96,32 @@
 			<h2 class="text-sm font-medium">Name &amp; color</h2>
 			<p class="text-xs text-[#6e6a63]">Saved to your account and used in every game.</p>
 			<ProfileBadge />
+		</section>
+
+		<section class="space-y-2">
+			<h2 class="text-sm font-medium">Notifications</h2>
+			<label class="flex cursor-pointer items-start gap-2 text-sm">
+				<input
+					type="checkbox"
+					class="mt-0.5 h-4 w-4 cursor-pointer accent-[#1a1917]"
+					checked={pushNotifications.enabled}
+					disabled={pushNotifications.busy || pushNotifications.permission === 'unsupported'}
+					onchange={(e) => togglePush(e.currentTarget)}
+				/>
+				<span>Push notification on this device when it's my turn</span>
+			</label>
+			<p class="text-xs text-[#6e6a63]">
+				{#if pushNotifications.permission === 'unsupported'}
+					This browser doesn't support notifications.
+				{:else if pushNotifications.permission === 'denied'}
+					Notifications are blocked — allow them in the browser site settings.
+				{:else}
+					Applies to all your games. Turn it on on each device you play on; the bell in a game is the same switch.
+				{/if}
+			</p>
+			{#if pushMessage}
+				<p class="text-xs font-medium" role="status">{pushMessage}</p>
+			{/if}
 		</section>
 
 		<form

@@ -12,12 +12,19 @@
 	import type { Snippet } from 'svelte';
 	import { auth } from '$lib/core/auth.svelte';
 	import { profile } from '$lib/core/profile.svelte';
+	import { pushNotifications } from '$lib/core/notifications.svelte';
 
 	let { children }: { children: Snippet } = $props();
 
 	onMount(() => {
 		profile.init();
+		pushNotifications.init();
 		void auth.load();
+	});
+
+	// Keep this device's push registration on the current player (moves on sign in/out).
+	$effect(() => {
+		if (auth.loaded && profile.playerId) void pushNotifications.syncPlayer(profile.playerId);
 	});
 </script>
 

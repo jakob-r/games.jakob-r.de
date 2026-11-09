@@ -251,76 +251,50 @@ def create_app(
         public_key = await manager.push.get_public_key()
         return {"public_key": public_key}
 
-    @app.get("/api/rooms/{room_id}/notifications/status")
-    async def get_room_notification_status(
-        room_id: str,
+    @app.get("/api/notifications/status")
+    async def get_notification_status(
         player_id: str = Query(..., min_length=1),
+        endpoint: str | None = Query(default=None),
     ) -> dict[str, Any]:
-        room = await active_db.get_room(room_id)
-        if room is None:
-            raise HTTPException(status_code=404, detail="Room not found")
-        subs = await active_db.get_push_subscriptions(room_id, player_id)
-        return {
-            "room_id": room_id,
-            "player_id": player_id,
-            "subscribed": len(subs) > 0,
-            "count": len(subs),
-        }
+        subs = await active_db.get_push_subscriptions(player_id)
+        subscribed = (
+            any(str(sub["endpoint"]) == endpoint for sub in subs) if endpoint else bool(subs)
+        )
+        return {"player_id": player_id, "subscribed": subscribed, "count": len(subs)}
 
-    @app.post("/api/rooms/{room_id}/notifications/subscribe")
-    async def subscribe_room_notifications(
-        room_id: str,
-        req: PushSubscribeRequest,
-    ) -> dict[str, Any]:
-        room = await active_db.get_room(room_id)
-        if room is None:
-            raise HTTPException(status_code=404, detail="Room not found")
-        players = await active_db.get_room_players(room_id)
-        if not any(p["player_id"] == req.player_id for p in players):
-            raise HTTPException(status_code=403, detail="Player is not in this room")
+    @app.post("/api/notifications/subscribe")
+    async def subscribe_notifications(req: PushSubscribeRequest) -> dict[str, Any]:
         try:
             endpoint = validate_push_endpoint(req.endpoint)
         except PushEndpointError as e:
             raise HTTPException(status_code=400, detail=str(e)) from e
-        existing = await active_db.get_push_subscriptions(room_id, req.player_id)
+        existing = await active_db.get_push_subscriptions(req.player_id)
         already_stored = any(str(sub["endpoint"]) == endpoint for sub in existing)
         if not already_stored and len(existing) >= MAX_PUSH_SUBSCRIPTIONS_PER_PLAYER:
             raise HTTPException(
                 status_code=409,
                 detail="Too many push subscriptions for this player",
             )
-        if req.player_id in manager._connected_player_ids(room_id):
-            manager.mark_player_active(room_id, req.player_id)
+        if req.room_id and req.player_id in manager._connected_player_ids(req.room_id):
+            manager.mark_player_active(req.room_id, req.player_id)
         await active_db.upsert_push_subscription(
-            room_id=room_id,
             player_id=req.player_id,
             endpoint=endpoint,
             p256dh=req.keys.p256dh,
             auth=req.keys.auth,
         )
-        return {
-            "status": "subscribed",
-            "room_id": room_id,
-            "player_id": req.player_id,
-        }
+        return {"status": "subscribed", "player_id": req.player_id}
 
-    @app.delete("/api/rooms/{room_id}/notifications/subscribe")
-    async def unsubscribe_room_notifications(
-        room_id: str,
+    @app.delete("/api/notifications/subscribe")
+    async def unsubscribe_notifications(
         player_id: str = Query(..., min_length=1),
-        endpoint: str | None = Query(default=None),
+        endpoint: str = Query(..., min_length=1),
     ) -> dict[str, Any]:
-        deleted = await active_db.delete_push_subscriptions(
-            room_id=room_id,
+        deleted = await active_db.delete_push_subscription(
             player_id=player_id,
             endpoint=endpoint,
         )
-        return {
-            "status": "unsubscribed",
-            "room_id": room_id,
-            "player_id": player_id,
-            "deleted": deleted,
-        }
+        return {"status": "unsubscribed", "player_id": player_id, "deleted": deleted}
 
     @app.get("/api/players/{player_id}/recent")
     async def get_player_recent_rooms(

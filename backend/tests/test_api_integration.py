@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from urllib.parse import quote
 
 from fastapi.testclient import TestClient
@@ -307,6 +308,9 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
     dispatched: list[dict[str, object]] = []
     fail_with_401 = {"on": False}
     peer_endpoint = "https://fcm.googleapis.com/fcm/send/peer2"
+    # Push subscriptions outlive rooms, so use fresh ids per run.
+    peer = f"peer_{uuid.uuid4().hex[:8]}"
+    account = f"account_{uuid.uuid4().hex[:8]}"
 
     def fake_webpush(
         *,
@@ -356,7 +360,7 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
 
         def subscribe(player_id: str, endpoint: str):
             return client.post(
-                f"/api/rooms/{room_id}/notifications/subscribe",
+                "/api/notifications/subscribe",
                 json={
                     "player_id": player_id,
                     "endpoint": endpoint,
@@ -367,50 +371,52 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
                 },
             )
 
-        # 3. A player who has not joined cannot subscribe, even with a valid endpoint.
-        stranger = subscribe("peer_2", peer_endpoint)
-        assert stranger.status_code == 403
+        def status(player_id: str) -> dict[str, object]:
+            res = client.get(f"/api/notifications/status?player_id={player_id}")
+            assert res.status_code == 200
+            return res.json()
 
-        status_before = client.get(f"/api/rooms/{room_id}/notifications/status?player_id=peer_2")
-        assert status_before.status_code == 200
-        assert status_before.json()["subscribed"] is False
+        # 3. Subscriptions are per player and device, not per room.
+        assert status(peer)["subscribed"] is False
 
         ws_url_1 = f"/ws/silbenstreit/{room_id}?player_id=host_1&name=Alice&color=%232563eb"
-        ws_url_2 = f"/ws/silbenstreit/{room_id}?player_id=peer_2&name=Bob&color=%23dc2626"
+        ws_url_2 = f"/ws/silbenstreit/{room_id}?player_id={peer}&name=Bob&color=%23dc2626"
 
-        # Join both players, then subscribe once peer_2 is a member.
+        # Join both players; subscribing does not depend on room membership.
         with client.websocket_connect(ws_url_1) as ws1, client.websocket_connect(ws_url_2) as ws2:
             _ = ws1.receive_json()
             _ = ws1.receive_json()
             _ = ws2.receive_json()
 
-        assert subscribe("peer_2", "http://127.0.0.1/push").status_code == 400
-        assert subscribe("peer_2", "https://evil.example/push").status_code == 400
+        assert subscribe(peer, "http://127.0.0.1/push").status_code == 400
+        assert subscribe(peer, "https://evil.example/push").status_code == 400
 
-        assert subscribe("peer_2", peer_endpoint).status_code == 200
+        assert subscribe(peer, peer_endpoint).status_code == 200
         for index in range(2, 6):
-            extra = subscribe("peer_2", f"https://fcm.googleapis.com/fcm/send/peer2-{index}")
+            extra = subscribe(peer, f"https://fcm.googleapis.com/fcm/send/peer2-{index}")
             assert extra.status_code == 200
-        sixth = subscribe("peer_2", "https://updates.push.services.mozilla.com/wpush/v2/extra")
+        sixth = subscribe(peer, "https://updates.push.services.mozilla.com/wpush/v2/extra")
         assert sixth.status_code == 409
-        assert subscribe("peer_2", peer_endpoint).status_code == 200
+        assert subscribe(peer, peer_endpoint).status_code == 200
 
         for index in range(2, 6):
             endpoint = quote(f"https://fcm.googleapis.com/fcm/send/peer2-{index}", safe="")
             removed = client.delete(
-                f"/api/rooms/{room_id}/notifications/subscribe?player_id=peer_2&endpoint={endpoint}"
+                f"/api/notifications/subscribe?player_id={peer}&endpoint={endpoint}"
             )
             assert removed.status_code == 200
             assert removed.json()["deleted"] == 1
 
-        status_after = client.get(f"/api/rooms/{room_id}/notifications/status?player_id=peer_2")
-        assert status_after.status_code == 200
-        assert status_after.json() == {
-            "room_id": room_id,
-            "player_id": "peer_2",
-            "subscribed": True,
-            "count": 1,
-        }
+        assert status(peer) == {"player_id": peer, "subscribed": True, "count": 1}
+        # Unsubscribing needs the device's endpoint.
+        assert client.delete(f"/api/notifications/subscribe?player_id={peer}").status_code == 422
+
+        # Signing in on that browser moves the device to the account's id, and back.
+        assert subscribe(account, peer_endpoint).status_code == 200
+        assert status(peer)["subscribed"] is False
+        assert status(account)["count"] == 1
+        assert subscribe(peer, peer_endpoint).status_code == 200
+        assert status(account)["subscribed"] is False
 
         # 4. Start the game and have host_1 pass -> peer_2 gets one notification.
         with client.websocket_connect(ws_url_1) as ws1, client.websocket_connect(ws_url_2) as ws2:
@@ -442,15 +448,16 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
         assert f"/{room_id}" in str(dispatched[0]["data"])
 
         # 5. Unsubscribe peer_2 and verify status
-        unsub_res = client.delete(f"/api/rooms/{room_id}/notifications/subscribe?player_id=peer_2")
+        peer_q = quote(peer_endpoint, safe="")
+        unsub_res = client.delete(
+            f"/api/notifications/subscribe?player_id={peer}&endpoint={peer_q}"
+        )
         assert unsub_res.status_code == 200
         assert unsub_res.json()["deleted"] == 1
-
-        status_final = client.get(f"/api/rooms/{room_id}/notifications/status?player_id=peer_2")
-        assert status_final.json()["subscribed"] is False
+        assert status(peer)["subscribed"] is False
 
         # 6. A 401 from the push service drops that endpoint.
-        assert subscribe("peer_2", peer_endpoint).status_code == 200
+        assert subscribe(peer, peer_endpoint).status_code == 200
         fail_with_401["on"] = True
         with client.websocket_connect(ws_url_1) as ws1, client.websocket_connect(ws_url_2) as ws2:
             _ = ws1.receive_json()
@@ -472,11 +479,68 @@ def test_turn_notifications_subscription_and_dispatch(monkeypatch) -> None:
 
             client.portal.call(app.state.room_manager.flush_push_tasks)
 
-        status_pruned = client.get(f"/api/rooms/{room_id}/notifications/status?player_id=peer_2")
-        assert status_pruned.json()["subscribed"] is False
+        assert status(peer)["subscribed"] is False
         assert len(dispatched) == 1
 
         client.delete(f"/api/rooms/{room_id}?player_id=host_1")
+
+
+def test_per_room_push_subscriptions_migrate_to_one_per_device() -> None:
+    test_db = Database()
+    app = create_app(database=test_db)
+    old_endpoint = "https://fcm.googleapis.com/fcm/send/migrate-old"
+    new_endpoint = "https://fcm.googleapis.com/fcm/send/migrate-new"
+
+    async def setup_legacy_table() -> None:
+        async with test_db.connection() as conn, conn.cursor() as cur:
+            await cur.execute("DROP TABLE push_subscriptions")
+            await cur.execute(
+                """
+                CREATE TABLE push_subscriptions (
+                    id BIGSERIAL PRIMARY KEY,
+                    room_id TEXT NOT NULL,
+                    player_id TEXT NOT NULL,
+                    endpoint TEXT NOT NULL,
+                    p256dh TEXT NOT NULL,
+                    auth TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    UNIQUE (room_id, player_id, endpoint)
+                )
+                """
+            )
+            await cur.execute(
+                "CREATE INDEX idx_push_subscriptions_room_player"
+                " ON push_subscriptions(room_id, player_id)"
+            )
+            await cur.execute(
+                """
+                INSERT INTO push_subscriptions (room_id, player_id, endpoint, p256dh, auth, updated_at)
+                VALUES ('r1', 'mig_anon', %s, 'k', 'a', NOW() - INTERVAL '2 days'),
+                       ('r2', 'mig_anon', %s, 'k', 'a', NOW() - INTERVAL '1 day'),
+                       ('r3', 'mig_account', %s, 'k2', 'a2', NOW()),
+                       ('r1', 'mig_anon', %s, 'k', 'a', NOW())
+                """,
+                (old_endpoint, old_endpoint, old_endpoint, new_endpoint),
+            )
+
+    with TestClient(app) as client:
+        assert client.portal is not None
+        client.portal.call(setup_legacy_table)
+        client.portal.call(test_db.init_schema)
+
+        account = client.portal.call(test_db.get_push_subscriptions, "mig_account")
+        anon = client.portal.call(test_db.get_push_subscriptions, "mig_anon")
+        # Each device is kept once, for the player who used it last.
+        assert [(s["endpoint"], s["p256dh"]) for s in account] == [(old_endpoint, "k2")]
+        assert [s["endpoint"] for s in anon] == [new_endpoint]
+
+        for player_id, endpoint in (("mig_account", old_endpoint), ("mig_anon", new_endpoint)):
+            client.portal.call(
+                lambda p=player_id, e=endpoint: test_db.delete_push_subscription(
+                    player_id=p, endpoint=e
+                )
+            )
 
 
 def test_player_stats_split_best_score_single_and_multi() -> None:
