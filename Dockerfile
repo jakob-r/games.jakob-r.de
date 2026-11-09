@@ -1,6 +1,8 @@
 # --- Frontend: SvelteKit static SPA
 FROM node:26-alpine AS frontend
-RUN npm install -g pnpm@12.18.0
+# npm 11+ skips install scripts unless allowed; pnpm's own are trusted. No npm update banner.
+ENV NPM_CONFIG_UPDATE_NOTIFIER=false
+RUN npm install -g --allow-scripts=pnpm pnpm@12.18.0
 WORKDIR /fe
 # CI silences the pnpm "update available" banner; config files must exist before
 # install so the prepare script (`svelte-kit sync`) finds the adapter.
