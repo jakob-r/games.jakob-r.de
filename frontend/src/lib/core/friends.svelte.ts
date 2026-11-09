@@ -14,6 +14,13 @@ export interface Friend extends FriendPerson {
 	label: string;
 }
 
+export interface RoomInvite {
+	room_id: string;
+	game_slug: string;
+	status: 'lobby' | 'playing';
+	from: { user_id: number; label: string; color: string };
+}
+
 export interface FriendsOverview {
 	friends: Friend[];
 	incoming: FriendPerson[];
@@ -49,6 +56,10 @@ async function friendsRequest<T>(
 class FriendsStore {
 	/** Friend status per player id for the room you're in (signed-in users only). */
 	roomStatuses = $state<Record<string, FriendStatus>>({});
+	/** Friends you already invited to that room. */
+	roomInvited = $state<number[]>([]);
+	/** Friends who already play in that room. */
+	roomFriendsHere = $state<number[]>([]);
 	/** Room the statuses belong to (set by RoomShell). */
 	roomId = '';
 
@@ -56,17 +67,48 @@ class FriendsStore {
 		this.roomId = roomId;
 		if (!auth.user) {
 			this.roomStatuses = {};
+			this.roomInvited = [];
+			this.roomFriendsHere = [];
 			return;
 		}
-		const res = await friendsRequest<{ statuses: Record<string, FriendStatus> }>(
-			`/rooms/${encodeURIComponent(roomId)}`
-		);
-		if (this.roomId === roomId) this.roomStatuses = res.data?.statuses ?? {};
+		const res = await friendsRequest<{
+			statuses: Record<string, FriendStatus>;
+			invited: number[];
+			friends_here: number[];
+		}>(`/rooms/${encodeURIComponent(roomId)}`);
+		if (this.roomId === roomId) {
+			this.roomStatuses = res.data?.statuses ?? {};
+			this.roomInvited = res.data?.invited ?? [];
+			this.roomFriendsHere = res.data?.friends_here ?? [];
+		}
 	}
 
 	clearRoom(): void {
 		this.roomId = '';
 		this.roomStatuses = {};
+		this.roomInvited = [];
+		this.roomFriendsHere = [];
+	}
+
+	/** Invite friends to the current room (push to each; mail if they opted in). */
+	async invite(userIds: number[]): Promise<ApiResult<{ invited: number[] }>> {
+		const roomId = this.roomId;
+		const res = await friendsRequest<{ invited: number[] }>('/invites', 'POST', {
+			room_id: roomId,
+			user_ids: userIds
+		});
+		if (res.ok && res.data && this.roomId === roomId) {
+			this.roomInvited = [...new Set([...this.roomInvited, ...res.data.invited])];
+		}
+		return res;
+	}
+
+	inbox(): Promise<ApiResult<{ invites: RoomInvite[] }>> {
+		return friendsRequest<{ invites: RoomInvite[] }>('/inbox');
+	}
+
+	dismissInvite(roomId: string): Promise<ApiResult<unknown>> {
+		return friendsRequest(`/invites/${encodeURIComponent(roomId)}`, 'DELETE');
 	}
 
 	/** Ask a co-player to be friends (accepts their request if they already asked). */

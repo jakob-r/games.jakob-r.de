@@ -5,6 +5,9 @@ accepted, declining and removing are silent, and nothing here reveals whether a
 friend is online or when they were last active.
 """
 
+import asyncio
+import logging
+from collections.abc import Callable
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException
@@ -13,9 +16,14 @@ from pydantic import BaseModel, Field
 from games_platform.core.auth import SESSION_COOKIE, AuthService
 from games_platform.core.auth_api import RateLimiter
 from games_platform.core.db import Database
+from games_platform.core.push import WebPushService, format_invite_notification
+
+logger = logging.getLogger(__name__)
 
 MAX_OUTGOING_REQUESTS = 50
 REQUESTS_PER_HOUR = 20
+INVITES_PER_DAY = 30
+MAX_INVITES_PER_CALL = 20
 
 FriendStatus = Literal["none", "outgoing", "incoming", "friend"]
 
@@ -50,8 +58,50 @@ def friend_labels(my_name: str, friends: list[dict[str, Any]]) -> list[str]:
 
 
 class FriendService:
-    def __init__(self, database: Database) -> None:
+    def __init__(
+        self,
+        database: Database,
+        *,
+        push: WebPushService | None = None,
+        game_title: Callable[[str], str] = lambda slug: slug,
+    ) -> None:
         self.db = database
+        self.push = push
+        self.game_title = game_title
+        self._tasks: set[asyncio.Task[Any]] = set()
+
+    async def flush(self) -> None:
+        """Wait for invite pushes in flight (tests)."""
+        if pending := [t for t in self._tasks if not t.done()]:
+            await asyncio.gather(*pending, return_exceptions=True)
+
+    def _background(self, coro: Any) -> None:
+        task = asyncio.create_task(coro)
+        self._tasks.add(task)
+
+        def done(t: asyncio.Task[Any]) -> None:
+            self._tasks.discard(t)
+            if not t.cancelled() and t.exception() is not None:
+                logger.warning("Invite notification failed: %s", repr(t.exception()))
+
+        task.add_done_callback(done)
+
+    async def _labels(self, cur: Any, viewer_id: int, viewer_name: str) -> dict[int, str]:
+        """Friend id -> name as ``viewer`` sees it (numbered duplicates)."""
+        await cur.execute(
+            """
+            SELECT u.id, u.display_name AS name
+            FROM friendships f JOIN users u ON u.id = f.friend_id
+            WHERE f.user_id = %s
+            ORDER BY f.created_at, u.id
+            """,
+            (viewer_id,),
+        )
+        rows = await cur.fetchall()
+        return {
+            int(r["id"]): label
+            for r, label in zip(rows, friend_labels(viewer_name, rows), strict=True)
+        }
 
     async def overview(self, user: dict[str, Any]) -> dict[str, Any]:
         """Friends (with display labels) plus incoming and outgoing requests."""
@@ -153,6 +203,146 @@ class FriendService:
                 statuses[row["player_id"]] = "none"
         return statuses
 
+    async def friends_in_room(self, user: dict[str, Any], room_id: str) -> list[int]:
+        """Friends who are players in this room (nothing to invite)."""
+        async with self.db.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT f.friend_id FROM friendships f
+                JOIN users u ON u.id = f.friend_id
+                JOIN room_players rp ON rp.player_id = u.player_id AND rp.room_id = %s
+                WHERE f.user_id = %s
+                """,
+                (room_id, user["id"]),
+            )
+            return [int(r["friend_id"]) for r in await cur.fetchall()]
+
+    async def invited_in_room(self, user: dict[str, Any], room_id: str) -> list[int]:
+        """Friends you already invited to this room."""
+        async with self.db.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "SELECT to_user_id FROM room_invites WHERE room_id = %s AND from_user_id = %s",
+                (room_id, user["id"]),
+            )
+            return [int(r["to_user_id"]) for r in await cur.fetchall()]
+
+    async def invite(self, user: dict[str, Any], room_id: str, user_ids: list[int]) -> list[int]:
+        """Invite friends to a room you are in. Returns the ids newly invited."""
+        uid = user["id"]
+        wanted = list(dict.fromkeys(user_ids))[:MAX_INVITES_PER_CALL]
+        async with self.db.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT r.game_slug FROM rooms r
+                JOIN room_players rp ON rp.room_id = r.id AND rp.player_id = %s
+                WHERE r.id = %s
+                """,
+                (user["player_id"], room_id),
+            )
+            room = await cur.fetchone()
+            if room is None:
+                raise FriendError(404, "You are not in this room")
+            await cur.execute(
+                """
+                SELECT COUNT(*) AS n FROM room_invites
+                WHERE from_user_id = %s AND created_at > NOW() - INTERVAL '1 day'
+                """,
+                (uid,),
+            )
+            row = await cur.fetchone()
+            if row is not None and row["n"] + len(wanted) > INVITES_PER_DAY:
+                raise FriendError(429, "That's a lot of invites today. Try again tomorrow.")
+            # Only friends who aren't in the room yet.
+            await cur.execute(
+                """
+                INSERT INTO room_invites (room_id, from_user_id, to_user_id)
+                SELECT %(room)s, %(me)s, u.id
+                FROM users u JOIN friendships f ON f.user_id = %(me)s AND f.friend_id = u.id
+                WHERE u.id = ANY(%(ids)s)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM room_players rp
+                      WHERE rp.room_id = %(room)s AND rp.player_id = u.player_id
+                  )
+                ON CONFLICT DO NOTHING
+                RETURNING to_user_id
+                """,
+                {"room": room_id, "me": uid, "ids": wanted},
+            )
+            invited = [int(r["to_user_id"]) for r in await cur.fetchall()]
+            if not invited:
+                return []
+            await cur.execute(
+                "SELECT id, player_id, display_name FROM users WHERE id = ANY(%s)", (invited,)
+            )
+            recipients = await cur.fetchall()
+            targets: list[tuple[dict[str, Any], str]] = []
+            for recipient in recipients:
+                labels = await self._labels(cur, int(recipient["id"]), recipient["display_name"])
+                inviter = labels.get(uid, str(user["display_name"]).strip() or "A friend")
+                targets.append((recipient, inviter))
+        game_slug = str(room["game_slug"])
+        for recipient, inviter in targets:
+            self._background(self._notify_invite(recipient, inviter, game_slug, room_id))
+        return invited
+
+    async def _notify_invite(
+        self, recipient: dict[str, Any], inviter: str, game_slug: str, room_id: str
+    ) -> None:
+        if self.push is None:
+            return
+        payload = format_invite_notification(
+            game_slug=game_slug,
+            game_title=self.game_title(game_slug),
+            room_id=room_id,
+            inviter=inviter,
+        )
+        await self.push.send_to_player(
+            room_id=room_id, player_id=str(recipient["player_id"]), payload=payload
+        )
+
+    async def inbox(self, user: dict[str, Any]) -> list[dict[str, Any]]:
+        """Open invites to rooms you haven't joined (no timestamps)."""
+        async with self.db.connection() as conn, conn.cursor() as cur:
+            labels = await self._labels(cur, user["id"], user["display_name"])
+            await cur.execute(
+                """
+                SELECT ri.room_id, ri.from_user_id, r.game_slug, r.status, u.color
+                FROM room_invites ri
+                JOIN rooms r ON r.id = ri.room_id
+                JOIN users u ON u.id = ri.from_user_id
+                WHERE ri.to_user_id = %s
+                  AND r.status <> 'finished'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM room_players rp
+                      WHERE rp.room_id = ri.room_id AND rp.player_id = %s
+                  )
+                ORDER BY ri.created_at DESC
+                """,
+                (user["id"], user["player_id"]),
+            )
+            rows = await cur.fetchall()
+        return [
+            {
+                "room_id": r["room_id"],
+                "game_slug": r["game_slug"],
+                "status": r["status"],
+                "from": {
+                    "user_id": int(r["from_user_id"]),
+                    "label": labels[int(r["from_user_id"])],
+                    "color": r["color"] or "",
+                },
+            }
+            for r in rows
+            if int(r["from_user_id"]) in labels
+        ]
+
+    async def dismiss_invite(self, user: dict[str, Any], room_id: str) -> None:
+        async with self.db.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "DELETE FROM room_invites WHERE room_id = %s AND to_user_id = %s",
+                (room_id, user["id"]),
+            )
+
     async def request(self, user: dict[str, Any], room_id: str, player_id: str) -> FriendStatus:
         """Send a request to a co-player (accepts theirs if they already asked)."""
         statuses = await self.room_statuses(user, room_id)
@@ -239,6 +429,19 @@ class FriendService:
                 """,
                 {"a": user["id"], "b": friend_id},
             )
+            await cur.execute(
+                """
+                DELETE FROM room_invites
+                WHERE (from_user_id = %(a)s AND to_user_id = %(b)s)
+                   OR (from_user_id = %(b)s AND to_user_id = %(a)s)
+                """,
+                {"a": user["id"], "b": friend_id},
+            )
+
+
+class InviteBody(BaseModel):
+    room_id: str = Field(min_length=1, max_length=64)
+    user_ids: list[int] = Field(min_length=1, max_length=MAX_INVITES_PER_CALL)
 
 
 class FriendRequestBody(BaseModel):
@@ -272,7 +475,25 @@ def create_friends_router(auth: AuthService, friends: FriendService) -> APIRoute
 
     @router.get("/rooms/{room_id}")
     async def room_statuses(room_id: str, user: User) -> dict[str, Any]:
-        return {"statuses": await friends.room_statuses(user, room_id)}
+        return {
+            "statuses": await friends.room_statuses(user, room_id),
+            "invited": await friends.invited_in_room(user, room_id),
+            "friends_here": await friends.friends_in_room(user, room_id),
+        }
+
+    @router.post("/invites")
+    async def invite(body: InviteBody, user: User) -> dict[str, Any]:
+        limiter.check(f"invite:{user['id']}", INVITES_PER_DAY, window=3600)
+        return {"invited": await run(friends.invite(user, body.room_id, body.user_ids))}
+
+    @router.get("/inbox")
+    async def inbox(user: User) -> dict[str, Any]:
+        return {"invites": await friends.inbox(user)}
+
+    @router.delete("/invites/{room_id}")
+    async def dismiss_invite(room_id: str, user: User) -> dict[str, Any]:
+        await friends.dismiss_invite(user, room_id)
+        return {"status": "dismissed"}
 
     @router.post("/requests")
     async def send_request(body: FriendRequestBody, user: User) -> dict[str, Any]:

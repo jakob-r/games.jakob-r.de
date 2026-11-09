@@ -122,12 +122,16 @@ def create_app(
     active_db = database or db
     manager = RoomManager(active_db)
     auth_service = AuthService(active_db)
-    friend_service = FriendService(active_db)
 
     slugs = enabled_games or list(ALL_GAMES.keys())
     for slug in slugs:
         if slug in ALL_GAMES:
             manager.register_game(ALL_GAMES[slug])
+
+    def _game_title(slug: str) -> str:
+        return manager.games[slug].title if slug in manager.games else slug
+
+    friend_service = FriendService(active_db, push=manager.push, game_title=_game_title)
 
     async def _periodic_cleanup() -> None:
         while True:
@@ -171,6 +175,7 @@ def create_app(
     app.state.db = active_db
     app.state.auth = auth_service
     app.state.room_manager = manager
+    app.state.friends = friend_service
 
     @app.get("/api/health")
     async def health() -> dict[str, str]:

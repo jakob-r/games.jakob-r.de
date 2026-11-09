@@ -148,6 +148,19 @@ CREATE TABLE IF NOT EXISTS friend_requests (
 );
 
 CREATE INDEX IF NOT EXISTS idx_friend_requests_to ON friend_requests(to_user_id);
+
+-- Invites to a room; one per room and friend, gone when the room is deleted.
+CREATE TABLE IF NOT EXISTS room_invites (
+    room_id TEXT NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    from_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    to_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    mailed_at TIMESTAMPTZ,
+    PRIMARY KEY (room_id, to_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_room_invites_to ON room_invites(to_user_id);
+CREATE INDEX IF NOT EXISTS idx_room_invites_from ON room_invites(from_user_id, created_at);
 """
 
 

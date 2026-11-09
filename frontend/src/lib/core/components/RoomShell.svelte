@@ -6,6 +6,7 @@
 	import { profile } from '$lib/core/profile.svelte';
 	import type { PlayerInfo, RoomSocketClient } from '$lib/core/ws.svelte';
 	import DeleteRoomModal from './DeleteRoomModal.svelte';
+	import InviteFriendsModal from './InviteFriendsModal.svelte';
 	import Lobby from './Lobby.svelte';
 	import NamePromptModal from './NamePromptModal.svelte';
 	import ProfileBadge from './ProfileBadge.svelte';
@@ -37,6 +38,7 @@
 	let deleteConfirmOpen = $state(false);
 	let leavingRoom = $state<boolean>(false);
 	let copiedRoomLink = $state(false);
+	let inviteOpen = $state(false);
 
 	let room = $derived(client.room);
 	let players = $derived<PlayerInfo[]>(room?.players ?? []);
@@ -110,6 +112,8 @@
 	}}
 />
 
+<InviteFriendsModal open={inviteOpen} onClose={() => (inviteOpen = false)} />
+
 <div class="mx-auto flex w-full {maxWidthClass} flex-1 flex-col px-3 py-3 sm:px-6 sm:py-5">
 	<!-- Top Header -->
 	<header class="mb-3 flex items-center justify-between gap-2">
@@ -144,6 +148,30 @@
 		</div>
 
 		<div class="flex items-center gap-2">
+			{#if auth.user}
+				<button
+					type="button"
+					onclick={() => (inviteOpen = true)}
+					title="Invite friends"
+					aria-label="Invite friends"
+					class="inline-flex cursor-pointer items-center justify-center rounded border-[1.5px] border-[#1a1917] bg-[#faf8f4] p-1.5 text-[#6e6a63] shadow-[1.5px_1.5px_0px_#1a1917] transition hover:bg-[#f2eee6] hover:text-[#1a1917]"
+				>
+					<svg
+						class="h-3.5 w-3.5"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						aria-hidden="true"
+					>
+						<circle cx="9" cy="8" r="4" />
+						<path d="M2 21c0-4 3-7 7-7s7 3 7 7" />
+						<path d="M19 8v6M16 11h6" />
+					</svg>
+				</button>
+			{/if}
 			{#if headerActions}
 				{@render headerActions()}
 			{/if}

@@ -126,6 +126,20 @@ def format_turn_notification(
     }
 
 
+def format_invite_notification(
+    *, game_slug: str, game_title: str, room_id: str, inviter: str
+) -> dict[str, str]:
+    """Payload for "a friend invites you to a room"."""
+    return {
+        "title": f"{game_title} — {inviter} invites you",
+        "body": f"Join {inviter}'s room #{room_id}.",
+        "url": f"/{game_slug}/{room_id}",
+        "tag": f"invite-{room_id}",
+        "room_id": room_id,
+        "game_slug": game_slug,
+    }
+
+
 class WebPushService:
     """Manages VAPID keys and dispatches Web Push notifications to subscribed players."""
 
