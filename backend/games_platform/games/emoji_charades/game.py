@@ -207,9 +207,9 @@ class EmojiCharadesGame:
         player_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         validated = self.validate_config(config)
-        # The room manager orders players (random first game, then the last loser
-        # starts); explainers then rotate circularly in this order.
+        # Random first explainer, then circular in this order.
         turn_order = list(player_ids or [])
+        random.shuffle(turn_order)
         explainer_id = turn_order[0] if turn_order else None
         return {
             "language": validated["language"],
