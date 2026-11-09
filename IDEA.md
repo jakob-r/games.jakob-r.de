@@ -36,6 +36,23 @@ Each game is reachable at its own URL (e.g. `/sudoku`) for SEO and deep links. T
 - Player removal: As a room creator, clicking on another player's name opens a confirmation modal to remove them from the room.
 - Idle mid-game joiners: If a new player enters a running game, does nothing, and closes the browser window, they automatically leave the room.
 
+## Friends (accounts only)
+
+Privacy first: friends never see whether you are online or when you were last active.
+
+- Adding: only from a shared room. Tap a co-player's name → "Add friend" (shown only when both players have an account). No search, no friend link for now.
+- Friendships are mutual: a request has to be accepted. Declining is silent (the sender just sees "pending"). Either side can remove the friendship at any time, also silently.
+- Names don't have to be unique. If friends share a name (with each other or with you), you see them numbered (e.g. "Anna (2)"), numbered by when you added them.
+- Friends see: your name, your colour, the lobbies you host, and the invites you send them. Not: online status, last seen, your friend list, whether you read an invite.
+- Friends' lobbies page: lists rooms that friends created and that are still in the lobby phase (no running games). No timestamps, so it doesn't work as an activity indicator. Lobbies without moves disappear after 2 days anyway.
+- Invites: from a lobby (or right after creating a room) pick friends to invite. Invites show up in an inbox on the friends page and trigger a push (and optionally a mail). An invite expires with its room. One invite per room per friend, daily cap per sender.
+- Settings (`/account`):
+  - Friends: incoming and outgoing requests, friend list with remove.
+  - Notifications: push on/off (one global switch per device, not per room), email when it's my turn, email when someone invites me (both opt-in, verified addresses only).
+- Push notifications become global: one subscription per player and device instead of one per room. Turn pushes go out for any room where it's your turn; invites use the same subscription.
+- Turn mails: only if it's still your turn ~15 min later and you are not connected to the room; at most one per room until you have moved. Invite mails: at most one per inviter per day. Every mail has a one-click unsubscribe link.
+- Deleting an account removes its friendships, requests and invites. The privacy page describes the friends data.
+
 ## Games
 
 ### Multiplayer Sudoku
