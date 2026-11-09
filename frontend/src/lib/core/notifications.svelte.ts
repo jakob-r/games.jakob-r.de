@@ -1,4 +1,4 @@
-import { profile } from '$lib/core/profile.svelte';
+import { profile } from '#lib/core/profile.svelte.ts';
 
 /** One switch per browser/device: on means pushes for every room where it's your turn. */
 const STORAGE_KEY = 'games_push_notifications_v2';

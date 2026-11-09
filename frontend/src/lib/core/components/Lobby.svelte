@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { resolvePlayerColor } from '$lib/core/color';
-	import type { PlayerInfo } from '$lib/core/ws.svelte';
-	import { friends } from '$lib/core/friends.svelte';
+	import { resolvePlayerColor } from '#lib/core/color.ts';
+	import type { PlayerInfo } from '#lib/core/ws.svelte.ts';
+	import { friends } from '#lib/core/friends.svelte.ts';
 	import PlayerActionsModal from './PlayerActionsModal.svelte';
 	import ScribblyBox from './ScribblyBox.svelte';
 	import ScribblyButton from './ScribblyButton.svelte';

@@ -1,10 +1,10 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { auth } from '$lib/core/auth.svelte';
-	import { friends } from '$lib/core/friends.svelte';
-	import { profile } from '$lib/core/profile.svelte';
-	import type { PlayerInfo, RoomSocketClient } from '$lib/core/ws.svelte';
+	import { auth } from '#lib/core/auth.svelte.ts';
+	import { friends } from '#lib/core/friends.svelte.ts';
+	import { profile } from '#lib/core/profile.svelte.ts';
+	import type { PlayerInfo, RoomSocketClient } from '#lib/core/ws.svelte.ts';
 	import DeleteRoomModal from './DeleteRoomModal.svelte';
 	import InviteFriendsModal from './InviteFriendsModal.svelte';
 	import Lobby from './Lobby.svelte';

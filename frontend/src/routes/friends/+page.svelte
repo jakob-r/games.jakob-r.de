@@ -1,10 +1,10 @@
 <script lang="ts">
-	import AuthShell from '$lib/core/components/AuthShell.svelte';
-	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
-	import { auth } from '$lib/core/auth.svelte';
-	import { friends, type FriendLobby, type RoomInvite } from '$lib/core/friends.svelte';
-	import GameLogo from '$lib/games/GameLogo.svelte';
-	import { GAMES, getGame, roomPath, type GameSlug } from '$lib/games/catalog';
+	import AuthShell from '#lib/core/components/AuthShell.svelte';
+	import ScribblyButton from '#lib/core/components/ScribblyButton.svelte';
+	import { auth } from '#lib/core/auth.svelte.ts';
+	import { friends, type FriendLobby, type RoomInvite } from '#lib/core/friends.svelte.ts';
+	import GameLogo from '#lib/games/GameLogo.svelte';
+	import { GAMES, getGame, roomPath, type GameSlug } from '#lib/games/catalog.ts';
 
 	let invites = $state<RoomInvite[] | null>(null);
 	let lobbies = $state<FriendLobby[] | null>(null);

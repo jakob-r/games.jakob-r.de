@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { roomDocumentTitle } from '$lib/core/notifications.svelte';
-	import SilbenstreitGame from '$lib/games/silbenstreit/SilbenstreitGame.svelte';
+	import { roomDocumentTitle } from '#lib/core/notifications.svelte.ts';
+	import SilbenstreitGame from '#lib/games/silbenstreit/SilbenstreitGame.svelte';
 
 	let roomId = $derived(page.params.roomId ?? '');
 	let title = $derived(roomDocumentTitle.text ?? `Silbenstreit #${roomId} • games.jakob-r.de`);

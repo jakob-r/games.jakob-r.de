@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { resolvePlayerColor } from '$lib/core/color';
-	import { friends } from '$lib/core/friends.svelte';
-	import type { PlayerInfo } from '$lib/core/ws.svelte';
+	import { resolvePlayerColor } from '#lib/core/color.ts';
+	import { friends } from '#lib/core/friends.svelte.ts';
+	import type { PlayerInfo } from '#lib/core/ws.svelte.ts';
 	import ScribblyBox from './ScribblyBox.svelte';
 	import ScribblyButton from './ScribblyButton.svelte';
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import MinesweeperGame from '$lib/games/minesweeper/MinesweeperGame.svelte';
+	import MinesweeperGame from '#lib/games/minesweeper/MinesweeperGame.svelte';
 
 	let roomId = $derived(page.params.roomId ?? '');
 </script>

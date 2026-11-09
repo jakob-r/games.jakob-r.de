@@ -16,7 +16,10 @@ General product concept lives in `idea.md`.
 - **Color System (`opponent_color`)**:
   - **OKLCH perceptual color space** in `frontend/src/lib/core/color.ts` for `opponent_color(my_color, their_color)`.
   - Keeps other players' colors unchanged unless they are perceptually too similar to `my_color`, in which case it deterministically assigns a distinct color from `PRESET_PLAYER_COLORS`.
-- **Build & Package Manager**: **Vite** + **pnpm**; production uses `@sveltejs/adapter-static` (SPA fallback) so FastAPI can serve the built site.
+- **Build & Package Manager**: **Vite 8** + **pnpm 12** (Node 26 in Docker); production uses `@sveltejs/adapter-static` (SPA fallback) so FastAPI can serve the built site.
+  - **SvelteKit 3**: there is no `svelte.config.js`; adapter and preprocess options are passed to `sveltekit({...})` in `frontend/vite.config.ts`. `tsconfig.json` extends `$app/tsconfig`.
+  - Shared code is imported via the `#lib/*` subpath import (`package.json` `imports`, replaces `$lib`). Write imports with explicit extensions (`#lib/core/auth.svelte.ts`, `#lib/games/catalog.ts`); extensionless `#lib` paths do not type-check.
+  - TypeScript stays on 6.x until `svelte-check`/SvelteKit accept 7.
 
 ### Backend
 - **Language & Packaging**: **Python 3.13+** managed with **uv**.

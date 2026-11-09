@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SITE_NAME, SITE_ORIGIN } from '$lib/games/catalog';
+	import { SITE_NAME, SITE_ORIGIN } from '#lib/games/catalog.ts';
 
 	let {
 		title,

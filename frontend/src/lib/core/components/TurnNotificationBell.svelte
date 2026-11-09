@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { pushNotifications, roomDocumentTitle } from '$lib/core/notifications.svelte';
+	import { pushNotifications, roomDocumentTitle } from '#lib/core/notifications.svelte.ts';
 
 	let {
 		roomId,

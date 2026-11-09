@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { PRESET_PLAYER_COLORS } from '$lib/core/color';
-	import { profile } from '$lib/core/profile.svelte';
+	import { PRESET_PLAYER_COLORS } from '#lib/core/color.ts';
+	import { profile } from '#lib/core/profile.svelte.ts';
 	import ScribblyBox from './ScribblyBox.svelte';
 	import ScribblyButton from './ScribblyButton.svelte';
 

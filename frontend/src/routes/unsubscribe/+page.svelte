@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import AuthShell from '$lib/core/components/AuthShell.svelte';
-	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
+	import AuthShell from '#lib/core/components/AuthShell.svelte';
+	import ScribblyButton from '#lib/core/components/ScribblyButton.svelte';
 
 	// A button (not an automatic request) so link scanners in mail clients don't unsubscribe.
 	let busy = $state(false);

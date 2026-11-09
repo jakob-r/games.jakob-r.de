@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import AuthShell from '$lib/core/components/AuthShell.svelte';
-	import { auth, authRequest, type AccountUser } from '$lib/core/auth.svelte';
+	import AuthShell from '#lib/core/components/AuthShell.svelte';
+	import { auth, authRequest, type AccountUser } from '#lib/core/auth.svelte.ts';
 
 	let status = $state<'working' | 'ok' | 'error'>('working');
 	let error = $state('');

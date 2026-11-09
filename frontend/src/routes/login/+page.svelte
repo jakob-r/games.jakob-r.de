@@ -2,10 +2,10 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import AuthShell from '$lib/core/components/AuthShell.svelte';
-	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
-	import { auth, authRequest, type AccountUser } from '$lib/core/auth.svelte';
-	import { profile } from '$lib/core/profile.svelte';
+	import AuthShell from '#lib/core/components/AuthShell.svelte';
+	import ScribblyButton from '#lib/core/components/ScribblyButton.svelte';
+	import { auth, authRequest, type AccountUser } from '#lib/core/auth.svelte.ts';
+	import { profile } from '#lib/core/profile.svelte.ts';
 
 	type Mode = 'login' | 'register' | 'forgot';
 

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { roomDocumentTitle } from '$lib/core/notifications.svelte';
-	import NorthSouthSortGame from '$lib/games/north-south-sort/NorthSouthSortGame.svelte';
+	import { roomDocumentTitle } from '#lib/core/notifications.svelte.ts';
+	import NorthSouthSortGame from '#lib/games/north-south-sort/NorthSouthSortGame.svelte';
 
 	let roomId = $derived(page.params.roomId ?? '');
 	let title = $derived(roomDocumentTitle.text ?? `North South Sort #${roomId} • games.jakob-r.de`);

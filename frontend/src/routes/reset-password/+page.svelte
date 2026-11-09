@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import AuthShell from '$lib/core/components/AuthShell.svelte';
-	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
-	import { authRequest } from '$lib/core/auth.svelte';
+	import AuthShell from '#lib/core/components/AuthShell.svelte';
+	import ScribblyButton from '#lib/core/components/ScribblyButton.svelte';
+	import { authRequest } from '#lib/core/auth.svelte.ts';
 
 	let password = $state('');
 	let busy = $state(false);

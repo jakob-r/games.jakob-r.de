@@ -1,5 +1,5 @@
 <script lang="ts">
-	import SeoHead from '$lib/core/components/SeoHead.svelte';
+	import SeoHead from '#lib/core/components/SeoHead.svelte';
 </script>
 
 <SeoHead

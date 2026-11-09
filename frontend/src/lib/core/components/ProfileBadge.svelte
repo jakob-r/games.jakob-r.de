@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { PRESET_PLAYER_COLORS } from '$lib/core/color';
-	import { auth } from '$lib/core/auth.svelte';
-	import { profile } from '$lib/core/profile.svelte';
+	import { PRESET_PLAYER_COLORS } from '#lib/core/color.ts';
+	import { auth } from '#lib/core/auth.svelte.ts';
+	import { profile } from '#lib/core/profile.svelte.ts';
 
 	let {
 		onChange,

@@ -1,11 +1,11 @@
 # --- Frontend: SvelteKit static SPA
-FROM node:22-alpine AS frontend
-RUN npm install -g pnpm@10.30.3
+FROM node:26-alpine AS frontend
+RUN npm install -g pnpm@12.18.0
 WORKDIR /fe
 # CI silences the pnpm "update available" banner; config files must exist before
 # install so the prepare script (`svelte-kit sync`) finds the adapter.
 ENV CI=true
-COPY frontend/package.json frontend/pnpm-lock.yaml frontend/svelte.config.js frontend/tsconfig.json ./
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/vite.config.ts frontend/tsconfig.json ./
 RUN pnpm install --frozen-lockfile
 COPY frontend/ .
 RUN pnpm run build

@@ -10,9 +10,9 @@
 	import '../app.css';
 	import { onMount } from 'svelte';
 	import type { Snippet } from 'svelte';
-	import { auth } from '$lib/core/auth.svelte';
-	import { profile } from '$lib/core/profile.svelte';
-	import { pushNotifications } from '$lib/core/notifications.svelte';
+	import { auth } from '#lib/core/auth.svelte.ts';
+	import { profile } from '#lib/core/profile.svelte.ts';
+	import { pushNotifications } from '#lib/core/notifications.svelte.ts';
 
 	let { children }: { children: Snippet } = $props();
 

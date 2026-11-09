@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import DeleteRoomModal from '$lib/core/components/DeleteRoomModal.svelte';
-	import ProfileBadge from '$lib/core/components/ProfileBadge.svelte';
-	import SeoHead from '$lib/core/components/SeoHead.svelte';
-	import ScribblyBox from '$lib/core/components/ScribblyBox.svelte';
-	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
-	import { auth } from '$lib/core/auth.svelte';
-	import { profile } from '$lib/core/profile.svelte';
+	import DeleteRoomModal from '#lib/core/components/DeleteRoomModal.svelte';
+	import ProfileBadge from '#lib/core/components/ProfileBadge.svelte';
+	import SeoHead from '#lib/core/components/SeoHead.svelte';
+	import ScribblyBox from '#lib/core/components/ScribblyBox.svelte';
+	import ScribblyButton from '#lib/core/components/ScribblyButton.svelte';
+	import { auth } from '#lib/core/auth.svelte.ts';
+	import { profile } from '#lib/core/profile.svelte.ts';
 	import {
 		GAMES,
 		SITE_ORIGIN,
@@ -16,9 +16,9 @@
 		roomPath,
 		type GameInfo,
 		type GameSlug
-	} from '$lib/games/catalog';
-	import GameLogo from '$lib/games/GameLogo.svelte';
-	import { friends } from '$lib/core/friends.svelte';
+	} from '#lib/games/catalog.ts';
+	import GameLogo from '#lib/games/GameLogo.svelte';
+	import { friends } from '#lib/core/friends.svelte.ts';
 
 	interface RecentRoom {
 		room_id: string;

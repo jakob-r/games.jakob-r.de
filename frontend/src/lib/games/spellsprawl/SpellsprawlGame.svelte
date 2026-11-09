@@ -1,14 +1,14 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { resolvePlayerColor } from '$lib/core/color';
-	import PlayerBar from '$lib/core/components/PlayerBar.svelte';
-	import RoomShell from '$lib/core/components/RoomShell.svelte';
-	import ScribblyBox from '$lib/core/components/ScribblyBox.svelte';
-	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
-	import TurnNotificationBell from '$lib/core/components/TurnNotificationBell.svelte';
-	import ZoomBoard from '$lib/core/components/ZoomBoard.svelte';
-	import { profile } from '$lib/core/profile.svelte';
-	import { RoomSocketClient, type PlayerInfo, type ServerEvent } from '$lib/core/ws.svelte';
+	import { resolvePlayerColor } from '#lib/core/color.ts';
+	import PlayerBar from '#lib/core/components/PlayerBar.svelte';
+	import RoomShell from '#lib/core/components/RoomShell.svelte';
+	import ScribblyBox from '#lib/core/components/ScribblyBox.svelte';
+	import ScribblyButton from '#lib/core/components/ScribblyButton.svelte';
+	import TurnNotificationBell from '#lib/core/components/TurnNotificationBell.svelte';
+	import ZoomBoard from '#lib/core/components/ZoomBoard.svelte';
+	import { profile } from '#lib/core/profile.svelte.ts';
+	import { RoomSocketClient, type PlayerInfo, type ServerEvent } from '#lib/core/ws.svelte.ts';
 	import {
 		cellKey,
 		foldLetters,

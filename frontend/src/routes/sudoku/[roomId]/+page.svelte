@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import SudokuGame from '$lib/games/sudoku/SudokuGame.svelte';
+	import SudokuGame from '#lib/games/sudoku/SudokuGame.svelte';
 
 	let roomId = $derived(page.params.roomId ?? '');
 </script>

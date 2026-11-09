@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import AuthShell from '$lib/core/components/AuthShell.svelte';
-	import ProfileBadge from '$lib/core/components/ProfileBadge.svelte';
-	import ScribblyButton from '$lib/core/components/ScribblyButton.svelte';
-	import { auth, authRequest, type AccountUser } from '$lib/core/auth.svelte';
-	import { profile } from '$lib/core/profile.svelte';
-	import { pushNotifications } from '$lib/core/notifications.svelte';
-	import { friends, type FriendsOverview } from '$lib/core/friends.svelte';
+	import AuthShell from '#lib/core/components/AuthShell.svelte';
+	import ProfileBadge from '#lib/core/components/ProfileBadge.svelte';
+	import ScribblyButton from '#lib/core/components/ScribblyButton.svelte';
+	import { auth, authRequest, type AccountUser } from '#lib/core/auth.svelte.ts';
+	import { profile } from '#lib/core/profile.svelte.ts';
+	import { pushNotifications } from '#lib/core/notifications.svelte.ts';
+	import { friends, type FriendsOverview } from '#lib/core/friends.svelte.ts';
 
 	let currentPassword = $state('');
 	let newPassword = $state('');

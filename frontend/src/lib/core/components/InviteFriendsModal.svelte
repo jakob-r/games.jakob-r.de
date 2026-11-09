@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { friends, type Friend } from '$lib/core/friends.svelte';
+	import { friends, type Friend } from '#lib/core/friends.svelte.ts';
 	import ScribblyBox from './ScribblyBox.svelte';
 	import ScribblyButton from './ScribblyButton.svelte';
 
