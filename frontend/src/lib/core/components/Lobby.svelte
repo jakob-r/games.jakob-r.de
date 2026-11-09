@@ -2,7 +2,8 @@
 	import type { Snippet } from 'svelte';
 	import { resolvePlayerColor } from '$lib/core/color';
 	import type { PlayerInfo } from '$lib/core/ws.svelte';
-	import RemovePlayerModal from './RemovePlayerModal.svelte';
+	import { friends } from '$lib/core/friends.svelte';
+	import PlayerActionsModal from './PlayerActionsModal.svelte';
 	import ScribblyBox from './ScribblyBox.svelte';
 	import ScribblyButton from './ScribblyButton.svelte';
 
@@ -102,17 +103,18 @@
 				{@const displayColor = resolvePlayerColor(player.player_id, myPlayerId, myColor, players)}
 				{@const canRemove =
 					isHost && player.player_id !== myPlayerId && !player.is_bot && Boolean(onRemovePlayer)}
+			{@const canOpen = canRemove || friends.roomStatuses[player.player_id] !== undefined}
 				<li class="flex items-center justify-between py-2.5">
 					<div class="flex items-center gap-2.5">
 						<span
 							class="h-4 w-4 rounded-full border-[1.6px] border-[#1a1917]"
 							style="background-color: {displayColor};"
 						></span>
-						{#if canRemove}
+						{#if canOpen}
 							<button
 								type="button"
 								onclick={() => (playerToRemove = player)}
-								title="Click to remove {player.name}"
+								title={canRemove ? `Remove or befriend ${player.name}` : `Add ${player.name} as a friend`}
 								class="cursor-pointer font-medium underline-offset-2 hover:underline"
 								style="color: {displayColor};"
 							>
@@ -180,11 +182,12 @@
 	</ScribblyBox>
 </div>
 
-<RemovePlayerModal
+<PlayerActionsModal
 	player={activePlayerToRemove}
+	canRemove={isHost && Boolean(onRemovePlayer)}
 	{myPlayerId}
 	{myColor}
 	{players}
-	onConfirm={(playerId) => onRemovePlayer?.(playerId)}
+	onRemove={(playerId) => onRemovePlayer?.(playerId)}
 	onClose={() => (playerToRemove = null)}
 />

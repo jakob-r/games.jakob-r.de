@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { auth } from '$lib/core/auth.svelte';
+	import { friends } from '$lib/core/friends.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 	import type { PlayerInfo, RoomSocketClient } from '$lib/core/ws.svelte';
 	import DeleteRoomModal from './DeleteRoomModal.svelte';
@@ -39,6 +41,15 @@
 	let room = $derived(client.room);
 	let players = $derived<PlayerInfo[]>(room?.players ?? []);
 	let isHost = $derived(room?.host_player_id === profile.playerId);
+
+	// Friend status of co-players (for "Add friend"); reload when players or sign-in change.
+	let playerKey = $derived(players.map((p) => p.player_id).join(','));
+	$effect(() => {
+		if (!playerKey) return;
+		void auth.user?.id;
+		void friends.loadRoom(roomId);
+	});
+	$effect(() => () => friends.clearRoom());
 
 	async function deleteRoom() {
 		if (!isHost || !profile.playerId || deletingRoom) return;

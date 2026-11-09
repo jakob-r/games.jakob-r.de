@@ -20,6 +20,7 @@ from psycopg import Error as PsycopgError
 from games_platform.core.auth import AuthService, public_base_url
 from games_platform.core.auth_api import create_auth_router
 from games_platform.core.db import Database, db
+from games_platform.core.friends import FriendService, create_friends_router
 from games_platform.core.protocol import (
     CreateRoomRequest,
     GameDefinition,
@@ -121,6 +122,7 @@ def create_app(
     active_db = database or db
     manager = RoomManager(active_db)
     auth_service = AuthService(active_db)
+    friend_service = FriendService(active_db)
 
     slugs = enabled_games or list(ALL_GAMES.keys())
     for slug in slugs:
@@ -165,6 +167,7 @@ def create_app(
     )
 
     app.include_router(create_auth_router(auth_service))
+    app.include_router(create_friends_router(auth_service, friend_service))
     app.state.db = active_db
     app.state.auth = auth_service
     app.state.room_manager = manager

@@ -128,6 +128,26 @@ CREATE TABLE IF NOT EXISTS oauth_accounts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_oauth_accounts_user ON oauth_accounts(user_id);
+
+-- Mutual friendships between accounts, stored once per direction.
+CREATE TABLE IF NOT EXISTS friendships (
+    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    friend_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, friend_id)
+);
+
+-- Pending requests. A declined one stays (the sender still sees "pending") so it
+-- can't be sent again until it expires after 30 days.
+CREATE TABLE IF NOT EXISTS friend_requests (
+    from_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    to_user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    declined_at TIMESTAMPTZ,
+    PRIMARY KEY (from_user_id, to_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_friend_requests_to ON friend_requests(to_user_id);
 """
 
 
@@ -434,6 +454,9 @@ class Database:
             # Devices that never synced again (each visit with notifications on does).
             await cur.execute(
                 "DELETE FROM push_subscriptions WHERE updated_at < NOW() - INTERVAL '1 year'"
+            )
+            await cur.execute(
+                "DELETE FROM friend_requests WHERE created_at < NOW() - INTERVAL '30 days'"
             )
             await cur.execute("DELETE FROM auth_sessions WHERE expires_at < NOW()")
             await cur.execute(

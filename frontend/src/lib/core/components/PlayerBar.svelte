@@ -2,7 +2,8 @@
 	import { onMount } from 'svelte';
 	import { resolvePlayerColor } from '$lib/core/color';
 	import type { PlayerInfo } from '$lib/core/ws.svelte';
-	import RemovePlayerModal from './RemovePlayerModal.svelte';
+	import { friends } from '$lib/core/friends.svelte';
+	import PlayerActionsModal from './PlayerActionsModal.svelte';
 
 	let {
 		players,
@@ -68,6 +69,7 @@
 			{@const isTurn = showTurnBadge && p.player_id === currentPlayerId}
 			{@const canRemove =
 				isHost && p.player_id !== myPlayerId && !p.is_bot && Boolean(onRemovePlayer)}
+			{@const canOpen = canRemove || friends.roomStatuses[p.player_id] !== undefined}
 			{@const multRatio = showMultiplier ? getMultiplierRemainingRatio(p) : 0}
 			{@const liveMult = showMultiplier ? getLiveMultiplier(p) : 1}
 
@@ -85,11 +87,11 @@
 					style="background-color: {pColor};"
 				></span>
 
-				{#if canRemove}
+				{#if canOpen}
 					<button
 						type="button"
 						onclick={() => (playerToRemove = p)}
-						title="Click to remove {p.name}"
+						title={canRemove ? `Remove or befriend ${p.name}` : `Add ${p.name} as a friend`}
 						class="max-w-[96px] cursor-pointer truncate text-xs font-semibold underline-offset-2 hover:underline"
 						style="color: {pColor};"
 					>
@@ -149,11 +151,12 @@
 	{/if}
 </div>
 
-<RemovePlayerModal
+<PlayerActionsModal
 	player={activePlayerToRemove}
+	canRemove={isHost && Boolean(onRemovePlayer)}
 	{myPlayerId}
 	{myColor}
 	{players}
-	onConfirm={(playerId) => onRemovePlayer?.(playerId)}
+	onRemove={(playerId) => onRemovePlayer?.(playerId)}
 	onClose={() => (playerToRemove = null)}
 />

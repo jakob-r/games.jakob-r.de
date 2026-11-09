@@ -6,6 +6,7 @@
 	import { auth, authRequest } from '$lib/core/auth.svelte';
 	import { profile } from '$lib/core/profile.svelte';
 	import { pushNotifications } from '$lib/core/notifications.svelte';
+	import { friends, type FriendsOverview } from '$lib/core/friends.svelte';
 
 	let currentPassword = $state('');
 	let newPassword = $state('');
@@ -14,6 +15,27 @@
 	let notice = $state('');
 	let error = $state('');
 	let pushMessage = $state('');
+	let friendData = $state<FriendsOverview | null>(null);
+	let friendError = $state('');
+	let removingFriend = $state<number | null>(null);
+
+	async function loadFriends() {
+		const res = await friends.overview();
+		if (res.ok) friendData = res.data;
+		else friendError = res.error;
+	}
+
+	$effect(() => {
+		if (auth.user) void loadFriends();
+	});
+
+	async function friendAction(action: () => Promise<{ ok: boolean; error: string }>) {
+		friendError = '';
+		const res = await action();
+		if (!res.ok) friendError = res.error;
+		removingFriend = null;
+		await loadFriends();
+	}
 
 	async function togglePush(input: HTMLInputElement) {
 		pushMessage = await pushNotifications.setEnabled(input.checked);
@@ -96,6 +118,85 @@
 			<h2 class="text-sm font-medium">Name &amp; color</h2>
 			<p class="text-xs text-[#6e6a63]">Saved to your account and used in every game.</p>
 			<ProfileBadge />
+		</section>
+
+		<section class="space-y-2">
+			<h2 class="text-sm font-medium">Friends</h2>
+			<p class="text-xs text-[#6e6a63]">
+				Add friends by tapping their name in a game you play together (both need an account).
+				Friends never see whether you're online.
+			</p>
+			{#if friendError}
+				<p class="text-xs font-medium text-[#dc2626]" role="alert">{friendError}</p>
+			{/if}
+			{#if friendData}
+				{#if friendData.incoming.length}
+					<ul class="space-y-1.5">
+						{#each friendData.incoming as person (person.user_id)}
+							<li class="flex flex-wrap items-center justify-between gap-2 text-sm">
+								<span class="flex items-center gap-2">
+									<span
+										class="h-3 w-3 shrink-0 rounded-full border border-[#1a1917]"
+										style="background-color: {person.color || '#faf8f4'};"
+									></span>
+									<span><strong>{person.name}</strong> wants to be friends</span>
+								</span>
+								<span class="flex gap-2">
+									<ScribblyButton onclick={() => friendAction(() => friends.accept(person.user_id))}>
+										Accept
+									</ScribblyButton>
+									<ScribblyButton onclick={() => friendAction(() => friends.decline(person.user_id))}>
+										Decline
+									</ScribblyButton>
+								</span>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+
+				{#if friendData.friends.length}
+					<ul class="divide-y divide-[#1a1917]/10">
+						{#each friendData.friends as friend (friend.user_id)}
+							<li class="flex flex-wrap items-center justify-between gap-2 py-1.5 text-sm">
+								<span class="flex items-center gap-2">
+									<span
+										class="h-3 w-3 shrink-0 rounded-full border border-[#1a1917]"
+										style="background-color: {friend.color || '#faf8f4'};"
+									></span>
+									<span class="font-medium">{friend.label}</span>
+								</span>
+								{#if removingFriend === friend.user_id}
+									<span class="flex gap-2">
+										<ScribblyButton
+											variant="danger"
+											onclick={() => friendAction(() => friends.remove(friend.user_id))}
+										>
+											Remove
+										</ScribblyButton>
+										<ScribblyButton onclick={() => (removingFriend = null)}>Keep</ScribblyButton>
+									</span>
+								{:else}
+									<button
+										type="button"
+										class="cursor-pointer text-xs underline"
+										onclick={() => (removingFriend = friend.user_id)}
+									>
+										Remove
+									</button>
+								{/if}
+							</li>
+						{/each}
+					</ul>
+				{:else}
+					<p class="text-sm">No friends yet.</p>
+				{/if}
+
+				{#if friendData.outgoing.length}
+					<p class="text-xs text-[#6e6a63]">
+						Waiting for: {friendData.outgoing.map((p) => p.name).join(', ')}
+					</p>
+				{/if}
+			{/if}
 		</section>
 
 		<section class="space-y-2">

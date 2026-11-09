@@ -104,8 +104,14 @@
 			Nothing is sent to Google unless you click that button.
 		</p>
 		<p>
+			Signed-in players can add other signed-in players from a game they share as friends. I store who is
+			friends with whom and open friend requests (a request expires after 30 days). Friends see your name and
+			colour; they never see whether you are online, when you were last active, your email address or your
+			other friends. Declining a request or removing a friend is not shown to the other person.
+		</p>
+		<p>
 			The legal basis is Art. 6(1)(b) GDPR. You can delete your account at any time on the account page; this
-			erases your account data, statistics and the rooms you host. Accounts whose email address was never
+			erases your account data, statistics, friendships and the rooms you host. Accounts whose email address was never
 			confirmed and that have no active session are deleted automatically after 30 days.
 		</p>
 
