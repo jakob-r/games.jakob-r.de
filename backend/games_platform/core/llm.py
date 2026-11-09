@@ -6,7 +6,7 @@ import logging
 import os
 from typing import Any
 
-import httpx
+import httpx2
 
 from games_platform.core.auth import public_base_url
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "deepseek/deepseek-v4.1-flash"
 DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
-LLM_TIMEOUT = httpx.Timeout(20.0, connect=5.0)
+LLM_TIMEOUT = httpx2.Timeout(20.0, connect=5.0)
 
 
 class LlmError(RuntimeError):
@@ -29,7 +29,7 @@ async def chat(
     messages: list[dict[str, Any]],
     *,
     max_tokens: int = 64,
-    timeout: httpx.Timeout = LLM_TIMEOUT,
+    timeout: httpx2.Timeout = LLM_TIMEOUT,
 ) -> str:
     """Send a chat completion request and return the answer text."""
     api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
@@ -47,7 +47,7 @@ async def chat(
         "provider": {"data_collection": "deny"},
     }
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
+        async with httpx2.AsyncClient(timeout=timeout) as client:
             response = await client.post(
                 f"{base_url}/chat/completions",
                 json=body,
@@ -57,7 +57,7 @@ async def chat(
                     "X-Title": "games.jakob-r.de",
                 },
             )
-    except httpx.HTTPError as e:
+    except httpx2.HTTPError as e:
         raise LlmError(f"Could not reach OpenRouter: {e!r}") from e
     try:
         payload = response.json()

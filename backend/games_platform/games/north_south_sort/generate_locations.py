@@ -32,7 +32,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-import httpx
+import httpx2
 
 from games_platform.core.llm import LlmError, chat, llm_configured
 from games_platform.games.north_south_sort.locations import (
@@ -427,7 +427,7 @@ class WikidataError(RuntimeError):
 
 
 class Wikidata:
-    def __init__(self, client: httpx.AsyncClient, *, refresh: bool) -> None:
+    def __init__(self, client: httpx2.AsyncClient, *, refresh: bool) -> None:
         self.client = client
         self.refresh = refresh
         self.cache_dir = CACHE_DIR / "sparql"
@@ -467,9 +467,9 @@ class Wikidata:
                 if retry_after and retry_after.isdigit():
                     delay = float(retry_after)
                 is_timeout = response.status_code != 429
-            except httpx.TimeoutException as e:
+            except httpx2.TimeoutException as e:
                 error, is_timeout = repr(e), True
-            except (httpx.HTTPError, ValueError) as e:
+            except (httpx2.HTTPError, ValueError) as e:
                 error, is_timeout = repr(e), False
             if is_timeout:
                 failures += 1
@@ -550,7 +550,7 @@ SELECT * WHERE {{
 
 LLM_BATCH = 25
 LLM_CONCURRENCY = 4
-LLM_TIMEOUT = httpx.Timeout(180.0, connect=10.0)
+LLM_TIMEOUT = httpx2.Timeout(180.0, connect=10.0)
 
 CATEGORY_HINTS: dict[Category, str] = {
     "city": "cities",
@@ -719,8 +719,8 @@ async def run(args: argparse.Namespace) -> None:
         print("OPENROUTER_API_KEY not set: skipping LLM curation", file=sys.stderr)
     pre_llm = math.ceil(args.per_category * 1.5)
 
-    async with httpx.AsyncClient(
-        timeout=httpx.Timeout(90.0, connect=10.0), headers={"User-Agent": USER_AGENT}
+    async with httpx2.AsyncClient(
+        timeout=httpx2.Timeout(90.0, connect=10.0), headers={"User-Agent": USER_AGENT}
     ) as client:
         wikidata = Wikidata(client, refresh=args.refresh)
         seen: set[str] = set()

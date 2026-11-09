@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass
 from urllib.parse import urlencode
 
-import httpx
+import httpx2
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -113,7 +113,7 @@ async def exchange_code(*, code: str, verifier: str, base_url: str) -> GoogleIde
     signature need not be checked; issuer, audience and expiry still are."""
     client_id = os.environ["GOOGLE_CLIENT_ID"]
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx2.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 GOOGLE_TOKEN_URL,
                 data={
@@ -127,7 +127,7 @@ async def exchange_code(*, code: str, verifier: str, base_url: str) -> GoogleIde
             )
             response.raise_for_status()
             token = response.json()
-    except (httpx.HTTPError, ValueError) as e:
+    except (httpx2.HTTPError, ValueError) as e:
         raise OAuthError(f"Token exchange failed: {e!r}") from e
     id_token = token.get("id_token") if isinstance(token, dict) else None
     if not isinstance(id_token, str) or id_token.count(".") != 2:
