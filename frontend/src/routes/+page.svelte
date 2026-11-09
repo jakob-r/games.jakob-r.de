@@ -18,6 +18,7 @@
 		type GameSlug
 	} from '#lib/games/catalog.ts';
 	import GameLogo from '#lib/games/GameLogo.svelte';
+	import InstallAppPrompt from '#lib/core/components/InstallAppPrompt.svelte';
 	import { friends } from '#lib/core/friends.svelte.ts';
 
 	interface RecentRoom {
@@ -593,6 +594,8 @@
 			{/if}
 		</ScribblyBox>
 	</div>
+
+	<InstallAppPrompt />
 
 	<footer class="mt-10 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-[#1a1917]/15 pt-6 text-sm text-[#6e6a63]">
 		<span>Source available under PolyForm Noncommercial · hosted in Europe (Germany)</span>

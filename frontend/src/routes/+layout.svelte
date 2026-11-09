@@ -20,6 +20,8 @@
 		profile.init();
 		pushNotifications.init();
 		void auth.load();
+		// A registered service worker is part of what makes the site installable as an app.
+		if ('serviceWorker' in navigator) void navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
 	});
 
 	// Keep this device's push registration on the current player (moves on sign in/out).

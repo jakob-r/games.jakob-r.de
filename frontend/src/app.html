@@ -7,6 +7,12 @@
 		<meta name="apple-mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-title" content="games j" />
+		<meta name="application-name" content="games j" />
+		<link rel="manifest" href="/manifest.json" />
+		<link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png" />
+		<link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
+		<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
 		<!-- Defaults for SPA fallback (200.html); prerendered pages override via SeoHead -->
 		<title>games.jakob-r.de – Minimalistic multiplayer games</title>
 		<meta
@@ -58,6 +64,15 @@
 					}
 				]
 			}
+		</script>
+
+		<script>
+			// Keep Chromium's install prompt for the "Install" button on the landing page
+			// instead of letting the browser show its own banner.
+			addEventListener('beforeinstallprompt', function (e) {
+				e.preventDefault();
+				window.__installPrompt = e;
+			});
 		</script>
 
 		%sveltekit.head%

@@ -31,7 +31,9 @@
 		"vite": "^8.3.6"
 	},
 	"dependencies": {
+		"@khmyznikov/pwa-install": "0.7.0",
 		"d3-geo": "^3.1.2",
+		"lit": "^3.3.3",
 		"roughjs": "^4.6.6",
 		"topojson-client": "^3.1.0",
 		"world-atlas": "^2.0.2"

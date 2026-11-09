@@ -1,0 +1,31 @@
+<!doctype html>
+<!-- Source of frontend/static/icons/*.png (app icon). Render with `make icons`. -->
+<!-- Default: content inside the central 80% circle (maskable). `?any` scales it up for the regular icons. -->
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+	@font-face { font-family: 'Architects Daughter'; src: url('../frontend/node_modules/@fontsource/architects-daughter/files/architects-daughter-latin-400-normal.woff2'); }
+	html, body { margin: 0; width: 512px; height: 512px; overflow: hidden; background: #faf8f4; }
+</style>
+</head>
+<body>
+	<svg width="512" height="512" viewBox="0 0 512 512">
+		<g id="art" transform="rotate(-6 256 256)">
+			<rect x="132" y="132" width="264" height="264" rx="10" fill="#1a1917" transform="translate(14 14)" />
+			<rect x="132" y="132" width="264" height="264" rx="10" fill="#fff" stroke="#1a1917" stroke-width="12" />
+			<!-- faint 3x3 grid -->
+			<g stroke="#1a1917" stroke-width="5" stroke-linecap="round" opacity="0.18" fill="none">
+				<path d="M220 140 L221 388 M308 140 L307 388 M140 220 L388 221 M140 308 L388 307" />
+			</g>
+			<!-- claimed boxes -->
+			<rect x="144" y="144" width="70" height="70" fill="#2f5bea" opacity="0.22" />
+			<rect x="314" y="314" width="70" height="70" fill="#dc2626" opacity="0.2" />
+			<text x="268" y="300" text-anchor="middle" font-family="Architects Daughter" font-size="210" font-weight="700" fill="#1a1917" stroke="#1a1917" stroke-width="3">j</text>
+		</g>
+	</svg>
+	<script>
+		if (location.search.includes('any')) document.getElementById('art').setAttribute('transform', 'translate(250 250) scale(1.24) translate(-256 -256) rotate(-6 256 256)');
+	</script>
+</body>
+</html>

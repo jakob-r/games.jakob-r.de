@@ -1,5 +1,5 @@
 .PHONY: dev db db-down wait-db backend frontend install test check build \
-	docker-up docker-down og locations
+	docker-up docker-down og icons locations
 
 DOCKER_COMPOSE ?= docker-compose
 
@@ -67,6 +67,20 @@ og:
 	"$(CHROME)" --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
 		--window-size=1200,630 --allow-file-access-from-files \
 		--screenshot="$(CURDIR)/frontend/static/og.png" "file://$(CURDIR)/og/og.html"
+
+# Render the app icon (PWA manifest, favicon, apple-touch-icon) from og/icon.html
+ICON_DIR = $(CURDIR)/frontend/static/icons
+icons:
+	mkdir -p "$(ICON_DIR)"
+	"$(CHROME)" --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+		--window-size=512,512 --allow-file-access-from-files \
+		--screenshot="$(ICON_DIR)/maskable-512.png" "file://$(CURDIR)/og/icon.html"
+	"$(CHROME)" --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
+		--window-size=512,512 --allow-file-access-from-files \
+		--screenshot="$(ICON_DIR)/icon-512.png" "file://$(CURDIR)/og/icon.html?any"
+	sips -z 192 192 "$(ICON_DIR)/icon-512.png" --out "$(ICON_DIR)/icon-192.png" >/dev/null
+	sips -z 180 180 "$(ICON_DIR)/icon-512.png" --out "$(ICON_DIR)/apple-touch-icon.png" >/dev/null
+	sips -z 48 48 "$(ICON_DIR)/icon-512.png" --out "$(ICON_DIR)/favicon-48.png" >/dev/null
 
 docker-up:
 	test -f .env || cp .env.example .env
