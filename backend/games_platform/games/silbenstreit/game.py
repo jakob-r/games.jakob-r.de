@@ -103,6 +103,7 @@ class SilbenstreitGame:
     """Self-contained 2-to-4-player Silbenstreit implementation."""
 
     slug: str = "silbenstreit"
+    solo_turn_goes_to_joiner: bool = True
     title: str = "Silbenstreit"
     description: str = (
         "2–4 player word strategy on a 4×4 to 8×8 letter grid. Form valid words to claim "

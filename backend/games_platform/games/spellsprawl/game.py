@@ -71,6 +71,7 @@ class SpellsprawlGame:
     """Self-contained 1-to-8-player Spellsprawl implementation."""
 
     slug: str = "spellsprawl"
+    solo_turn_goes_to_joiner: bool = True
     title: str = "Spellsprawl"
     description: str = (
         "1–8 player word game on an endless grid. Spell words anywhere, but only letters "

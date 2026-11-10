@@ -65,6 +65,7 @@ class FragmentoryGame:
     """Self-contained Fragmentory implementation."""
 
     slug: str = "fragmentory"
+    solo_turn_goes_to_joiner: bool = True
     title: str = "Fragmentory"
     description: str = (
         "Turn-based territory game for 1–8 players. Rotate and place square cards with "
@@ -256,6 +257,17 @@ class FragmentoryGame:
         )
 
     # ------------------------------------------------------------------ hooks
+
+    def on_player_joined(
+        self, state: dict[str, Any], config: dict[str, Any], player_id: str
+    ) -> dict[str, Any]:
+        _ = config
+        if state.get("finished") or state.get("current_player_id") != player_id:
+            return state
+        # The joiner got the turn of a solo game: deal them their card now.
+        state = copy.deepcopy(state)
+        self._ensure_current_has_card(state)
+        return state
 
     def on_player_removed(
         self, state: dict[str, Any], config: dict[str, Any], player_id: str

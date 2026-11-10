@@ -182,6 +182,7 @@ class KaesekaestchenGame:
     """Self-contained Multiplayer Käsekästchen game implementation."""
 
     slug: str = "kaesekaestchen"
+    solo_turn_goes_to_joiner: bool = True
     title: str = "Käsekästchen"
     description: str = (
         "Round-based Dots & Boxes on a customizable grid. Draw lines in your color, "

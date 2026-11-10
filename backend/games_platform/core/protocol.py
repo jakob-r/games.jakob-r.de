@@ -72,6 +72,14 @@ class GameDefinition(Protocol):
 #     Adjust game state after a player left or was removed mid-game (after the
 #     shared turn_order fix-up).
 #
+# solo_turn_goes_to_joiner: bool
+#     Turn-based games: when someone joins a running game that was played alone (one
+#     player in turn_order), the joiner gets the turn right away.
+#
+# def on_player_joined(self, state, config, player_id: str) -> dict[str, Any]
+#     Adjust game state after a player joined mid-game (after the shared turn_order
+#     append and the solo hand-over), e.g. deal cards or restart a turn clock.
+#
 # def on_game_ended(self, state, config) -> dict[str, Any]
 #     Adjust game state when the host ends the game early with end_game (e.g. reveal
 #     hidden cards on the final screen).

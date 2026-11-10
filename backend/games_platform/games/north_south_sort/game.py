@@ -156,6 +156,7 @@ class NorthSouthSortGame:
     """Players take turns placing location cards north or south of the ones on the axis."""
 
     slug: str = "north-south-sort"
+    solo_turn_goes_to_joiner: bool = True
     title: str = "North South Sort"
     description: str = (
         "1–8 player geography game. Place cities, landmarks and historical events on a shared "
@@ -514,6 +515,20 @@ class NorthSouthSortGame:
     def on_game_ended(self, state: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
         _ = config
         return {**state, "finished": True}
+
+    def on_player_joined(
+        self, state: dict[str, Any], config: dict[str, Any], player_id: str
+    ) -> dict[str, Any]:
+        _ = config
+        if state.get("finished") or state.get("current_player_id") != player_id:
+            return state
+        # The joiner got the turn of a solo game: deal right away and start their clock.
+        state = copy.deepcopy(state)
+        if not state["hands"].get(player_id):
+            self._deal_hand(state, player_id)
+        state.setdefault("player_scores", {}).setdefault(player_id, 0.0)
+        state["turn_started_at"] = _now().isoformat()
+        return state
 
     def on_player_removed(
         self, state: dict[str, Any], config: dict[str, Any], player_id: str

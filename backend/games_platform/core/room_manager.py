@@ -601,17 +601,37 @@ class RoomManager:
             if room is not None and room["status"] == "playing":
                 if not was_existing and player_id != room["host_player_id"]:
                     self.midgame_inactive_players.setdefault(room_id, set()).add(player_id)
-                if isinstance(room["state"], dict) and "turn_order" in room["state"]:
-                    state = dict(room["state"])
-                    turn_order: list[str] = list(state.get("turn_order") or [])
-                    if player_id not in turn_order:
-                        turn_order.append(player_id)
-                        state["turn_order"] = turn_order
-                        if not state.get("current_player_id"):
-                            state["current_player_id"] = turn_order[0]
-                        await self.db.update_room(room_id, state=state)
+                await self._add_midgame_player(room, player_id)
             await self.broadcast_room_state(room_id)
         return conn
+
+    async def _add_midgame_player(self, room: dict[str, Any], player_id: str) -> None:
+        """Append a player joining a running game to ``turn_order``.
+
+        If the game was being played alone (one player in ``turn_order``) and the game sets
+        ``solo_turn_goes_to_joiner``, the joiner gets the turn right away. The optional hook
+        ``on_player_joined`` then fixes up game state (deal cards, restart a turn clock).
+        """
+        state = room["state"]
+        if not isinstance(state, dict) or "turn_order" not in state:
+            return
+        turn_order: list[str] = list(state.get("turn_order") or [])
+        if player_id in turn_order:
+            return
+        game = self.get_game(room["game_slug"])
+        state = dict(state)
+        was_solo = len(turn_order) == 1
+        turn_order.append(player_id)
+        state["turn_order"] = turn_order
+        if was_solo and getattr(game, "solo_turn_goes_to_joiner", False):
+            state["current_player_id"] = player_id
+            state["current_turn_index"] = turn_order.index(player_id)
+        elif not state.get("current_player_id"):
+            state["current_player_id"] = turn_order[0]
+        hook = getattr(game, "on_player_joined", None)
+        if hook is not None:
+            state = hook(state, room["config"], player_id)
+        await self.db.update_room(room["id"], state=state)
 
     async def disconnect(self, room_id: str, conn: RoomConnection) -> None:
         empty_room = False
@@ -694,15 +714,7 @@ class RoomManager:
                             self.midgame_inactive_players.setdefault(room_id, set()).add(
                                 msg.player_id
                             )
-                        if isinstance(room["state"], dict) and "turn_order" in room["state"]:
-                            state = dict(room["state"])
-                            turn_order: list[str] = list(state.get("turn_order") or [])
-                            if msg.player_id not in turn_order:
-                                turn_order.append(msg.player_id)
-                                state["turn_order"] = turn_order
-                                if not state.get("current_player_id"):
-                                    state["current_player_id"] = turn_order[0]
-                                await self.db.update_room(room_id, state=state)
+                        await self._add_midgame_player(room, msg.player_id)
                     await self.broadcast_room_state(room_id)
 
                 case SetReadyMessage():
