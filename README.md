@@ -61,6 +61,8 @@ All configuration lives in **one root `.env`** (not checked in). `.env.example` 
 | Command                          | What it does                                        |
 | -------------------------------- | --------------------------------------------------- |
 | `make dev`                       | Full local setup + backend and frontend             |
+| `make test`                      | Backend tests (pytest)                              |
+| `make e2e`                       | Playwright end-to-end tests (own servers, fixed mode) |
 | `make check`                     | Frontend typecheck / svelte-check                   |
 | `make build`                     | Production build                                    |
 | `make docker-up` / `docker-down` | Run the production image together with Postgres     |

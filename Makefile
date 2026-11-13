@@ -1,4 +1,4 @@
-.PHONY: dev db db-down wait-db backend frontend install test check build \
+.PHONY: dev db db-down wait-db backend frontend install test e2e check build \
 	docker-up docker-down og icons locations
 
 DOCKER_COMPOSE ?= docker-compose
@@ -47,6 +47,11 @@ install:
 
 test: db wait-db
 	cd backend && uv run pytest
+
+# Playwright end-to-end tests. Starts its own backend (GAMES_E2E_FIXED=1, port 8100) and
+# frontend (port 5180) next to a running `make dev`. Pass options via ARGS, e.g. ARGS="--ui".
+e2e: db wait-db
+	cd frontend && pnpm exec playwright install chromium && pnpm exec playwright test $(ARGS)
 
 check:
 	cd backend && uv run ruff check .

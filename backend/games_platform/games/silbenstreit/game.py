@@ -7,11 +7,13 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, TypeAdapter
 
+from games_platform.core.e2e import fixed_mode
 from games_platform.core.protocol import ActionOutcome
 from games_platform.games.silbenstreit.dictionary import (
     DEFAULT_LANGUAGE,
     SUPPORTED_LANGUAGES,
     generate_board,
+    get_letter_score,
     is_valid_word,
     normalize_language,
 )
@@ -20,6 +22,9 @@ MIN_SIZE = 4
 MAX_SIZE = 8
 DEFAULT_SIZE = 5
 MAX_PLAYERS = 4
+
+# Board used in E2E fixed mode for 5×5 German games: every row is a valid word.
+FIXED_BOARD_DE_5 = ("TISCH", "BLUME", "KATZE", "STERN", "WOLKE")
 
 
 class TilePosition(BaseModel):
@@ -146,7 +151,11 @@ class SilbenstreitGame:
         size: int = validated["size"]
         language: str = validated["language"]
 
-        letters, values = generate_board(size=size, language=language)
+        if fixed_mode() and size == len(FIXED_BOARD_DE_5) and language == "de":
+            letters = [list(row) for row in FIXED_BOARD_DE_5]
+            values = [[get_letter_score(ch, language) for ch in row] for row in letters]
+        else:
+            letters, values = generate_board(size=size, language=language)
         owners: list[list[str | None]] = [[None for _ in range(size)] for _ in range(size)]
         protected: list[list[bool]] = [[False for _ in range(size)] for _ in range(size)]
 

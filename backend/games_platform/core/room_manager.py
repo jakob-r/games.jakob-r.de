@@ -9,10 +9,11 @@ import secrets
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import TypeAdapter, ValidationError
 
 from games_platform.core.db import Database
+from games_platform.core.e2e import fixed_mode
 from games_platform.core.protocol import (
     ClientMessage,
     CursorMoveMessage,
@@ -542,7 +543,7 @@ class RoomManager:
         for conn in conns:
             try:
                 await conn.websocket.send_json(message)
-            except (RuntimeError, OSError) as e:
+            except (RuntimeError, OSError, WebSocketDisconnect) as e:
                 logger.debug("WebSocket send failed for %s: %s", conn.player_id, repr(e))
                 stale.append(conn)
         if stale:
@@ -564,7 +565,7 @@ class RoomManager:
             message = {**snapshot, "state": self._view_state(game, room, conn.player_id)}
             try:
                 await conn.websocket.send_json(message)
-            except (RuntimeError, OSError) as e:
+            except (RuntimeError, OSError, WebSocketDisconnect) as e:
                 logger.debug("WebSocket send failed for %s: %s", conn.player_id, repr(e))
                 stale.append(conn)
         for s in stale:
@@ -838,7 +839,8 @@ class RoomManager:
         The loser of the room's previous game starts; the first game (or when the
         loser has left) starts with a random player. Games take ``turn_order[0]``.
         """
-        if len(player_ids) < 2:
+        if len(player_ids) < 2 or fixed_mode():
+            # E2E fixed mode keeps the join order, so the host opens.
             return player_ids
         starter = await self.db.get_next_starter_id(room_id)
         if starter not in player_ids:

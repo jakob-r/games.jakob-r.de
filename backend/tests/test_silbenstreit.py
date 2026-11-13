@@ -339,3 +339,12 @@ def test_sub_words_of_played_words_are_blocked() -> None:
     assert find_blocking_word("NATIONAL", played) == "INTERNATIONALIZATION"
     assert find_blocking_word("RUNNERS", played) is None
     assert find_blocking_word("NATIONS", played) is None
+
+
+def test_e2e_fixed_mode_uses_the_fixed_board(monkeypatch) -> None:
+    from games_platform.games.silbenstreit.game import FIXED_BOARD_DE_5, silbenstreit_game
+
+    monkeypatch.setenv("GAMES_E2E_FIXED", "1")
+    state = silbenstreit_game.create_initial_state({"size": 5, "language": "de"}, ["a", "b"])
+    assert ["".join(row) for row in state["letters"]] == list(FIXED_BOARD_DE_5)
+    assert state["current_player_id"] == "a"
