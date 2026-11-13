@@ -613,3 +613,20 @@ def test_player_stats_split_best_score_single_and_multi() -> None:
                 )
 
         client.portal.call(_cleanup)
+
+
+def test_websocket_to_unknown_room_closes_with_4004() -> None:
+    import pytest
+    from starlette.websockets import WebSocketDisconnect
+
+    from games_platform.core.db import Database
+    from games_platform.main import create_app
+
+    with TestClient(create_app(database=Database())) as client:
+        # Accepted, then closed, so browsers see 4004 instead of 1006.
+        with (
+            pytest.raises(WebSocketDisconnect) as exc,
+            client.websocket_connect("/ws/silbenstreit/nosuchroom?player_id=p") as ws,
+        ):
+            ws.receive_json()
+        assert exc.value.code == 4004

@@ -413,19 +413,23 @@ def create_app(
         name: str = Query(default="Player"),
         color: str = Query(default="#2563eb"),
     ) -> None:
+        async def refuse(code: int, reason: str) -> None:
+            # Accept first: a close before the handshake reaches browsers as code 1006,
+            # which the client treats as a network drop and keeps reconnecting.
+            await websocket.accept()
+            await websocket.close(code=code, reason=reason)
+
         room = await active_db.get_room(room_id)
         if room is None or room["game_slug"] != game_slug:
-            await websocket.close(code=4004, reason="Room not found")
+            await refuse(4004, "Room not found")
             return
         if is_bot_id(player_id):
-            await websocket.close(code=4003, reason="Reserved player id")
+            await refuse(4003, "Reserved player id")
             return
         if is_solo_room(room["config"]) and player_id != room["host_player_id"]:
             room_players = await active_db.get_room_players(room_id)
             if not any(p["player_id"] == player_id for p in room_players):
-                # Accept first: a close before the handshake reaches browsers as code 1006.
-                await websocket.accept()
-                await websocket.close(code=4005, reason="Solo game")
+                await refuse(4005, "Solo game")
                 return
 
         conn = await manager.connect(
