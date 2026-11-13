@@ -40,12 +40,17 @@ def test_scoring_formulas() -> None:
     assert end_bonus(80) == 0
     assert end_bonus(81) == 0
     assert end_bonus(25) == round(1000 * (55 / 63) ** 2)
-    assert placement_bonus(1000, 500) == 100
-    assert placement_bonus(10, 5) == 100
-    assert placement_bonus(5000, 500) == 100  # before is capped at 1000
-    assert placement_bonus(1000, 1000) == 0
-    assert placement_bonus(1000, 0) == 0
-    assert placement_points(1000, 1000) == 1
+    assert placement_bonus(1000, 500, 17) == 100
+    assert placement_bonus(10, 5, 17) == 100
+    assert placement_bonus(1000, 500, 12) == 100  # weight is capped at 1
+    assert placement_bonus(5000, 500, 17) == 100  # before is capped at 1000
+    assert placement_bonus(1000, 500, 34) == 25  # (17/34)² = 0.25
+    assert placement_bonus(10, 5, 25) == round(100 * (17 / 25) ** 2)
+    assert placement_bonus(1000, 1000, 20) == 0
+    assert placement_bonus(1000, 0, 20) == 0
+    # +1 only while the count is still 1000+.
+    assert placement_points(1000, 1000, 5) == 1
+    assert placement_points(1000, 500, 17) == 100
 
 
 def test_solver_counts() -> None:
@@ -81,8 +86,8 @@ def test_solo_place_and_reach_unique() -> None:
     assert out.is_finished
     assert out.state["end_reason"] == "unique"
     assert out.state["end_bonus"] == 1000
-    # 1 point + log bonus 1000→1 + full end bonus
-    assert out.points_delta == 1 + placement_bonus(1000, 1) + 1000
+    # log bonus 1000→1 at full weight + full end bonus, no +1 below 1000+
+    assert out.points_delta == placement_bonus(1000, 1, 17) + 1000
 
 
 def test_rejections_without_penalty() -> None:
@@ -159,4 +164,4 @@ def test_multiplayer_end_bonus_split() -> None:
     out = place(game, state, "a", *clues[-1], 1)
     assert out.is_finished
     assert out.extra_score_deltas == {"b": 500.0}
-    assert out.points_delta == 1 + placement_bonus(1000, 1) + 500
+    assert out.points_delta == placement_bonus(1000, 1, 17) + 500

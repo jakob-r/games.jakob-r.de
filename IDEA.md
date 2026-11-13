@@ -292,8 +292,8 @@ Sudoku from scratch: start with an empty grid and create a puzzle with exactly o
 - Fewer clues, higher reward: A unique puzzle with 17 clues earns the maximum 1000 points. The score declines as clues are added, reaching 0 at 80 clues. Seventeen is the theoretical minimum for a unique standard Sudoku, so it is an exceptional achievement.
 - The game ends as soon as uniqueness is reached.
 - End bonus score `round(1000 × clamp((80 − clues) / 63, 0, 1)²)` is added to the score.
-- Every valid placement gives 1 point.
-- If the placement reduces the number of solutions, the player gets a bonus: `round(100 × log2(min(solutions before, 1000) / solutions after))`. A move from 1000 to 500 is worth the same as a move from 10 to 5.
+- A valid placement gives 1 point while the count is still 1000+ (no point once it drops below).
+- If the placement reduces the number of solutions, the player gets a bonus: `round(100 × log2(min(solutions before, 1000) / solutions after) × min(1, (17 / clues)²))`, with `clues` counted after the placement. At the same clue count, a move from 1000 to 500 is worth the same as a move from 10 to 5; cutting solutions with fewer clues on the board is worth more (halving at 17 clues: 100, at 25: 46, at 34: 25). Without the weight the bonuses would always add up to ≈ 997 on the way to a unique grid, no matter how many clues were used.
 
 
 Turn based multiplayer mode:

@@ -220,7 +220,7 @@ class SudokuZeroGame:
         s["consecutive_passes"] = 0
         s["consecutive_wrongs"] = 0
         s["move_count"] = int(s.get("move_count", 0)) + 1
-        points = placement_points(before, claimed)
+        points = placement_points(before, claimed, s["clues"])
 
         extra: dict[str, float] = {}
         bonus: int | None = None

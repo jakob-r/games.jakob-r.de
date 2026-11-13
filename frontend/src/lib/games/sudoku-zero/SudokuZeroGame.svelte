@@ -320,8 +320,9 @@
 					clues, the bigger the end bonus (17 clues: 1000 points).
 				</p>
 				<p class="text-xs text-[#6e6a63]">
-					Every clue scores 1 point plus a bonus for how much it cuts the solution count. A clue
-					that leaves no solution costs 50.
+					A clue that cuts the solution count scores — the fewer clues on the board, the more it
+					is worth. While the count is still 1000+, each clue scores 1 point. A clue that leaves
+					no solution costs 50.
 				</p>
 			</div>
 

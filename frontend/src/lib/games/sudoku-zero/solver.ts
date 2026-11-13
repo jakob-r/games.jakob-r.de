@@ -104,12 +104,25 @@ export function hasConflict(grid: readonly number[], index: number, value: numbe
 	return false;
 }
 
-/** `round(100 × log2(min(before, 1000) / after))`; 1000→500 is worth the same as 10→5. */
-export function placementBonus(before: number, after: number): number {
+/** `min(1, (17 / clues)²)`: cutting solutions early (few clues) is worth more. */
+export function clueWeight(clues: number): number {
+	return clues <= 17 ? 1 : (17 / clues) ** 2;
+}
+
+/**
+ * `round(100 × log2(min(before, 1000) / after) × min(1, (17 / clues)²))`, with `clues`
+ * counted after the placement. At the same clue count, 1000→500 equals 10→5.
+ */
+export function placementBonus(before: number, after: number, clues: number): number {
 	const b = Math.min(before, SOLUTION_CAP);
 	const a = Math.min(after, SOLUTION_CAP);
 	if (a <= 0 || b <= a) return 0;
-	return Math.round(100 * Math.log2(b / a));
+	return Math.round(100 * Math.log2(b / a) * clueWeight(clues));
+}
+
+/** +1 only while the count is still 1000+, plus the weighted bonus. */
+export function placementPoints(before: number, after: number, clues: number): number {
+	return (after >= SOLUTION_CAP ? 1 : 0) + placementBonus(before, after, clues);
 }
 
 /** `round(1000 × clamp((80 − clues) / 63, 0, 1)²)`: 17 clues → 1000, 80 → 0. */

@@ -23,16 +23,27 @@ def cap(solutions: int) -> int:
     return max(0, min(int(solutions), SOLUTION_CAP))
 
 
-def placement_bonus(before: int, after: int) -> int:
-    """``round(100 × log2(min(before, 1000) / after))``; 1000→500 equals 10→5."""
+def clue_weight(clues: int) -> float:
+    """``min(1, (17 / clues)²)``: cutting solutions early (few clues) is worth more."""
+    return 1.0 if clues <= MIN_CLUES else (MIN_CLUES / clues) ** 2
+
+
+def placement_bonus(before: int, after: int, clues: int) -> int:
+    """``round(100 × log2(min(before, 1000) / after) × min(1, (17 / clues)²))``.
+
+    ``clues`` counts the clues after this placement. At the same clue count, 1000→500
+    equals 10→5.
+    """
     b, a = cap(before), cap(after)
     if a <= 0 or b <= a:
         return 0
-    return round(100 * math.log2(b / a))
+    return round(100 * math.log2(b / a) * clue_weight(clues))
 
 
-def placement_points(before: int, after: int) -> int:
-    return POINTS_PER_CLUE + placement_bonus(before, after)
+def placement_points(before: int, after: int, clues: int) -> int:
+    """+1 only while the count is still 1000+, plus the weighted bonus."""
+    base = POINTS_PER_CLUE if cap(after) >= SOLUTION_CAP else 0
+    return base + placement_bonus(before, after, clues)
 
 
 def end_bonus(clues: int) -> int:

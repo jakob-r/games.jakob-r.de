@@ -146,7 +146,7 @@ export const GAMES: GameInfo[] = [
 		title: 'Sudoku Zero',
 		tagline: 'Start from an empty grid and build a unique Sudoku with as few clues as possible.',
 		description:
-			'Sudoku from scratch. Place numbers on an empty 9×9 grid until exactly one solution remains — a live counter shows how many are left. Every clue that cuts the count scores, and finishing with few clues pays big: 17 clues, the theoretical minimum, earns 1000 points. A clue that leaves no solution costs 50. Play solo or take turns with a friend.',
+			'Sudoku from scratch. Place numbers on an empty 9×9 grid until exactly one solution remains — a live counter shows how many are left. Every clue that cuts the count scores — more the fewer clues are on the board — and finishing with few clues pays big: 17 clues, the theoretical minimum, earns 1000 points. A clue that leaves no solution costs 50. Play solo or take turns with a friend.',
 		playersLabel: '1–2',
 		playersAria: '1 or 2 players',
 		boxSeed: 69,
