@@ -127,6 +127,10 @@ Privacy first: friends never see whether you are online or when you were last ac
 - A played word cannot be reused, nor can any word contained in a played word (after "RUNNER", "RUN" is blocked for everyone).
 - Players can see the list of all played words.
 
+Solo mode:
+- Same mechanics as for multiplayer but reusing your own protected letters gives you their score as a penalty.
+- This mode cannot be joined by other players.
+
 ### Emoji Charades
 
 A multiplayer game that can be played in person but also remotely.
@@ -273,3 +277,21 @@ Clarifications:
 - 1 to 8 players, no game settings.
 - Claiming an area is optional. A card that fits nowhere is discarded.
 - A player may only occupy a new area if the move does not increase one of their current areas (no area of the placed card joins an area holding their colour). So the area is chosen after placing the card; the areas that may be occupied are marked with empty circles.
+
+### Sudoku Zero
+
+Sudoku from scratch: start with an empty grid and create a puzzle with exactly one solution.
+
+- Goal: Place as few clues as possible on a standard 9×9 Sudoku board until only one valid completed grid remains.
+- Player-created puzzle: There is no predetermined hidden solution. Each committed number constrains the set of possible completions.
+- Standard Sudoku rules: Every completed row, column, and 3×3 box must contain the digits 1–9 exactly once.
+- Live solution counter: Recalculate after each placement. Show exact counts up to 1,000 and display "1000+" once at least 1,001 solutions have been found.
+- Automatic victory: End the round immediately when exactly one solution remains and award the full win value for the current clue count.
+- Cash out early: Players can give up at any time to secure the displayed cash-out score. This ends the round.
+- Failure penalty: If a placement leaves zero possible solutions, end the round, discard the unbanked score, and subtract 50 points from the running total. Contradictions can exist even without an obvious repeated number.
+- Fewer clues, higher reward: A unique puzzle with 17 clues earns the maximum 1000 points. The score declines as clues are added, reaching 0 at 80 clues. Seventeen is the theoretical minimum for a unique standard Sudoku, so it is an exceptional achievement.
+- Win formula: `round(100 × clamp((80 − clues) / 63, 0, 1)²)`. The round ends as soon as uniqueness is reached; 80 clues is a scoring baseline.
+- Cash-out formula: `floor(win value / remaining solutions)` when the exact count is between 2 and 1,000. At 1000+, cash-out value is 0. Award points once per round, rather than for every move.
+- Core tension: An effective clue reduces the remaining possibilities; a redundant clue lowers the available win value; an incompatible clue loses the round. Players weigh another attempt against banking their current score.
+
+For two players this is round based and the score each player gets
