@@ -102,6 +102,11 @@ def is_bot_id(player_id: str) -> bool:
     return player_id.startswith(BOT_ID_PREFIX)
 
 
+def is_solo_room(config: dict[str, Any] | None) -> bool:
+    """A room whose config has ``solo: true`` is closed to everyone but the host."""
+    return bool((config or {}).get("solo"))
+
+
 # --- Client -> Server WebSocket Messages ---
 
 

@@ -348,3 +348,132 @@ def test_e2e_fixed_mode_uses_the_fixed_board(monkeypatch) -> None:
     state = silbenstreit_game.create_initial_state({"size": 5, "language": "de"}, ["a", "b"])
     assert ["".join(row) for row in state["letters"]] == list(FIXED_BOARD_DE_5)
     assert state["current_player_id"] == "a"
+
+
+SOLO_BOARD = [
+    ["C", "A", "T", "S"],
+    ["O", "R", "E", "D"],
+    ["L", "I", "N", "E"],
+    ["D", "O", "G", "S"],
+]
+
+
+def _submit(game, state, config, player_id, coords):
+    return game.apply_action(
+        state=state,
+        config=config,
+        player_id=player_id,
+        action={
+            "type": "submit_word",
+            "positions": [{"row": r, "col": c} for r, c in coords],
+        },
+        player_multiplier=1.0,
+    )
+
+
+def test_solo_reusing_own_protected_tiles_costs_their_value() -> None:
+    game = SilbenstreitGame()
+    config = game.validate_config({"size": 4, "language": "en", "solo": True})
+    assert config["solo"] is True
+    state = game.create_initial_state(config, player_ids=["me", "other"])
+    assert state["turn_order"] == ["me"]
+    state["letters"] = SOLO_BOARD
+    state["values"] = [[get_letter_score(ch, "en") for ch in row] for row in SOLO_BOARD]
+    v = state["values"]
+
+    m1 = _submit(game, state, config, "me", [(0, 0), (0, 1), (0, 2), (0, 3)])  # CATS
+    assert m1.is_correct_entry is True
+    assert m1.state["current_player_id"] == "me"
+    m2 = _submit(game, m1.state, config, "me", [(1, 0), (1, 1), (1, 2)])  # ORE
+    assert m2.state["protected"][0][0] is True
+    assert m2.state["protected"][1][0] is False
+
+    # COLD reuses protected C (penalty) and unprotected O (free), claims L and D.
+    m3 = _submit(game, m2.state, config, "me", [(0, 0), (1, 0), (2, 0), (3, 0)])
+    assert m3.is_correct_entry is True
+    assert m3.events[0]["penalty"] == v[0][0]
+    assert m3.points_delta == float(v[2][0] + v[3][0] - v[0][0])
+    assert m3.state["penalties"] == {"me": v[0][0]}
+    board = sum(v[r][c] for r in range(4) for c in range(4) if m3.state["owners"][r][c] == "me")
+    assert m3.state["player_scores"]["me"] == board - v[0][0]
+
+
+def test_multiplayer_reusing_own_protected_tiles_is_free() -> None:
+    game = SilbenstreitGame()
+    config = game.validate_config({"size": 4, "language": "en"})
+    assert config["solo"] is False
+    state = game.create_initial_state(config, player_ids=["me"])
+    state["letters"] = SOLO_BOARD
+    state["values"] = [[get_letter_score(ch, "en") for ch in row] for row in SOLO_BOARD]
+    m1 = _submit(game, state, config, "me", [(0, 0), (0, 1), (0, 2), (0, 3)])
+    m2 = _submit(game, m1.state, config, "me", [(1, 0), (1, 1), (1, 2)])
+    m3 = _submit(game, m2.state, config, "me", [(0, 0), (1, 0), (2, 0), (3, 0)])
+    assert m3.events[0]["penalty"] == 0
+    assert m3.state["penalties"] == {}
+
+
+def test_solo_pass_ends_the_game() -> None:
+    game = SilbenstreitGame()
+    config = game.validate_config({"size": 4, "language": "en", "solo": True})
+    state = game.create_initial_state(config, player_ids=["me"])
+    outcome = game.apply_action(state, config, "me", {"type": "pass_turn"}, 1.0)
+    assert outcome.is_finished is True
+
+
+def test_solo_room_cannot_be_joined() -> None:
+    from starlette.websockets import WebSocketDisconnect
+
+    app = create_app(database=Database())
+    with TestClient(app) as client:
+        room_id = client.post(
+            "/api/rooms",
+            json={
+                "game_slug": "silbenstreit",
+                "host_player_id": "solo_host",
+                "host_name": "Anna",
+                "host_color": "#2563eb",
+                "config": {"size": 4, "language": "de", "solo": True},
+            },
+        ).json()["room_id"]
+
+        with client.websocket_connect(
+            f"/ws/silbenstreit/{room_id}?player_id=solo_host&name=Anna"
+        ) as ws:
+            assert ws.receive_json()["config"]["solo"] is True
+
+        with (
+            pytest.raises(WebSocketDisconnect) as exc,
+            client.websocket_connect(
+                f"/ws/silbenstreit/{room_id}?player_id=intruder&name=Ben"
+            ) as ws2,
+        ):
+            ws2.receive_json()
+        assert exc.value.code == 4005
+        players = client.get(f"/api/rooms/{room_id}").json()["players"]
+        assert [p["player_id"] for p in players] == ["solo_host"]
+
+
+def test_switching_to_solo_needs_an_empty_room() -> None:
+    app = create_app(database=Database())
+    with TestClient(app) as client:
+        room_id = client.post(
+            "/api/rooms",
+            json={
+                "game_slug": "silbenstreit",
+                "host_player_id": "host_x",
+                "host_name": "Anna",
+                "host_color": "#2563eb",
+                "config": {"size": 4, "language": "de"},
+            },
+        ).json()["room_id"]
+        with (
+            client.websocket_connect(f"/ws/silbenstreit/{room_id}?player_id=host_x") as ws1,
+            client.websocket_connect(f"/ws/silbenstreit/{room_id}?player_id=guest_x") as ws2,
+        ):
+            _ = ws1.receive_json()
+            _ = ws1.receive_json()
+            _ = ws2.receive_json()
+            ws1.send_json({"type": "update_config", "config": {"solo": True}})
+            err = ws1.receive_json()
+            assert err["type"] == "error"
+            assert client.get(f"/api/rooms/{room_id}").json()["config"]["solo"] is False

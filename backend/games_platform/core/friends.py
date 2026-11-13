@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from games_platform.core.auth import SESSION_COOKIE, AuthService
 from games_platform.core.auth_api import RateLimiter
 from games_platform.core.db import Database
+from games_platform.core.protocol import is_solo_room
 from games_platform.core.push import WebPushService, format_invite_notification
 
 logger = logging.getLogger(__name__)
@@ -235,7 +236,7 @@ class FriendService:
         async with self.db.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                SELECT r.game_slug FROM rooms r
+                SELECT r.game_slug, r.config FROM rooms r
                 JOIN room_players rp ON rp.room_id = r.id AND rp.player_id = %s
                 WHERE r.id = %s
                 """,
@@ -244,6 +245,8 @@ class FriendService:
             room = await cur.fetchone()
             if room is None:
                 raise FriendError(404, "You are not in this room")
+            if is_solo_room(room["config"]):
+                raise FriendError(400, "Solo games cannot be joined.")
             await cur.execute(
                 """
                 SELECT COUNT(*) AS n FROM room_invites
@@ -366,6 +369,7 @@ class FriendService:
                 JOIN users u ON u.player_id = r.host_player_id
                 JOIN friendships f ON f.user_id = %(me)s AND f.friend_id = u.id
                 WHERE r.status = 'lobby'
+                  AND NOT COALESCE((r.config->>'solo')::boolean, false)
                 """,
                 {"me": user["id"], "pid": user["player_id"]},
             )

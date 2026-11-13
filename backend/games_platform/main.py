@@ -27,6 +27,7 @@ from games_platform.core.protocol import (
     GameDefinition,
     PushSubscribeRequest,
     is_bot_id,
+    is_solo_room,
 )
 from games_platform.core.push import (
     MAX_PUSH_SUBSCRIPTIONS_PER_PLAYER,
@@ -419,6 +420,13 @@ def create_app(
         if is_bot_id(player_id):
             await websocket.close(code=4003, reason="Reserved player id")
             return
+        if is_solo_room(room["config"]) and player_id != room["host_player_id"]:
+            room_players = await active_db.get_room_players(room_id)
+            if not any(p["player_id"] == player_id for p in room_players):
+                # Accept first: a close before the handshake reaches browsers as code 1006.
+                await websocket.accept()
+                await websocket.close(code=4005, reason="Solo game")
+                return
 
         conn = await manager.connect(
             websocket=websocket,

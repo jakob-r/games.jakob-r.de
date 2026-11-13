@@ -1,4 +1,4 @@
-"""Silbenstreit (2-player round-based word ownership & tile protection game)."""
+"""Silbenstreit (round-based word ownership & tile protection game)."""
 
 from __future__ import annotations
 
@@ -100,18 +100,26 @@ def find_blocking_word(word: str, played_words: list[dict[str, Any]]) -> str | N
     return next((p for p in played if word in p), None)
 
 
+def apply_penalties(scores: dict[str, int], penalties: dict[str, int]) -> dict[str, int]:
+    """Subtract accumulated (solo) penalties from board scores."""
+    result = dict(scores)
+    for pid, penalty in penalties.items():
+        result[pid] = result.get(pid, 0) - int(penalty)
+    return result
+
+
 def count_unowned_tiles(size: int, owners: list[list[str | None]]) -> int:
     return sum(1 for r in range(size) for c in range(size) if owners[r][c] is None)
 
 
 class SilbenstreitGame:
-    """Self-contained 2-to-4-player Silbenstreit implementation."""
+    """Self-contained 1-to-4-player Silbenstreit implementation (solo mode: config ``solo``)."""
 
     slug: str = "silbenstreit"
     solo_turn_goes_to_joiner: bool = True
     title: str = "Silbenstreit"
     description: str = (
-        "2–4 player word strategy on a 4×4 to 8×8 letter grid. Form valid words to claim "
+        "1–4 player word strategy on a 4×4 to 8×8 letter grid. Form valid words to claim "
         "letters in your color, score rarity points (1–10), and surround your tiles to "
         "protect them from being stolen!"
     )
@@ -121,6 +129,7 @@ class SilbenstreitGame:
             "size": DEFAULT_SIZE,
             "language": DEFAULT_LANGUAGE,
             "scoring_enabled": True,
+            "solo": False,
         }
 
     def validate_config(self, raw_config: dict[str, Any]) -> dict[str, Any]:
@@ -140,6 +149,8 @@ class SilbenstreitGame:
             "size": size,
             "language": language,
             "scoring_enabled": bool(raw_config.get("scoring_enabled", True)),
+            # Solo rooms are closed to other players (platform convention, see RoomManager).
+            "solo": bool(raw_config.get("solo", False)),
         }
 
     def create_initial_state(
@@ -159,7 +170,8 @@ class SilbenstreitGame:
         owners: list[list[str | None]] = [[None for _ in range(size)] for _ in range(size)]
         protected: list[list[bool]] = [[False for _ in range(size)] for _ in range(size)]
 
-        turn_order: list[str] = list(player_ids or [])[:MAX_PLAYERS]
+        solo: bool = validated["solo"]
+        turn_order: list[str] = list(player_ids or [])[: 1 if solo else MAX_PLAYERS]
         current_player_id: str | None = turn_order[0] if turn_order else None
 
         return {
@@ -175,6 +187,9 @@ class SilbenstreitGame:
             "current_player_id": current_player_id,
             "played_words": [],
             "player_scores": {pid: 0 for pid in turn_order},
+            "solo": solo,
+            # Solo only: points lost by reusing own protected tiles, per player.
+            "penalties": {},
             "unowned_count": size * size,
             "total_tiles": size * size,
             "consecutive_passes": 0,
@@ -223,7 +238,8 @@ class SilbenstreitGame:
         protected: list[list[bool]] = next_state["protected"]
         turn_order: list[str] = list(next_state.get("turn_order") or [])
 
-        if player_id not in turn_order and len(turn_order) < MAX_PLAYERS:
+        solo = bool(next_state.get("solo", False))
+        if player_id not in turn_order and len(turn_order) < (1 if solo else MAX_PLAYERS):
             turn_order.append(player_id)
             next_state["turn_order"] = turn_order
 
@@ -256,7 +272,8 @@ class SilbenstreitGame:
                     "player_id": player_id,
                 }
                 self._advance_turn(next_state, player_id)
-                pass_limit = max(2, len(turn_order) * 2)
+                # Alone, passing means giving up: nothing would change on the next turn.
+                pass_limit = 1 if solo else max(2, len(turn_order) * 2)
                 is_finished = passes >= pass_limit
                 return ActionOutcome(
                     state=next_state,
@@ -361,8 +378,21 @@ class SilbenstreitGame:
                         ],
                     )
 
-                # Valid word! Compute old ownership scores, update tile owners, and recompute protection
-                old_scores = compute_board_scores(size, values, owners)
+                # Valid word! Compute old scores, update tile owners, and recompute protection
+                penalties: dict[str, int] = dict(next_state.get("penalties") or {})
+                old_scores = apply_penalties(compute_board_scores(size, values, owners), penalties)
+
+                # Solo: reusing your own protected tiles costs their value.
+                penalty = 0
+                if solo:
+                    penalty = sum(
+                        int(values[p.row][p.col])
+                        for p in positions
+                        if protected[p.row][p.col] and owners[p.row][p.col] == player_id
+                    )
+                    if penalty:
+                        penalties[player_id] = penalties.get(player_id, 0) + penalty
+                        next_state["penalties"] = penalties
 
                 pos_dicts: list[dict[str, int]] = []
                 word_tile_value = 0
@@ -375,7 +405,7 @@ class SilbenstreitGame:
                 new_protected = compute_protected_grid(size, owners)
                 next_state["protected"] = new_protected
 
-                new_scores = compute_board_scores(size, values, owners)
+                new_scores = apply_penalties(compute_board_scores(size, values, owners), penalties)
                 for pid in turn_order:
                     new_scores.setdefault(pid, 0)
                 next_state["player_scores"] = new_scores
@@ -399,6 +429,7 @@ class SilbenstreitGame:
                     "positions": pos_dicts,
                     "word_points": word_tile_value,
                     "points_delta": actor_delta,
+                    "penalty": penalty,
                     "move_number": move_number,
                 }
                 played_words.append(move_entry)
@@ -422,6 +453,7 @@ class SilbenstreitGame:
                             "positions": pos_dicts,
                             "word_points": word_tile_value,
                             "points_delta": actor_delta,
+                            "penalty": penalty,
                             "next_player_id": next_state["current_player_id"],
                         }
                     ],

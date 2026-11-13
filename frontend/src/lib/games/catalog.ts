@@ -70,11 +70,11 @@ export const GAMES: GameInfo[] = [
 		title: 'Silbenstreit',
 		tagline: 'Claim letter tiles with words, steal, and protect your territory.',
 		description:
-			'A 2–4 player word strategy on a 4×4 to 8×8 letter grid. Form valid words in German, English, French, or Spanish to claim letters, score rarity points, and surround your tiles so they cannot be stolen.',
-		playersLabel: '2–4',
-		playersAria: '2 to 4 players',
+			'A 1–4 player word strategy on a 4×4 to 8×8 letter grid. Form valid words in German, English, French, or Spanish to claim letters, score rarity points, and surround your tiles so they cannot be stolen. Play solo to fill the board on your own: reusing your own protected letters costs their points.',
+		playersLabel: '1–4',
+		playersAria: '1 to 4 players',
 		boxSeed: 39,
-		defaultConfig: { size: 5, language: 'de', scoring_enabled: true },
+		defaultConfig: { size: 5, language: 'de', scoring_enabled: true, solo: false },
 		createLabel: 'New Silbenstreit →'
 	},
 	{

@@ -27,6 +27,7 @@ from games_platform.core.protocol import (
     StartGameMessage,
     UpdateConfigMessage,
     is_bot_id,
+    is_solo_room,
 )
 from games_platform.core.push import WebPushService, format_turn_notification
 
@@ -37,6 +38,9 @@ MULTIPLIER_WINDOW_SECONDS = 10.0
 MULTIPLIER_FACTOR = 1.1
 # Bots act once the game state has been quiet (no human action) for this long.
 BOT_DEBOUNCE_SECONDS = 3.0
+
+
+SOLO_ROOM_MESSAGE = "This is a solo game. It cannot be joined."
 
 
 def generate_room_id(length: int = 6) -> str:
@@ -696,6 +700,15 @@ class RoomManager:
                     old_player_id = conn.player_id
                     existing_players = await self.db.get_room_players(room_id)
                     was_existing = any(p["player_id"] == msg.player_id for p in existing_players)
+                    if (
+                        is_solo_room(room["config"])
+                        and not was_existing
+                        and msg.player_id != room["host_player_id"]
+                    ):
+                        await conn.websocket.send_json(
+                            {"type": "error", "message": SOLO_ROOM_MESSAGE}
+                        )
+                        return
                     conn.player_id = msg.player_id
                     await self.db.upsert_room_player(
                         room_id=room_id,
@@ -734,6 +747,20 @@ class RoomManager:
                         return
                     merged = {**room["config"], **msg.config}
                     validated = game.validate_config(merged)
+                    if is_solo_room(validated) and not is_solo_room(room["config"]):
+                        players_rows = await self.db.get_room_players(room_id)
+                        if any(
+                            p["player_id"] != room["host_player_id"]
+                            and not is_bot_id(p["player_id"])
+                            for p in players_rows
+                        ):
+                            await conn.websocket.send_json(
+                                {
+                                    "type": "error",
+                                    "message": "Remove the other players before switching to solo.",
+                                }
+                            )
+                            return
                     await self.db.update_room(room_id, config=validated)
                     await self._sync_bot_players(room_id, game, validated)
                     await self.broadcast_room_state(room_id)

@@ -43,6 +43,8 @@
 	let room = $derived(client.room);
 	let players = $derived<PlayerInfo[]>(room?.players ?? []);
 	let isHost = $derived(room?.host_player_id === profile.playerId);
+	// Solo rooms (config `solo`) are closed to other players, so there is nobody to invite.
+	let isSolo = $derived(Boolean(room?.config?.solo));
 
 	// Friend status of co-players (for "Add friend"); reload when players or sign-in change.
 	let playerKey = $derived(players.map((p) => p.player_id).join(','));
@@ -148,7 +150,7 @@
 		</div>
 
 		<div class="flex items-center gap-2">
-			{#if auth.user}
+			{#if auth.user && !isSolo}
 				<button
 					type="button"
 					onclick={() => (inviteOpen = true)}

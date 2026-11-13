@@ -22,6 +22,8 @@
 		positions: TileCoord[];
 		word_points: number;
 		points_delta: number;
+		/** Solo only: value of own protected tiles reused by this word. */
+		penalty?: number;
 		move_number: number;
 	}
 
@@ -42,6 +44,8 @@
 		current_player_id?: string | null;
 		played_words?: PlayedWordEntry[];
 		player_scores?: Record<string, number>;
+		solo?: boolean;
+		penalties?: Record<string, number>;
 		unowned_count?: number;
 		total_tiles?: number;
 		consecutive_passes?: number;
@@ -74,6 +78,9 @@
 	let cfgSize = $derived(Number(room?.config?.size ?? 5));
 	let cfgLanguage = $derived(String(room?.config?.language ?? 'de'));
 	let cfgScoring = $derived(Boolean(room?.config?.scoring_enabled ?? true));
+	let cfgSolo = $derived(Boolean(room?.config?.solo ?? false));
+	// Solo can only be switched on while the host is alone in the room.
+	let canSwitchToSolo = $derived(players.filter((p) => !p.is_bot).length <= 1);
 
 	// Playing board derived values
 	let boardSize = $derived(gameState.size ?? cfgSize);
@@ -84,6 +91,8 @@
 	let protectedGrid = $derived(gameState.protected ?? []);
 	let playedWords = $derived<PlayedWordEntry[]>(gameState.played_words ?? []);
 	let currentPlayerId = $derived(gameState.current_player_id ?? null);
+	let isSolo = $derived(gameState.solo ?? cfgSolo);
+	let myPenalty = $derived(gameState.penalties?.[profile.playerId] ?? 0);
 	let isMyTurn = $derived(room?.status === 'playing' && currentPlayerId === profile.playerId);
 	let turnNotificationHint = $derived.by(() => {
 		const last = gameState.last_move;
@@ -106,6 +115,18 @@
 	);
 	let composedPoints = $derived(
 		selectedTiles.reduce((sum, pos) => sum + (values[pos.row]?.[pos.col] ?? 0), 0)
+	);
+	// Solo: reusing your own protected tiles costs their value.
+	let composedPenalty = $derived(
+		isSolo
+			? selectedTiles.reduce(
+					(sum, { row, col }) =>
+						protectedGrid[row]?.[col] && owners[row]?.[col] === profile.playerId
+							? sum + (values[row]?.[col] ?? 0)
+							: sum,
+					0
+				)
+			: 0
 	);
 	// A word is blocked if it was already played or is part of a played word ("RUN" after "RUNNER").
 	let composedBlockingWord = $derived.by(() => {
@@ -131,6 +152,7 @@
 			scores[me] = (scores[me] ?? 0) + value;
 			if (owner) scores[owner] = (scores[owner] ?? 0) - value;
 		}
+		scores[me] = (scores[me] ?? 0) - composedPenalty;
 		return scores;
 	});
 
@@ -186,6 +208,11 @@
 	function updateScoring(scoring_enabled: boolean) {
 		if (!isHost) return;
 		client.updateConfig({ scoring_enabled });
+	}
+
+	function updateSolo(solo: boolean) {
+		if (!isHost || (solo && !canSwitchToSolo)) return;
+		client.updateConfig({ solo });
 	}
 
 	function toggleTile(row: number, col: number) {
@@ -360,7 +387,11 @@
 	{client}
 	{roomId}
 	title="Silbenstreit"
-	subtitleItems={[`${boardSize}×${boardSize}`, boardLang.toUpperCase()]}
+	subtitleItems={[
+		`${boardSize}×${boardSize}`,
+		boardLang.toUpperCase(),
+		...(isSolo ? ['Solo'] : [])
+	]}
 >
 	{#snippet headerActions()}
 		<TurnNotificationBell
@@ -423,6 +454,34 @@
 				</div>
 			</div>
 
+			<!-- Solo Toggle -->
+			<div class="flex items-center justify-between border-t border-[#1a1917]/15 pt-3">
+				<div>
+					<div class="text-xs font-semibold uppercase">Solo</div>
+					<div class="text-xs text-[#6e6a63]">
+						{#if cfgSolo}
+							Nobody else can join. Reusing your own protected letters costs their points.
+						{:else if isHost && !canSwitchToSolo}
+							Only possible while you are alone in the room.
+						{:else}
+							Fill the board on your own; nobody else can join.
+						{/if}
+					</div>
+				</div>
+				<button
+					type="button"
+					data-testid="silben-solo-toggle"
+					aria-label="Solo mode"
+					aria-pressed={cfgSolo}
+					disabled={!isHost || (!cfgSolo && !canSwitchToSolo)}
+					onclick={() => updateSolo(!cfgSolo)}
+					class="cursor-pointer rounded border border-[#1a1917] px-3 py-1 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-50
+					{cfgSolo ? 'bg-[#1a1917] text-[#faf8f4]' : 'bg-[#faf8f4] text-[#6e6a63]'}"
+				>
+					{cfgSolo ? 'On' : 'Off'}
+				</button>
+			</div>
+
 			<!-- Scoring Toggle -->
 			<div class="flex items-center justify-between border-t border-[#1a1917]/15 pt-3">
 				<div>
@@ -462,7 +521,14 @@
 		{#if room?.status === 'finished'}
 			<ScribblyBox seed={59} class="bg-[#faf8f4] p-4 text-center">
 				<div class="font-hand text-xl">
-					{#if winners.length === 1}
+					{#if isSolo}
+						{gameState.unowned_count === 0 ? 'Board filled!' : 'Game over!'}
+						{#if cfgScoring}
+							You scored {players.find((p) => p.player_id === profile.playerId)?.score ?? 0} pts{myPenalty
+								? ` (−${myPenalty} penalty)`
+								: ''}.
+						{/if}
+					{:else if winners.length === 1}
 						{winners[0].name} wins ({winners[0].score} pts)!
 					{:else if winners.length > 1}
 						It's a tie! ({winners.map((w) => w.name).join(' & ')} — {winners[0].score} pts)
@@ -579,6 +645,11 @@
 							<span class="font-mono-num ml-1 text-xs text-[#6e6a63]">
 								{composedPoints} pts
 							</span>
+							{#if composedPenalty > 0}
+								<span class="font-mono-num text-xs font-medium text-[#dc2626]">
+									−{composedPenalty} penalty
+								</span>
+							{/if}
 						</div>
 
 						<button
@@ -611,9 +682,11 @@
 					<ScribblyButton
 						onclick={passTurn}
 						disabled={!isMyTurn || selectedTiles.length > 0}
-						title="Pass turn if no valid word can be formed"
+						title={isSolo
+							? 'End the game if no more words can be found'
+							: 'Pass turn if no valid word can be formed'}
 					>
-						Pass Turn
+						{isSolo ? 'End Game' : 'Pass Turn'}
 					</ScribblyButton>
 
 					<ScribblyButton
