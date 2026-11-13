@@ -16,24 +16,47 @@ CLUES_BY_DIFFICULTY: dict[Difficulty, int] = {
 }
 
 
-def _pattern(r: int, c: int) -> int:
-    return (3 * (r % 3) + r // 3 + c) % 9
-
-
-def _shuffled(seq: list[int], rng: random.Random) -> list[int]:
-    copy = list(seq)
-    rng.shuffle(copy)
-    return copy
-
-
 def generate_solved_grid(rng: random.Random | None = None) -> Grid:
-    """Generate a valid full 9x9 Sudoku solution grid."""
+    """Generate a uniformly varied, valid full 9x9 Sudoku solution grid.
+
+    Uses a randomized backtracking fill (MRV, shuffled candidates) rather than a
+    fixed base pattern, so rows are not shifted copies of each other.
+    """
     r_gen = rng or random.Random()
-    r_base = [0, 1, 2]
-    rows = [g * 3 + r for g in _shuffled(r_base, r_gen) for r in _shuffled(r_base, r_gen)]
-    cols = [g * 3 + c for g in _shuffled(r_base, r_gen) for c in _shuffled(r_base, r_gen)]
-    nums = _shuffled(list(range(1, 10)), r_gen)
-    return [[nums[_pattern(r, c)] for c in cols] for r in rows]
+    grid: Grid = [[0] * 9 for _ in range(9)]
+
+    # The three diagonal boxes are independent of each other: fill them directly.
+    for b in range(3):
+        digits = list(range(1, 10))
+        r_gen.shuffle(digits)
+        for i, d in enumerate(digits):
+            grid[b * 3 + i // 3][b * 3 + i % 3] = d
+
+    def fill() -> bool:
+        best: tuple[int, int] | None = None
+        best_cands: list[int] = []
+        for r in range(9):
+            for c in range(9):
+                if grid[r][c] == 0:
+                    cands = get_candidates(grid, r, c)
+                    if not cands:
+                        return False
+                    if best is None or len(cands) < len(best_cands):
+                        best, best_cands = (r, c), list(cands)
+        if best is None:
+            return True
+        r, c = best
+        r_gen.shuffle(best_cands)
+        for d in best_cands:
+            grid[r][c] = d
+            if fill():
+                return True
+        grid[r][c] = 0
+        return False
+
+    if not fill():  # pragma: no cover - diagonal boxes always extend to a full grid
+        raise RuntimeError("Failed to generate a Sudoku solution grid")
+    return grid
 
 
 def get_candidates(grid: Grid, row: int, col: int) -> set[int]:

@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import random
 from datetime import UTC, datetime, timedelta
 
 from games_platform.core.room_manager import compute_effective_multiplier
 from games_platform.games.sudoku.game import SudokuGame
-from games_platform.games.sudoku.generator import count_solutions, generate_sudoku_puzzle
+from games_platform.games.sudoku.generator import (
+    count_solutions,
+    generate_solved_grid,
+    generate_sudoku_puzzle,
+)
 
 
 def test_sudoku_generator_produces_unique_solution() -> None:
@@ -20,6 +25,37 @@ def test_sudoku_generator_produces_unique_solution() -> None:
         for c in range(9):
             if givens[r][c] != 0:
                 assert givens[r][c] == solution[r][c]
+
+
+def _is_valid_solution(grid: list[list[int]]) -> bool:
+    digits = set(range(1, 10))
+    rows = all(set(row) == digits for row in grid)
+    cols = all({grid[r][c] for r in range(9)} == digits for c in range(9))
+    boxes = all(
+        {grid[br + r][bc + c] for r in range(3) for c in range(3)} == digits
+        for br in (0, 3, 6)
+        for bc in (0, 3, 6)
+    )
+    return rows and cols and boxes
+
+
+def _is_pattern_grid(grid: list[list[int]]) -> bool:
+    """True if every row in each band is a cyclic shift of the band's first row."""
+    for band in (0, 3, 6):
+        first = grid[band]
+        rotations = [first[k:] + first[:k] for k in range(9)]
+        if not all(grid[band + i] in rotations for i in (1, 2)):
+            return False
+    return True
+
+
+def test_solved_grids_are_valid_and_not_shifted_rows() -> None:
+    rng = random.Random(7)
+    grids = [generate_solved_grid(rng) for _ in range(30)]
+    assert all(_is_valid_solution(g) for g in grids)
+    # A randomized fill should essentially never produce the old shifted-row structure.
+    assert sum(_is_pattern_grid(g) for g in grids) <= 1
+    assert len({tuple(map(tuple, g)) for g in grids}) == 30
 
 
 def test_sudoku_notes_and_moves_and_scoring() -> None:
