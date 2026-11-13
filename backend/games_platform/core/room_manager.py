@@ -609,8 +609,9 @@ class RoomManager:
     async def _add_midgame_player(self, room: dict[str, Any], player_id: str) -> None:
         """Append a player joining a running game to ``turn_order``.
 
-        If the game was being played alone (one player in ``turn_order``) and the game sets
-        ``solo_turn_goes_to_joiner``, the joiner gets the turn right away. The optional hook
+        If the game was being played alone (one player in ``turn_order``), the solo player
+        has already moved (``move_count > 0``) and the game sets ``solo_turn_goes_to_joiner``,
+        the joiner gets the turn right away; before the first move the opener keeps it. The optional hook
         ``on_player_joined`` then fixes up game state (deal cards, restart a turn clock).
         """
         state = room["state"]
@@ -622,9 +623,10 @@ class RoomManager:
         game = self.get_game(room["game_slug"])
         state = dict(state)
         was_solo = len(turn_order) == 1
+        has_moved = int(state.get("move_count") or 0) > 0
         turn_order.append(player_id)
         state["turn_order"] = turn_order
-        if was_solo and getattr(game, "solo_turn_goes_to_joiner", False):
+        if was_solo and has_moved and getattr(game, "solo_turn_goes_to_joiner", False):
             state["current_player_id"] = player_id
             state["current_turn_index"] = turn_order.index(player_id)
         elif not state.get("current_player_id"):

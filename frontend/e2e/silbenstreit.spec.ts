@@ -74,30 +74,29 @@ test('multiplayer from the lobby: both ready, host starts, two words each', asyn
 	await expectWaiting(b);
 });
 
-test('joining a game started alone: the joiner moves first, then turns alternate', async ({
+test('joining a game started alone before any move: the host keeps the opening move', async ({
 	browser
 }) => {
 	const a = await newPlayer(browser, 'Alice');
 	const b = await newPlayer(browser, 'Bob');
 	const url = await createRoom(a, 'silbenstreit', 'New Silbenstreit →');
 	await startGame(a);
-	await expectMyTurn(a);
 
-	// A solo game hands the turn to whoever joins (`solo_turn_goes_to_joiner`).
+	// The joiner only takes the turn once the solo player has moved.
 	await b.goto(url);
-	await expectWaiting(a);
+	await expectWaiting(b);
 
-	await playRow(b, 0, 0);
-	await expectPlayed(a, 1, ROWS[0]);
-	await playRow(a, 1, 1);
-	await expectPlayed(b, 2, ROWS[1]);
-	await playRow(b, 2, 2);
-	await expectPlayed(a, 3, ROWS[2]);
-	await playRow(a, 3, 3);
-	await expectPlayed(b, 4, ROWS[3]);
+	await playRow(a, 0, 0);
+	await expectPlayed(b, 1, ROWS[0]);
+	await playRow(b, 1, 1);
+	await expectPlayed(a, 2, ROWS[1]);
+	await playRow(a, 2, 2);
+	await expectPlayed(b, 3, ROWS[2]);
+	await playRow(b, 3, 3);
+	await expectPlayed(a, 4, ROWS[3]);
 });
 
-test('joining after the host already moved: turns alternate from the joiner', async ({
+test('joining after the host already moved: the joiner takes the turn', async ({
 	browser
 }) => {
 	const a = await newPlayer(browser, 'Alice');

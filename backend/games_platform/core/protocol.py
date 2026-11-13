@@ -74,7 +74,8 @@ class GameDefinition(Protocol):
 #
 # solo_turn_goes_to_joiner: bool
 #     Turn-based games: when someone joins a running game that was played alone (one
-#     player in turn_order), the joiner gets the turn right away.
+#     player in turn_order) and that player has already moved (state["move_count"] > 0),
+#     the joiner gets the turn right away. Before the first move the opener keeps it.
 #
 # def on_player_joined(self, state, config, player_id: str) -> dict[str, Any]
 #     Adjust game state after a player joined mid-game (after the shared turn_order

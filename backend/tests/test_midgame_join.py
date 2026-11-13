@@ -1,4 +1,4 @@
-"""A player joining a game that is being played alone gets the turn right away."""
+"""A player joining a game played alone gets the turn once the solo player has moved."""
 
 from __future__ import annotations
 
@@ -17,8 +17,13 @@ def _receive_state(ws) -> dict:
             return msg
 
 
-def _start_solo_and_join(game_slug: str, config: dict, extra_peer: bool = False) -> list[dict]:
-    """Host starts alone, then peers join; returns the game state after each join."""
+def _start_solo_and_join(
+    game_slug: str,
+    config: dict,
+    extra_peer: bool = False,
+    host_passes: bool = True,
+) -> list[dict]:
+    """Host starts alone (and passes once), then peers join; returns the state after each join."""
     app = create_app(database=Database())
     states: list[dict] = []
     with TestClient(app) as client:
@@ -38,6 +43,9 @@ def _start_solo_and_join(game_slug: str, config: dict, extra_peer: bool = False)
             ws1.send_json({"type": "start_game"})
             started = _receive_state(ws1)
             assert started["state"]["current_player_id"] == "host_1"
+            if host_passes:
+                ws1.send_json({"type": "game_action", "action": {"type": "pass_turn"}})
+                assert _receive_state(ws1)["state"]["move_count"] == 1
             with client.websocket_connect(f"{url}&player_id=peer_2&name=Bob") as ws2:
                 states.append(_receive_state(ws2)["state"])
                 if extra_peer:
@@ -53,6 +61,15 @@ def test_joiner_of_solo_silbenstreit_gets_the_turn() -> None:
     assert state["current_turn_index"] == 1
 
 
+def test_joiner_waits_while_the_solo_player_has_not_moved() -> None:
+    (state,) = _start_solo_and_join(
+        "silbenstreit", {"size": 5, "language": "de"}, host_passes=False
+    )
+    assert state["turn_order"] == ["host_1", "peer_2"]
+    assert state["current_player_id"] == "host_1"
+    assert state["current_turn_index"] == 0
+
+
 def test_third_player_does_not_take_the_turn() -> None:
     _, state = _start_solo_and_join("spellsprawl", {}, extra_peer=True)
     assert state["turn_order"] == ["host_1", "peer_2", "peer_3"]
@@ -60,7 +77,7 @@ def test_third_player_does_not_take_the_turn() -> None:
 
 
 def test_emoji_charades_keeps_its_explainer() -> None:
-    (state,) = _start_solo_and_join("emoji-charades", {})
+    (state,) = _start_solo_and_join("emoji-charades", {}, host_passes=False)
     assert state["current_player_id"] == "host_1"
 
 
