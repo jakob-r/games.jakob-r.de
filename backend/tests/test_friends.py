@@ -444,3 +444,33 @@ def test_turn_mail_waits_and_is_sent_once(client: TestClient, mails: list[dict])
     assert f"/sudoku/{room_id}" in mails[-1]["body"]
 
     client.delete(f"/api/rooms/{room_id}?player_id={pid}")
+
+
+def test_full_rooms_are_not_listed_and_cannot_be_invited_to(client: TestClient) -> None:
+    acc = Accounts(client)
+    alice = acc.register("alice", "Alice")
+    bob = acc.register("bob", "Bob")
+    met = _room_with(client, alice["player_id"], bob["player_id"])
+    _befriend(acc, "alice", "bob", met)
+
+    # A solo Silbenstreit game has one seat, taken by its host.
+    solo = client.post(
+        "/api/rooms",
+        json={
+            "game_slug": "silbenstreit",
+            "host_player_id": alice["player_id"],
+            "host_name": "Alice",
+            "host_color": "#2563eb",
+            "config": {"solo": True},
+        },
+    ).json()
+    assert solo["max_players"] == 1
+    lobbies = acc.act_as("bob").get("/api/friends/lobbies").json()["lobbies"]
+    assert [lb["room_id"] for lb in lobbies] == [met]
+    res = acc.act_as("alice").post(
+        "/api/friends/invites", json={"room_id": solo["room_id"], "user_ids": [bob["id"]]}
+    )
+    assert res.status_code == 400
+
+    for rid in (met, solo["room_id"]):
+        client.delete(f"/api/rooms/{rid}?player_id={alice['player_id']}")

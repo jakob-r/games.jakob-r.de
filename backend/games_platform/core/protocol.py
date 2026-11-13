@@ -102,9 +102,16 @@ def is_bot_id(player_id: str) -> bool:
     return player_id.startswith(BOT_ID_PREFIX)
 
 
-def is_solo_room(config: dict[str, Any] | None) -> bool:
-    """A room whose config has ``solo: true`` is closed to everyone but the host."""
-    return bool((config or {}).get("solo"))
+def seat_limit(game: object, config: dict[str, Any]) -> int | None:
+    """Human seats from the optional game hook ``max_players(config)``; None = no limit."""
+    hook = getattr(game, "max_players", None)
+    return None if hook is None else int(hook(config))
+
+
+def is_room_full(game: object, config: dict[str, Any], player_ids: list[str]) -> bool:
+    """A full room cannot be joined; players already in it can always come back."""
+    limit = seat_limit(game, config)
+    return limit is not None and sum(1 for p in player_ids if not is_bot_id(p)) >= limit
 
 
 # --- Client -> Server WebSocket Messages ---

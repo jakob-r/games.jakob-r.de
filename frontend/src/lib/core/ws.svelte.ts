@@ -19,6 +19,8 @@ export interface RoomStateSnapshot<TState = Record<string, unknown>> {
 	game_slug: string;
 	status: 'lobby' | 'playing' | 'finished';
 	host_player_id: string;
+	/** Human seats (game hook `max_players`); null = no limit. A full room cannot be joined. */
+	max_players?: number | null;
 	config: Record<string, unknown>;
 	state: TState;
 	players: PlayerInfo[];
@@ -294,7 +296,7 @@ export class RoomSocketClient {
 				if (ev.code === 4004) {
 					this.error = 'Room not found.';
 				} else if (ev.code === 4005) {
-					this.error = 'This is a solo game. It cannot be joined.';
+					this.error = 'This game is full. It cannot be joined.';
 				} else if (ev.code === 4003 && !this.error) {
 					this.error = 'You were removed from this room by the host.';
 				}

@@ -299,7 +299,7 @@ test('rejected words: unknown words and parts of played words are refused', asyn
 	await expect(a.getByRole('button', { name: 'Submit Word' })).toBeDisabled();
 });
 
-test('solo: nobody can join, ending the game shows the score', async ({ browser }) => {
+test('solo: the game is full, nobody can join, ending the game shows the score', async ({ browser }) => {
 	const a = await newPlayer(browser, 'Alice');
 	const url = await createRoom(a, 'silbenstreit', 'New Silbenstreit →');
 	await a.getByTestId('silben-solo-toggle').click();
@@ -307,7 +307,7 @@ test('solo: nobody can join, ending the game shows the score', async ({ browser 
 
 	const b = await newPlayer(browser, 'Bob');
 	await b.goto(url);
-	await expect(b.getByText('This is a solo game. It cannot be joined.')).toBeVisible();
+	await expect(b.getByText('This game is full. It cannot be joined.')).toBeVisible();
 	await expect(a.getByText('Players (1)')).toBeVisible();
 
 	await startGame(a);

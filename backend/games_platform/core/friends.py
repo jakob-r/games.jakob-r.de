@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from games_platform.core.auth import SESSION_COOKIE, AuthService
 from games_platform.core.auth_api import RateLimiter
 from games_platform.core.db import Database
-from games_platform.core.protocol import is_solo_room
+from games_platform.core.protocol import BOT_ID_PREFIX
 from games_platform.core.push import WebPushService, format_invite_notification
 
 logger = logging.getLogger(__name__)
@@ -65,13 +65,19 @@ class FriendService:
         *,
         push: WebPushService | None = None,
         game_title: Callable[[str], str] = lambda slug: slug,
+        seat_limit: Callable[[str, dict[str, Any]], int | None] = lambda slug, config: None,
         mailer: Any = None,
     ) -> None:
+        self.seat_limit = seat_limit
         self.db = database
         self.push = push
         self.mailer = mailer
         self.game_title = game_title
         self._tasks: set[asyncio.Task[Any]] = set()
+
+    def _is_full(self, game_slug: str, config: dict[str, Any], humans: int) -> bool:
+        limit = self.seat_limit(game_slug, config)
+        return limit is not None and humans >= limit
 
     async def flush(self) -> None:
         """Wait for invite pushes in flight (tests)."""
@@ -236,17 +242,20 @@ class FriendService:
         async with self.db.connection() as conn, conn.cursor() as cur:
             await cur.execute(
                 """
-                SELECT r.game_slug, r.config FROM rooms r
+                SELECT r.game_slug, r.config,
+                       (SELECT COUNT(*) FROM room_players h
+                        WHERE h.room_id = r.id AND h.player_id NOT LIKE %s) AS humans
+                FROM rooms r
                 JOIN room_players rp ON rp.room_id = r.id AND rp.player_id = %s
                 WHERE r.id = %s
                 """,
-                (user["player_id"], room_id),
+                (f"{BOT_ID_PREFIX}%", user["player_id"], room_id),
             )
             room = await cur.fetchone()
             if room is None:
                 raise FriendError(404, "You are not in this room")
-            if is_solo_room(room["config"]):
-                raise FriendError(400, "Solo games cannot be joined.")
+            if self._is_full(room["game_slug"], room["config"], int(room["humans"])):
+                raise FriendError(400, "This game is full.")
             await cur.execute(
                 """
                 SELECT COUNT(*) AS n FROM room_invites
@@ -359,8 +368,10 @@ class FriendService:
             labels = await self._labels(cur, user["id"], user["display_name"])
             await cur.execute(
                 """
-                SELECT r.id AS room_id, r.game_slug, u.id AS host_id, u.color,
+                SELECT r.id AS room_id, r.game_slug, r.config, u.id AS host_id, u.color,
                        (SELECT COUNT(*) FROM room_players rp WHERE rp.room_id = r.id) AS players,
+                       (SELECT COUNT(*) FROM room_players rp
+                        WHERE rp.room_id = r.id AND rp.player_id NOT LIKE %(bot)s) AS humans,
                        EXISTS (
                            SELECT 1 FROM room_players rp
                            WHERE rp.room_id = r.id AND rp.player_id = %(pid)s
@@ -369,9 +380,8 @@ class FriendService:
                 JOIN users u ON u.player_id = r.host_player_id
                 JOIN friendships f ON f.user_id = %(me)s AND f.friend_id = u.id
                 WHERE r.status = 'lobby'
-                  AND NOT COALESCE((r.config->>'solo')::boolean, false)
                 """,
-                {"me": user["id"], "pid": user["player_id"]},
+                {"me": user["id"], "pid": user["player_id"], "bot": f"{BOT_ID_PREFIX}%"},
             )
             rows = await cur.fetchall()
         lobbies = [
@@ -388,6 +398,7 @@ class FriendService:
             }
             for r in rows
             if int(r["host_id"]) in labels
+            and (r["joined"] or not self._is_full(r["game_slug"], r["config"], int(r["humans"])))
         ]
         # Stable order without any notion of recency.
         lobbies.sort(

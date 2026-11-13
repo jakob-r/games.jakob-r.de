@@ -7,6 +7,7 @@ from collections import Counter
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from games_platform.core.db import Database
 from games_platform.games.silbenstreit.dictionary import (
@@ -421,8 +422,6 @@ def test_solo_pass_ends_the_game() -> None:
 
 
 def test_solo_room_cannot_be_joined() -> None:
-    from starlette.websockets import WebSocketDisconnect
-
     app = create_app(database=Database())
     with TestClient(app) as client:
         room_id = client.post(
@@ -477,3 +476,34 @@ def test_switching_to_solo_needs_an_empty_room() -> None:
             err = ws1.receive_json()
             assert err["type"] == "error"
             assert client.get(f"/api/rooms/{room_id}").json()["config"]["solo"] is False
+
+
+def test_a_full_room_cannot_be_joined() -> None:
+    app = create_app(database=Database())
+    with TestClient(app) as client:
+        room = client.post(
+            "/api/rooms",
+            json={
+                "game_slug": "silbenstreit",
+                "host_player_id": "full_host",
+                "host_name": "Anna",
+                "host_color": "#2563eb",
+                "config": {"size": 4, "language": "de"},
+            },
+        ).json()
+        assert room["max_players"] == 4
+        room_id = room["room_id"]
+        for pid in ("full_2", "full_3", "full_4"):
+            with client.websocket_connect(f"/ws/silbenstreit/{room_id}?player_id={pid}") as ws:
+                ws.receive_json()
+
+        with (
+            pytest.raises(WebSocketDisconnect) as exc,
+            client.websocket_connect(f"/ws/silbenstreit/{room_id}?player_id=full_5") as ws,
+        ):
+            ws.receive_json()
+        assert exc.value.code == 4005
+
+        # Players already in the room can always come back.
+        with client.websocket_connect(f"/ws/silbenstreit/{room_id}?player_id=full_4") as ws:
+            assert len(ws.receive_json()["players"]) == 4

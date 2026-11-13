@@ -43,8 +43,11 @@
 	let room = $derived(client.room);
 	let players = $derived<PlayerInfo[]>(room?.players ?? []);
 	let isHost = $derived(room?.host_player_id === profile.playerId);
-	// Solo rooms (config `solo`) are closed to other players, so there is nobody to invite.
-	let isSolo = $derived(Boolean(room?.config?.solo));
+	// A full room (e.g. a solo game) cannot be joined, so there is nobody to invite.
+	let isFull = $derived(
+		room?.max_players != null &&
+			players.filter((p) => !p.is_bot).length >= room.max_players
+	);
 
 	// Friend status of co-players (for "Add friend"); reload when players or sign-in change.
 	let playerKey = $derived(players.map((p) => p.player_id).join(','));
@@ -150,7 +153,7 @@
 		</div>
 
 		<div class="flex items-center gap-2">
-			{#if auth.user && !isSolo}
+			{#if auth.user && !isFull}
 				<button
 					type="button"
 					onclick={() => (inviteOpen = true)}

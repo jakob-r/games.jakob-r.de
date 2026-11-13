@@ -27,7 +27,8 @@ from games_platform.core.protocol import (
     StartGameMessage,
     UpdateConfigMessage,
     is_bot_id,
-    is_solo_room,
+    is_room_full,
+    seat_limit,
 )
 from games_platform.core.push import WebPushService, format_turn_notification
 
@@ -40,7 +41,7 @@ MULTIPLIER_FACTOR = 1.1
 BOT_DEBOUNCE_SECONDS = 3.0
 
 
-SOLO_ROOM_MESSAGE = "This is a solo game. It cannot be joined."
+ROOM_FULL_MESSAGE = "This game is full. It cannot be joined."
 
 
 def generate_room_id(length: int = 6) -> str:
@@ -533,6 +534,7 @@ class RoomManager:
             "room_id": room["id"],
             "game_slug": room["game_slug"],
             "status": room["status"],
+            "max_players": seat_limit(game, room["config"]),
             "host_player_id": room["host_player_id"],
             "config": room["config"],
             "state": {},
@@ -700,13 +702,11 @@ class RoomManager:
                     old_player_id = conn.player_id
                     existing_players = await self.db.get_room_players(room_id)
                     was_existing = any(p["player_id"] == msg.player_id for p in existing_players)
-                    if (
-                        is_solo_room(room["config"])
-                        and not was_existing
-                        and msg.player_id != room["host_player_id"]
+                    if not was_existing and is_room_full(
+                        game, room["config"], [p["player_id"] for p in existing_players]
                     ):
                         await conn.websocket.send_json(
-                            {"type": "error", "message": SOLO_ROOM_MESSAGE}
+                            {"type": "error", "message": ROOM_FULL_MESSAGE}
                         )
                         return
                     conn.player_id = msg.player_id
@@ -747,17 +747,15 @@ class RoomManager:
                         return
                     merged = {**room["config"], **msg.config}
                     validated = game.validate_config(merged)
-                    if is_solo_room(validated) and not is_solo_room(room["config"]):
+                    limit = seat_limit(game, validated)
+                    if limit is not None:
                         players_rows = await self.db.get_room_players(room_id)
-                        if any(
-                            p["player_id"] != room["host_player_id"]
-                            and not is_bot_id(p["player_id"])
-                            for p in players_rows
-                        ):
+                        humans = sum(1 for p in players_rows if not is_bot_id(p["player_id"]))
+                        if humans > limit:
                             await conn.websocket.send_json(
                                 {
                                     "type": "error",
-                                    "message": "Remove the other players before switching to solo.",
+                                    "message": "Too many players in the room for these settings.",
                                 }
                             )
                             return

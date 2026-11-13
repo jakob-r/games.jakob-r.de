@@ -132,6 +132,10 @@ class SilbenstreitGame:
             "solo": False,
         }
 
+    def max_players(self, config: dict[str, Any]) -> int:
+        """Seats in a room; solo games are full with the host alone."""
+        return 1 if config.get("solo") else MAX_PLAYERS
+
     def validate_config(self, raw_config: dict[str, Any]) -> dict[str, Any]:
         try:
             size = int(raw_config.get("size", DEFAULT_SIZE))
@@ -149,7 +153,7 @@ class SilbenstreitGame:
             "size": size,
             "language": language,
             "scoring_enabled": bool(raw_config.get("scoring_enabled", True)),
-            # Solo rooms are closed to other players (platform convention, see RoomManager).
+            # Solo: one seat (see max_players), so nobody else can join.
             "solo": bool(raw_config.get("solo", False)),
         }
 

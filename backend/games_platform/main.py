@@ -27,7 +27,8 @@ from games_platform.core.protocol import (
     GameDefinition,
     PushSubscribeRequest,
     is_bot_id,
-    is_solo_room,
+    is_room_full,
+    seat_limit,
 )
 from games_platform.core.push import (
     MAX_PUSH_SUBSCRIPTIONS_PER_PLAYER,
@@ -133,10 +134,17 @@ def create_app(
     def _game_title(slug: str) -> str:
         return manager.games[slug].title if slug in manager.games else slug
 
+    def _seat_limit(slug: str, config: dict[str, Any]) -> int | None:
+        return seat_limit(manager.games[slug], config) if slug in manager.games else None
+
     mailer = NotificationMailer(active_db, auth_service, game_title=_game_title)
     manager.mailer = mailer
     friend_service = FriendService(
-        active_db, push=manager.push, game_title=_game_title, mailer=mailer
+        active_db,
+        push=manager.push,
+        game_title=_game_title,
+        seat_limit=_seat_limit,
+        mailer=mailer,
     )
 
     async def _turn_mail_loop() -> None:
@@ -426,11 +434,12 @@ def create_app(
         if is_bot_id(player_id):
             await refuse(4003, "Reserved player id")
             return
-        if is_solo_room(room["config"]) and player_id != room["host_player_id"]:
-            room_players = await active_db.get_room_players(room_id)
-            if not any(p["player_id"] == player_id for p in room_players):
-                await refuse(4005, "Solo game")
-                return
+        room_player_ids = [p["player_id"] for p in await active_db.get_room_players(room_id)]
+        if player_id not in room_player_ids and is_room_full(
+            manager.get_game(game_slug), room["config"], room_player_ids
+        ):
+            await refuse(4005, "Room full")
+            return
 
         conn = await manager.connect(
             websocket=websocket,
