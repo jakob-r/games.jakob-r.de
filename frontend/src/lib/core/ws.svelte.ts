@@ -180,6 +180,29 @@ export type ServerEvent =
 			col: number | null;
 	  }
 	| {
+			type: 'clue_placed';
+			player_id: string;
+			row: number;
+			col: number;
+			value: number;
+			solutions: number;
+			points: number;
+			next_player_id: string | null;
+	  }
+	| {
+			type: 'clue_rejected';
+			player_id: string;
+			reason: string;
+			row?: number;
+			col?: number;
+			value?: number;
+			penalty?: number;
+	  }
+	| {
+			type: 'gave_up';
+			player_id: string;
+	  }
+	| {
 			type: 'room_deleted';
 			room_id: string;
 	  }

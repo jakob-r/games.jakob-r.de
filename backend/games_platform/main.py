@@ -44,6 +44,7 @@ from games_platform.games.north_south_sort.game import north_south_sort_game
 from games_platform.games.silbenstreit.game import silbenstreit_game
 from games_platform.games.spellsprawl.game import spellsprawl_game
 from games_platform.games.sudoku.game import sudoku_game
+from games_platform.games.sudoku_zero.game import sudoku_zero_game
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ ALL_GAMES: dict[str, GameDefinition] = {
     spellsprawl_game.slug: spellsprawl_game,
     north_south_sort_game.slug: north_south_sort_game,
     fragmentory_game.slug: fragmentory_game,
+    sudoku_zero_game.slug: sudoku_zero_game,
 }
 
 

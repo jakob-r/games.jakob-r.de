@@ -293,6 +293,54 @@
 			filter="url(#scribble-filter)"
 		/>
 	</svg>
+{:else if slug === 'sudoku-zero'}
+	<svg
+		class={className}
+		viewBox="0 0 48 48"
+		fill="none"
+		role="img"
+		aria-hidden={titleAttr ? undefined : true}
+		aria-label={titleAttr}
+	>
+		{#if titleAttr}<title>{titleAttr}</title>{/if}
+		<!-- Empty 3×3 grid with a single clue and a big hand-drawn zero -->
+		<rect
+			x="5.5"
+			y="5.5"
+			width="37"
+			height="37"
+			rx="3"
+			stroke="#1a1917"
+			stroke-width="1.7"
+			stroke-linejoin="round"
+			filter="url(#scribble-filter)"
+		/>
+		<path
+			d="M17.2 6.2v35.5M30.8 6.5v35M6.2 17.3h35.5M6.5 30.7h35"
+			stroke="#1a1917"
+			stroke-width="1"
+			stroke-opacity="0.35"
+			stroke-linecap="round"
+			filter="url(#scribble-filter)"
+		/>
+		<ellipse
+			cx="24"
+			cy="24"
+			rx="8.5"
+			ry="12"
+			stroke="#1a1917"
+			stroke-width="2.2"
+			fill="#faf8f4"
+			filter="url(#scribble-filter)"
+		/>
+		<text
+			x="34.4"
+			y="15.2"
+			font-family="Architects Daughter, cursive"
+			font-size="9"
+			fill="#1a1917"
+		>7</text>
+	</svg>
 {:else}
 	<svg
 		class={className}

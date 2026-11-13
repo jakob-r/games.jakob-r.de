@@ -23,6 +23,7 @@
 		host_player_id: string;
 		config: {
 			difficulty?: string;
+			solo?: boolean;
 			scoring_enabled?: boolean;
 			width?: number;
 			height?: number;
@@ -158,6 +159,9 @@
 			const w = item.config?.width ?? 6;
 			const h = item.config?.height ?? 6;
 			return `${w}×${h}`;
+		}
+		if (item.game_slug === 'sudoku-zero') {
+			return item.config?.solo ? 'Solo' : '2 players';
 		}
 		if (item.game_slug === 'silbenstreit') {
 			const sz = item.config?.size ?? 5;

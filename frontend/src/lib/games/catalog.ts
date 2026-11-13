@@ -8,7 +8,8 @@ export type GameSlug =
 	| 'emoji-charades'
 	| 'spellsprawl'
 	| 'north-south-sort'
-	| 'fragmentory';
+	| 'fragmentory'
+	| 'sudoku-zero';
 
 export interface GameInfo {
 	slug: GameSlug;
@@ -139,6 +140,18 @@ export const GAMES: GameInfo[] = [
 		boxSeed: 63,
 		defaultConfig: {},
 		createLabel: 'New Fragmentory →'
+	},
+	{
+		slug: 'sudoku-zero',
+		title: 'Sudoku Zero',
+		tagline: 'Start from an empty grid and build a unique Sudoku with as few clues as possible.',
+		description:
+			'Sudoku from scratch. Place numbers on an empty 9×9 grid until exactly one solution remains — a live counter shows how many are left. Every clue that cuts the count scores, and finishing with few clues pays big: 17 clues, the theoretical minimum, earns 1000 points. A clue that leaves no solution costs 50. Play solo or take turns with a friend.',
+		playersLabel: '1–2',
+		playersAria: '1 or 2 players',
+		boxSeed: 69,
+		defaultConfig: { solo: false, scoring_enabled: true },
+		createLabel: 'New Sudoku Zero →'
 	}
 ];
 
