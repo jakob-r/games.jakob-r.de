@@ -283,15 +283,25 @@ Clarifications:
 Sudoku from scratch: start with an empty grid and create a puzzle with exactly one solution.
 
 - Goal: Place as few clues as possible on a standard 9×9 Sudoku board until only one valid completed grid remains.
-- Player-created puzzle: There is no predetermined hidden solution. Each committed number constrains the set of possible completions.
-- Standard Sudoku rules: Every completed row, column, and 3×3 box must contain the digits 1–9 exactly once.
-- Live solution counter: Recalculate after each placement. Show exact counts up to 1,000 and display "1000+" once at least 1,001 solutions have been found.
+- Player-created puzzle: Each committed number constrains the set of possible completions.
+- Standard Sudoku rules for what are valid entries.
+- Live solution counter: After each entry calculate how many possible solutions remain. No need to calculate above 1000. Just show 1000+.
 - Automatic victory: End the round immediately when exactly one solution remains and award the full win value for the current clue count.
-- Cash out early: Players can give up at any time to secure the displayed cash-out score. This ends the round.
-- Failure penalty: If a placement leaves zero possible solutions, end the round, discard the unbanked score, and subtract 50 points from the running total. Contradictions can exist even without an obvious repeated number.
+- End early: Players can give up at any time to secure the displayed score.
+- Failure penalty: If a placement leaves zero possible solutions, end the round, subtract 50 points from the score. Contradictions can exist even without an obvious repeated number.
 - Fewer clues, higher reward: A unique puzzle with 17 clues earns the maximum 1000 points. The score declines as clues are added, reaching 0 at 80 clues. Seventeen is the theoretical minimum for a unique standard Sudoku, so it is an exceptional achievement.
-- Win formula: `round(100 × clamp((80 − clues) / 63, 0, 1)²)`. The round ends as soon as uniqueness is reached; 80 clues is a scoring baseline.
-- Cash-out formula: `floor(win value / remaining solutions)` when the exact count is between 2 and 1,000. At 1000+, cash-out value is 0. Award points once per round, rather than for every move.
-- Core tension: An effective clue reduces the remaining possibilities; a redundant clue lowers the available win value; an incompatible clue loses the round. Players weigh another attempt against banking their current score.
+- The game ends as soon as uniqueness is reached.
+- End bonus score `round(1000 × clamp((80 − clues) / 63, 0, 1)²)` is added to the score.
+- Every valid placement gives 1 point.
+- If the placement reduces the number of solutions, the player gets a bonus: `round(100 × log2(min(solutions before, 1000) / solutions after))`. A move from 1000 to 500 is worth the same as a move from 10 to 5.
 
-For two players this is round based and the score each player gets
+
+Turn based multiplayer mode:
+- Instead of ending the game, a player can pass and if both players pass, the round ends and the player with the higher score wins.
+- The end bonus score is split between the two players.
+- A wrong clue is rejected and the player gets a penalty of 50 points.
+- If both players consecutively place a wrong clue, the round ends and the player with the higher score wins.
+- It's not possible to join a solo player round.
+
+Technical notes:
+- The possibility count happens on the client side to keep server load low.
